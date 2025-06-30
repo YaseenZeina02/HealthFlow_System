@@ -1,0 +1,50 @@
+.bg-color-1{
+    -fx-background-color: linear-gradient(to bottom right, #188ba7, #306090);
+}
+.bg-color-2 {
+    -fx-background-color: #ffffff;
+}
+.input-field {
+    -fx-prompt-text-fill: #999;
+    -fx-background-radius: 5px;
+}
+.btn{
+    -fx-background-color: linear-gradient(to bottom right, #188ba7, #306090);
+    -fx-text-fill: #fff;
+}
+.btn:hover{
+    -fx-background-color: #306090;
+}
+
+.radius{
+    -fx-background-radius: 5px;
+}
+.shadow{
+    -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.5), 5,0,0,0);
+}
+.label-color-1 {
+    -fx-background-color: transparent;  /* خلفية شفافة */
+    -fx-text-fill: #456a94;             /* لون النص الأزرق */
+    -fx-font-style: italic;             /* نص مائل */
+    -fx-font-weight: bold;              /* نص غامق */
+    -fx-font-family: "Arial";          /* نوع الخط */
+}
+.label-color-1:hover{
+    -fx-text-fill: #000000;
+}
+.label-line {
+    -fx-underline: true;
+}
+.checkbox {
+    -fx-text-fill: #188ba7;
+}
+.health-image {
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  transition: transform 0.3s;
+  filter: drop-shadow(2px 4px 6px #1a73e855);
+}
+.health-image:hover {
+  transform: scale(1.02);
+  filter: brightness(1.05);
+}
