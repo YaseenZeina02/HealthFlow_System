@@ -9,10 +9,8 @@ import java.util.Objects;
 
 public class Navigation {
     public final String Login_Fxml = "Login.fxml";
-    /*
-    public final String Doctor_Fxml = "Doctor.fxml";
     public final String Reception_Fxml = "Reception.fxml";
-*/
+    //public final String Doctor_Fxml = "Doctor.fxml";
     public void navigateToSameStage(Parent currentRoot, String fxmlPath) {
         try {
             Parent newRoot = FXMLLoader.load(Objects.requireNonNull(getClass().getResource(fxmlPath)));

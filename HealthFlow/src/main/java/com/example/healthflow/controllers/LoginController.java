@@ -124,7 +124,7 @@ public class LoginController {
                 currentStage.close();  // إغلاق نافذة تسجيل الدخول الحالية
                 switch (username) {
                     case "Recep":
-                      //  navigation.navigateTo(new Stage(), navigation.Reception_Fxml);
+                        navigation.navigateTo(new Stage(), navigation.Reception_Fxml);
                         break;
                     case "Doctor":
                        // navigation.navigateTo(new Stage(), navigation.Doctor_Fxml);
