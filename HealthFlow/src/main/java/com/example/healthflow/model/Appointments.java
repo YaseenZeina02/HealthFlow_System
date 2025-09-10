@@ -22,6 +22,7 @@ public class Appointments {
         this.time = time;
         this.notes = notes;
         this.status = status;
+
     }
 
     public int getAppointmentId() {

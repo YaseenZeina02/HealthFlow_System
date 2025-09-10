@@ -47,4 +47,5 @@
 .health-image:hover {
   transform: scale(1.02);
   filter: brightness(1.05);
+
 }

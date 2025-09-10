@@ -17,6 +17,7 @@ public class Patients {
         this.dateOfBirth = dateOfBirth;
         this.mobile = mobile;
         this.address = address;
+
     }
 
     public int getPatientId() {

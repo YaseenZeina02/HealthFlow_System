@@ -25,6 +25,7 @@ public class Users {
         this.address = address;
         this.role = role;
         this.specialty = specialty;
+
     }
 
     public int getUserId() {

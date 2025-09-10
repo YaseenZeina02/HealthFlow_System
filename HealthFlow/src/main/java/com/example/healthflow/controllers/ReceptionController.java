@@ -146,6 +146,7 @@ public class ReceptionController {
         alert.setHeaderText(null);
         alert.setContentText(message);
         alert.showAndWait();
+
     }
 
 }

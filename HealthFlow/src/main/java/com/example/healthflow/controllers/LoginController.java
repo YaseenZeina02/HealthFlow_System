@@ -127,10 +127,10 @@ public class LoginController {
                         navigation.navigateTo(new Stage(), navigation.Reception_Fxml);
                         break;
                     case "Doctor":
-                       // navigation.navigateTo(new Stage(), navigation.Doctor_Fxml);
+//                        navigation.navigateTo(new Stage(), navigation.Doctor_Fxml);
                         break;
                     case "Pharmacist":
-                        // navigation.navigateTo(new Stage(), navigation.Pharmacy_Fxml);
+//                         navigation.navigateTo(new Stage(), navigation.Pharmacy_Fxml);
                         break;
                     case "Admin":
                         // navigation.navigateTo(new Stage(), navigation.Admin_Fxml);

@@ -35,6 +35,7 @@ public class Navigation {
             stage.show();
         } catch (IOException e) {
             e.printStackTrace();
+
         }
     }
 
