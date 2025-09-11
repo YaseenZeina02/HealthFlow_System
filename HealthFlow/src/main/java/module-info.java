@@ -1,10 +1,17 @@
 module com.example.healthflow {
     requires javafx.controls;
     requires javafx.fxml;
-    // افتح حزمة الـ controllers لـ JavaFX FXML
+    requires com.zaxxer.hikari;
+    requires java.sql;
+    requires org.postgresql.jdbc;
+    requires org.slf4j;
+    requires org.slf4j.simple;
+
+    // Open controllers package for JavaFX FXML
     opens com.example.healthflow.controllers to javafx.fxml;
 
-    // صدّر الحزم التي تحتوي على الكلاسات العامة
+    // Export packages containing public classes
     opens com.example.healthflow to javafx.fxml;
     exports com.example.healthflow;
+    exports com.example.healthflow.controllers;
 }

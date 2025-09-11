@@ -1,69 +1,151 @@
-.bg-color-1{
+/* backgrounds */
+.bg-color-1 {
     -fx-background-color: linear-gradient(to bottom right, #188ba7, #306090);
 }
-.white-bg{
-    -fx-background-color: #ffffff;
+.white-bg {
+    -fx-background-color: #ffffff;        /* 6-digit hex */
 }
-.border-top{
-    -fx-border-color: #000;
-    -fx-boarder-width: 0.5px 0.4px;
+
+/* top border only */
+.border-top {
+    /* typo fix: -fx-border-width (not boarder) */
+    /* set only TOP border: width = top right bottom left */
+    -fx-border-width: 1px 0 0 0;
+    -fx-border-color: #000000 transparent transparent transparent;
 }
-.header-top{
-    -fx-border-color: linear-gradient(to bottom right, #188ba7, #306090);
-    -fx-border-width: 0 0 0 2px;
+
+/* left-colored header stripe */
+.header-top {
+    -fx-border-width: 0 0 0 2px;          /* only LEFT border */
+    -fx-border-color: transparent transparent transparent
+    linear-gradient(to bottom right, #188ba7, #306090);
     -fx-padding: 0 0 0 5px;
 }
-.radius{
-    -fx-background-radius: 5px;
-}
-.shadow{
-    -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.5), 5,0,0,0);
-}
-.btn-1{
-    -fx-background-color:transparent;
-    -fx-text-fill: #fff;
+
+/* helpers */
+.radius { -fx-background-radius: 5px; }
+.shadow { -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.5), 5, 0, 0, 0); }
+
+/* buttons */
+.btn-1 {
+    -fx-background-color: transparent;
+    -fx-text-fill: #ffffff;                /* was #fff */
     -fx-font-size: 13px;
-    -fx-font-family: Arial;
-    -fx-border-color: #fff;
-    -fx-border-width:0.5px;
+    -fx-font-family: "Arial";
+    -fx-border-color: #ffffff;             /* was #fff */
+    -fx-border-width: 0.5 px;
     -fx-cursor: hand;
 }
-.btn-1:hover{
-    -fx-background-color: #fff;
-    -fx-text-fill: #000;
-}
-.btn-2{
-    -fx-background-color: linear-gradient(to bottom right, #188ba7, #306090);
-    -fx-text-fill: #fff;
-    -fx-font-size: 13px;
-    -fx-font-family: Arial;
-    -fx-cursor: hand;
-}
-.btn-2:hover{
-    -fx-background-color: #306090;
+.btn-1:hover {
+    -fx-background-color: #ffffff;
+    -fx-text-fill: #000000;
 }
 
-.text-gradient {
-    -fx-fill: linear-gradient(to bottom right, #188ba7, #306090); /* تطبيق التدرج على النص */
-    -fx-font-size: 16px;
-    -fx-font-family: Arial;
+.btn-2 {
+    -fx-background-color: linear-gradient(to bottom right, #188ba7, #306090);
+    -fx-text-fill: #ffffff;
+    -fx-font-size: 13px;
+    -fx-font-family: "Arial";
+    -fx-cursor: hand;
 }
-.table-view{
+.btn-2:hover { -fx-background-color: #306090; }
+
+/* gradient text (use with Text nodes, not Label) */
+.text-gradient {
+    -fx-fill: linear-gradient(to bottom right, #188ba7, #306090);
+    -fx-font-size: 16px;
+    -fx-font-family: "Arial";
+}
+
+/* table view styling */
+.table-view {
     -fx-padding: 0;
     -fx-border-radius: 8px;
+    -fx-background-insets: 0;
     -fx-border-color: linear-gradient(to bottom right, #188ba7, #306090);
 }
-.table-view .column-header-background{
+.table-view .column-header-background {
     -fx-background-color: linear-gradient(to bottom right, #188ba7, #306090);
-    -fx-background-insets: 0 0 0 0;
+    -fx-background-insets: 0;
     -fx-background-radius: 8px 8px 0 0;
 }
-.table-view .column-header, .filter{
+.table-view .column-header,
+.table-view .filter {                     /* scoped .filter under table-view */
     -fx-size: 40px;
-    -fx-background-color:transparent;
+    -fx-background-color: transparent;
 }
-.table-view .column-header .label{
+.table-view .column-header .label {
     -fx-text-fill: #ffffff;
-    -fx-font-family: Arial;
-
+    -fx-font-family: "Arial";
 }
+
+
+/*.bg-color-1{*/
+/*    -fx-background-color: linear-gradient(to bottom right, #188ba7, #306090);*/
+/*}*/
+/*.white-bg{*/
+/*    -fx-background-color: #ffffff;*/
+/*}*/
+/*.border-top{*/
+/*    -fx-border-color: #000;*/
+/*    -fx-boarder-width: 0.5px 0.4px;*/
+/*}*/
+/*.header-top{*/
+/*    -fx-border-color: linear-gradient(to bottom right, #188ba7, #306090);*/
+/*    -fx-border-width: 0 0 0 2px;*/
+/*    -fx-padding: 0 0 0 5px;*/
+/*}*/
+/*.radius{*/
+/*    -fx-background-radius: 5px;*/
+/*}*/
+/*.shadow{*/
+/*    -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.5), 5,0,0,0);*/
+/*}*/
+/*.btn-1{*/
+/*    -fx-background-color:transparent;*/
+/*    -fx-text-fill: #fff;*/
+/*    -fx-font-size: 13px;*/
+/*    -fx-font-family: Arial;*/
+/*    -fx-border-color: #fff;*/
+/*    -fx-border-width:0.5px;*/
+/*    -fx-cursor: hand;*/
+/*}*/
+/*.btn-1:hover{*/
+/*    -fx-background-color: #fff;*/
+/*    -fx-text-fill: #000;*/
+/*}*/
+/*.btn-2{*/
+/*    -fx-background-color: linear-gradient(to bottom right, #188ba7, #306090);*/
+/*    -fx-text-fill: #fff;*/
+/*    -fx-font-size: 13px;*/
+/*    -fx-font-family: Arial;*/
+/*    -fx-cursor: hand;*/
+/*}*/
+/*.btn-2:hover{*/
+/*    -fx-background-color: #306090;*/
+/*}*/
+
+/*.text-gradient {*/
+/*    -fx-fill: linear-gradient(to bottom right, #188ba7, #306090); !* تطبيق التدرج على النص *!*/
+/*    -fx-font-size: 16px;*/
+/*    -fx-font-family: Arial;*/
+/*}*/
+/*.table-view{*/
+/*    -fx-padding: 0;*/
+/*    -fx-border-radius: 8px;*/
+/*    -fx-border-color: linear-gradient(to bottom right, #188ba7, #306090);*/
+/*}*/
+/*.table-view .column-header-background{*/
+/*    -fx-background-color: linear-gradient(to bottom right, #188ba7, #306090);*/
+/*    -fx-background-insets: 0 0 0 0;*/
+/*    -fx-background-radius: 8px 8px 0 0;*/
+/*}*/
+/*.table-view .column-header, .filter{*/
+/*    -fx-size: 40px;*/
+/*    -fx-background-color:transparent;*/
+/*}*/
+/*.table-view .column-header .label{*/
+/*    -fx-text-fill: #ffffff;*/
+/*    -fx-font-family: Arial;*/
+
+/*}*/
