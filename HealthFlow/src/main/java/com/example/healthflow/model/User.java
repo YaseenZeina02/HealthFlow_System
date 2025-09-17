@@ -33,6 +33,18 @@ public class User {
         this.updatedAt = updatedAt;
     }
 
+//    public User(Object o, String nationalId, String fullName, String email, String hash, String role) {
+//    }
+    public User(Long id, String nationalId, String fullName, String email,
+                String passwordHash, String role) {
+        this.id = id;
+        this.nationalId = nationalId;
+        this.fullName = fullName;
+        this.email = email;
+        this.passwordHash = passwordHash;
+        this.role = role;
+    }
+
     // Getters & Setters
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }

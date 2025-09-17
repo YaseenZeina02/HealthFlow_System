@@ -6,6 +6,7 @@ module com.example.healthflow {
     requires org.postgresql.jdbc;
     requires org.slf4j;
     requires org.slf4j.simple;
+    requires jbcrypt;
 
     // Open controllers package for JavaFX FXML
     opens com.example.healthflow.controllers to javafx.fxml;
