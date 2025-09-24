@@ -18,7 +18,8 @@ import org.mindrot.jbcrypt.BCrypt;
 import java.sql.SQLException;
 import java.time.Duration;
 import java.time.LocalDate;
-
+//بيانات تجريبية صالحة:
+//maya.recep@healthflow.com   $2a$10$hash
 public class App extends Application {
 
     private final ConnectivityMonitor monitor = new ConnectivityMonitor(

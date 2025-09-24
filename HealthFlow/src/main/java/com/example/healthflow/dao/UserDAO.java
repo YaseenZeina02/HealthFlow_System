@@ -1,6 +1,7 @@
 package com.example.healthflow.dao;
 
 import com.example.healthflow.db.Database;
+import com.example.healthflow.model.Role;
 import com.example.healthflow.model.User;
 
 import java.sql.*;
@@ -22,10 +23,11 @@ public class UserDAO {
         validateUserFields(u);
 
         final String sql = """
-            INSERT INTO users (national_id, full_name, email, password, role, phone)
-            VALUES (?,?,?,?,?,?)
-            RETURNING id, created_at, updated_at
-            """;
+                            INSERT INTO users (national_id, full_name, email, password_hash, role, phone)
+                            VALUES (?,?,?,?,?,?)
+                            RETURNING id, created_at, updated_at
+                            """;
+
         try (Connection c = Database.get();
              PreparedStatement ps = c.prepareStatement(sql)) {
 
@@ -33,7 +35,7 @@ public class UserDAO {
             ps.setString(2, u.getFullName());
             ps.setString(3, u.getEmail());
             ps.setString(4, u.getPasswordHash()); // Maps to 'password' column in DB
-            ps.setString(5, u.getRole());
+            ps.setString(5, u.getRole().name()); // ADMIN/DOCTOR/...
             ps.setString(6, u.getPhone());
 
             try (ResultSet rs = ps.executeQuery()) {
@@ -137,7 +139,7 @@ public class UserDAO {
     public boolean updatePassword(Long userId, String newPasswordHash) throws SQLException {
         final String sql = """
             UPDATE users
-               SET password = ?, updated_at = NOW()
+               SET password_hash = ?, updated_at = NOW()
              WHERE id = ?
             """;
         try (Connection c = Database.get();
@@ -149,7 +151,7 @@ public class UserDAO {
     }
 
     /** List users by role with simple pagination. */
-    public List<User> listByRole(String role, int limit, int offset) throws SQLException {
+    public List<User> listByRole(Role role, int limit, int offset) throws SQLException {
         final String sql = """
             SELECT * FROM users
              WHERE role = ?
@@ -158,7 +160,7 @@ public class UserDAO {
             """;
         try (Connection c = Database.get();
              PreparedStatement ps = c.prepareStatement(sql)) {
-            ps.setString(1, role);
+            ps.setString(1, role.name());
             ps.setInt(2, Math.max(1, limit));
             ps.setInt(3, Math.max(0, offset));
             try (ResultSet rs = ps.executeQuery()) {
@@ -177,8 +179,11 @@ public class UserDAO {
         u.setNationalId(rs.getString("national_id"));
         u.setFullName(rs.getString("full_name"));
         u.setEmail(rs.getString("email"));
-        u.setPasswordHash(rs.getString("password")); // DB column 'password' maps to passwordHash field
-        u.setRole(rs.getString("role"));
+        u.setPasswordHash(rs.getString("password_hash"));
+        String dbRole = rs.getString("role");
+        if (dbRole != null) {
+            u.setRole(Role.fromString(dbRole)); // يحوّل النص إلى enum بأمان
+        }
         u.setPhone(rs.getString("phone"));
         u.setActive(rs.getBoolean("is_active"));
         u.setLastLogin(rs.getObject("last_login", OffsetDateTime.class));
@@ -196,20 +201,19 @@ public class UserDAO {
         if (u == null) {
             throw new IllegalArgumentException("User cannot be null");
         }
+        if (u.getEmail() == null || u.getEmail().isBlank())
+            throw new IllegalArgumentException("Email is required");
+        if (u.getPasswordHash() == null || u.getPasswordHash().isBlank())
+            throw new IllegalArgumentException("Password hash is required");
+        if (u.getRole() == null)
+            throw new IllegalArgumentException("Role is required");
 
+        // Trigger validation from setters
+        u.setEmail(u.getEmail()); // Trigger validation
         // These setter methods will throw IllegalArgumentException if validation fails
         if (u.getNationalId() != null) {
             u.setNationalId(u.getNationalId()); // Trigger validation
         }
-
-        if (u.getEmail() != null) {
-            u.setEmail(u.getEmail()); // Trigger validation
-        }
-
-        if (u.getRole() != null) {
-            u.setRole(u.getRole()); // Trigger validation
-        }
-
         if (u.getPhone() != null) {
             u.setPhone(u.getPhone()); // Trigger validation
         }

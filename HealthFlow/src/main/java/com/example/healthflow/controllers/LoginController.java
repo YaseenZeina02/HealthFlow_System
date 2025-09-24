@@ -14,17 +14,27 @@ import javafx.scene.layout.Pane;
 import javafx.scene.layout.StackPane;
 import javafx.stage.Stage;
 import javafx.util.Duration;
-
+import org.mindrot.jbcrypt.BCrypt;
 import java.util.Map;
 
-public class LoginController {
+import com.example.healthflow.dao.UserDAO;
+import com.example.healthflow.model.User;
+import com.example.healthflow.model.Role;
 
+public class LoginController {
+    private final UserDAO userDao = new UserDAO();
     // ====== injected from FXML (ids must match Login.fxml) ======
     @FXML private TextField UserNameTextField;
     @FXML private PasswordField PasswordTextField;
     @FXML private CheckBox ShowPasswordCheckBox;
     @FXML private AnchorPane rootPane;
     @FXML private Button LoginButton;    // fx:id="LoginButton" موجود في FXML
+
+    private String getPasswordValue() {
+        return ShowPasswordCheckBox.isSelected()
+                ? visiblePasswordField.getText()
+                : PasswordTextField.getText();
+    }
 
     // ====== existing app classes ======
     private final Navigation navigation = new Navigation();
@@ -87,16 +97,21 @@ public class LoginController {
             // OnlineBindings.disableWhenOffline(monitor, UserNameTextField, PasswordTextField);
         }
     }
-
-    private boolean isValidUser(String username, String password) {
-        Map<String, String> users = Map.of(
-                "Admin", "123",
-                "Recep", "123",
-                "Doctor", "123",
-                "Pharmacist", "123"
-        );
-        return users.containsKey(username) && users.get(username).equals(password);
+    /** يرجع المستخدم عند نجاح التحقق، وإلا null */
+    private User authenticate(String email, String plainPassword) throws Exception {
+        User u = userDao.findByEmail(email == null ? null : email.trim().toLowerCase());
+        if (u == null || !u.isActive()) return null;
+        // مقارنة نصية مباشرة (مؤقتًا فقط)
+        return java.util.Objects.equals(plainPassword, u.getPasswordHash()) ? u : null;
     }
+    // نفس الدالة ولكن ببيانات مشفرة وليست نصوص عادية
+    /*
+    private User authenticate(String email, String plainPassword) throws Exception {
+        User u = userDao.findByEmail(email == null ? null : email.trim().toLowerCase());
+        if (u == null || !u.isActive()) return null;
+        return BCrypt.checkpw(plainPassword, u.getPasswordHash()) ? u : null;
+    }
+*/
 
     private void showAlert(String title, String message) {
         Alert alert = new Alert(Alert.AlertType.ERROR);
@@ -105,7 +120,6 @@ public class LoginController {
         alert.setContentText(message);
         alert.showAndWait();
     }
-
     @FXML
     public void LoginAction() {
         try {
@@ -133,24 +147,27 @@ public class LoginController {
                 return;
             }
 
-            if (isValidUser(username, password)) {
+            // ✅ التحقق الحقيقي من قاعدة البيانات
+            User user = authenticate(username, password);
+            if (user != null) {
                 Stage currentStage = (Stage) rootPane.getScene().getWindow();
                 currentStage.close();
-                switch (username) {
-                    case "Recep":
-                        navigation.navigateTo(new Stage(), navigation.Reception_Fxml);
-                        break;
-                    case "Doctor":
-                        // navigation.navigateTo(new Stage(), navigation.Doctor_Fxml);
-                        break;
-                    case "Pharmacist":
-                        // navigation.navigateTo(new Stage(), navigation.Pharmacy_Fxml);
-                        break;
-                    case "Admin":
-                         navigation.navigateTo(new Stage(), navigation.Admin_Fxml);
-                        break;
+
+                // ✅ التنقّل حسب الدور (enum)
+                Role r = user.getRole();
+                if (r == Role.RECEPTIONIST) {
+                    navigation.navigateTo(new Stage(), navigation.Reception_Fxml);
+                } else if (r == Role.DOCTOR) {
+                    // navigation.navigateTo(new Stage(), navigation.Doctor_Fxml);
+                } else if (r == Role.PHARMACIST) {
+                    // navigation.navigateTo(new Stage(), navigation.Pharmacy_Fxml);
+                } else if (r == Role.ADMIN) {
+                    navigation.navigateTo(new Stage(), navigation.Admin_Fxml);
+                } else if (r == Role.PATIENT) {
+                    showAlert("Access Restricted", "Patient portal is not available in this version.");
                 }
-                // نجاح: صفّر حالة الـ pending
+
+                // صفّر حالة pending
                 pendingLogin = false;
                 lastTriedUser = null;
                 lastTriedPass = null;
@@ -227,147 +244,3 @@ public class LoginController {
         ft.play();
     }
 }
-
-
-//package com.example.healthflow.controllers;
-//
-//import com.example.healthflow.net.ConnectivityMonitor;
-//import com.example.healthflow.ui.OnlineBindings;
-//import javafx.fxml.FXML;
-//import javafx.scene.control.*;
-//import javafx.scene.layout.AnchorPane;
-//import javafx.scene.layout.Pane;
-//import javafx.stage.Stage;
-//
-//import java.util.Map;
-//
-//public class LoginController {
-//
-//    // ====== injected from FXML (ids must match Login.fxml) ======
-//    @FXML private TextField UserNameTextField;
-//    @FXML private PasswordField PasswordTextField;
-//    @FXML private CheckBox ShowPasswordCheckBox;
-//    @FXML private AnchorPane rootPane;
-//    @FXML private Button LoginButton;    // <== make sure fx:id="LoginButton" exists (it does in your FXML)
-//
-//    // ====== existing app classes ======
-//    private final Navigation navigation = new Navigation();
-//
-//    // show-password helper field
-//    private final TextField visiblePasswordField = new TextField();
-//
-//    // ====== NEW: connectivity ======
-//    private final ConnectivityMonitor monitor;   // injected via constructor
-//
-//    // App will construct this controller and pass the monitor
-//    public LoginController(ConnectivityMonitor monitor) {
-//        this.monitor = monitor;
-//    }
-//
-//    @FXML
-//    private void initialize() {
-//        // ----- your show/hide password setup (unchanged) -----
-//        visiblePasswordField.setLayoutX(PasswordTextField.getLayoutX());
-//        visiblePasswordField.setLayoutY(PasswordTextField.getLayoutY());
-//        visiblePasswordField.setPrefWidth(PasswordTextField.getPrefWidth());
-//        visiblePasswordField.setPrefHeight(PasswordTextField.getPrefHeight());
-//        visiblePasswordField.setFont(PasswordTextField.getFont());
-//        visiblePasswordField.setStyle(PasswordTextField.getStyle());
-//        visiblePasswordField.setPromptText(PasswordTextField.getPromptText());
-//
-//        Pane parent = (Pane) PasswordTextField.getParent();
-//        parent.getChildren().add(visiblePasswordField);
-//
-//        visiblePasswordField.setVisible(false);
-//        visiblePasswordField.setManaged(false);
-//
-//        ShowPasswordCheckBox.selectedProperty().addListener((obs, wasSelected, isNowSelected) -> {
-//            if (isNowSelected) {
-//                visiblePasswordField.setText(PasswordTextField.getText());
-//                visiblePasswordField.setVisible(true);
-//                visiblePasswordField.setManaged(true);
-//                PasswordTextField.setVisible(false);
-//                PasswordTextField.setManaged(false);
-//            } else {
-//                PasswordTextField.setText(visiblePasswordField.getText());
-//                PasswordTextField.setVisible(true);
-//                PasswordTextField.setManaged(true);
-//                visiblePasswordField.setVisible(false);
-//                visiblePasswordField.setManaged(false);
-//            }
-//        });
-//
-//        // ----- NEW: bind UI to online state -----
-//        if (monitor != null && LoginButton != null) {
-//            OnlineBindings.disableWhenOffline(monitor, LoginButton);
-//            // (optional) also disable typing while offline:
-//            // OnlineBindings.disableWhenOffline(monitor, UserNameTextField, PasswordTextField);
-//        }
-//    }
-//
-//    private boolean isValidUser(String username, String password) {
-//        Map<String, String> users = Map.of(
-//                "Admin", "123",
-//                "Recep", "123",
-//                "Doctor", "123",
-//                "Pharmacist", "123"
-//        );
-//        return users.containsKey(username) && users.get(username).equals(password);
-//    }
-//
-//    private void showAlert(String title, String message) {
-//        Alert alert = new Alert(Alert.AlertType.ERROR);
-//        alert.setTitle(title);
-//        alert.setHeaderText(null);
-//        alert.setContentText(message);
-//        alert.showAndWait();
-//    }
-//
-//    @FXML
-//    public void LoginAction() {
-//        try {
-//            // NEW: block immediately if offline
-//            if (monitor != null && !monitor.isOnline()) {
-//                showAlert("Offline", "No internet connection. Please reconnect and try again.");
-//                return;
-//            }
-//
-//            String username = UserNameTextField.getText();
-//            String password = ShowPasswordCheckBox.isSelected()
-//                    ? visiblePasswordField.getText()
-//                    : PasswordTextField.getText();
-//
-//            if (username.isEmpty()) {
-//                showAlert("Error", "Username is required.");
-//                return;
-//            } else if (password.isEmpty()) {
-//                showAlert("Error", "Password is required.");
-//                return;
-//            }
-//
-//            if (isValidUser(username, password)) {
-//                Stage currentStage = (Stage) rootPane.getScene().getWindow();
-//                currentStage.close();
-//                switch (username) {
-//                    case "Recep":
-//                        navigation.navigateTo(new Stage(), navigation.Reception_Fxml);
-//                        break;
-//                    case "Doctor":
-//                        // navigation.navigateTo(new Stage(), navigation.Doctor_Fxml);
-//                        break;
-//                    case "Pharmacist":
-//                        // navigation.navigateTo(new Stage(), navigation.Pharmacy_Fxml);
-//                        break;
-//                    case "Admin":
-//                        // navigation.navigateTo(new Stage(), navigation.Admin_Fxml);
-//                        break;
-//                }
-//            } else {
-//                showAlert("Login Failed", "Invalid credentials");
-//            }
-//        } catch (Exception e) {
-//            e.printStackTrace();
-//            showAlert("Error", "An unexpected error occurred: " + e.getMessage());
-//        }
-//    }
-//}

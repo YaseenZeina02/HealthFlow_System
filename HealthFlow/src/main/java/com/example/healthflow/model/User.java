@@ -7,7 +7,7 @@ public class User {
     private String fullName;
     private String email;
     private String passwordHash;
-    private String role;         // ADMIN, DOCTOR, RECEPTIONIST, PHARMACIST, PATIENT
+    private Role role;         // ADMIN, DOCTOR, RECEPTIONIST, PHARMACIST, PATIENT
     private String phone;
     private boolean isActive;
     private OffsetDateTime lastLogin;
@@ -17,7 +17,7 @@ public class User {
     public User() {}
 
     public User(Long id, String nationalId, String fullName, String email,
-                String passwordHash, String role, String phone,
+                String passwordHash, Role role, String phone,
                 boolean isActive, OffsetDateTime lastLogin,
                 OffsetDateTime createdAt, OffsetDateTime updatedAt) {
         this.id = id;
@@ -36,7 +36,7 @@ public class User {
 //    public User(Object o, String nationalId, String fullName, String email, String hash, String role) {
 //    }
     public User(Long id, String nationalId, String fullName, String email,
-                String passwordHash, String role) {
+                String passwordHash, Role role) {
         this.id = id;
         this.nationalId = nationalId;
         this.fullName = fullName;
@@ -61,29 +61,18 @@ public class User {
     public String getPasswordHash() { return passwordHash; }
     public void setPasswordHash(String passwordHash) { this.passwordHash = passwordHash; }
 
-    public String getRole() { return role; }
+    public Role getRole() { return role; }
 
     /**
      * Sets the user role, validating that it's one of the allowed values.
      * @param role The role to set (ADMIN, DOCTOR, RECEPTIONIST, PHARMACIST, PATIENT)
      * @throws IllegalArgumentException if the role is not valid
      */
-    public void setRole(String role) {
+    public void setRole(Role role) {
         if (role == null) {
             throw new IllegalArgumentException("Role cannot be null");
         }
-
-        String upperRole = role.toUpperCase();
-        if (!upperRole.equals("ADMIN") && 
-            !upperRole.equals("DOCTOR") && 
-            !upperRole.equals("RECEPTIONIST") && 
-            !upperRole.equals("PHARMACIST") && 
-            !upperRole.equals("PATIENT")) {
-            throw new IllegalArgumentException("Invalid role: " + role + 
-                ". Must be one of: ADMIN, DOCTOR, RECEPTIONIST, PHARMACIST, PATIENT");
-        }
-
-        this.role = upperRole; // Store in uppercase for consistency
+        this.role = role;
     }
 
     public String getPhone() { return phone; }

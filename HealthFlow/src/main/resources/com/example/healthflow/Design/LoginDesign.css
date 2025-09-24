@@ -6,10 +6,19 @@
     -fx-background-color: #ffffff;
 }
 
-/* inputs & buttons */
 .input-field {
-    -fx-prompt-text-fill: #999999;      /* was #999 */
-    -fx-background-radius: 5px;
+    -fx-background-color: #ffffff;
+    -fx-background-radius: 6;
+    -fx-border-color: #e0e0e0;     /* أفتح */
+    -fx-border-radius: 6;
+    -fx-border-width: 0.5;         /* نصف بيكسل (خفيف جدًا) */
+    -fx-padding: 6 10 6 10;
+}
+
+/* عند التركيز فقط يكون أوضح */
+.input-field:focused {
+    -fx-border-color: #3d6fa6;
+    -fx-border-width: 1.2;
 }
 .btn {
     -fx-background-color: linear-gradient(to bottom right, #188ba7, #306090);
