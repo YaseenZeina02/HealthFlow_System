@@ -1,4 +1,5 @@
 package com.example.healthflow.controllers;
 
-public class PatientController {
+public class ParientController {
+
 }

@@ -12,7 +12,7 @@ public class Navigation {
     public final String Reception_Fxml = "/com/example/healthflow/views/Reception.fxml";
     public final String Admin_Fxml = "/com/example/healthflow/views/Admin.fxml";
     public final String Doctor_Fxml = "/com/example/healthflow/views/Doctor.fxml";
-//    public final String Admin_Fxml = "/com/example/healthflow/views/Admin.fxml";
+    public final String Parient_Fxml = "/com/example/healthflow/views/Parient.fxml";
     public void navigateToSameStage(Parent currentRoot, String fxmlPath) {
         try {
             Parent newRoot = FXMLLoader.load(Objects.requireNonNull(getClass().getResource(fxmlPath)));
