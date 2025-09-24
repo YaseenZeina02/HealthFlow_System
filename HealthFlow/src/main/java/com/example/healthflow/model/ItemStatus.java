@@ -1,0 +1,10 @@
+package com.example.healthflow.model;
+
+public enum ItemStatus {
+    PENDING, PARTIAL, DISPENSED, CANCELLED;
+
+    public static ItemStatus fromString(String v) {
+        if (v == null) throw new IllegalArgumentException("status is null");
+        return ItemStatus.valueOf(v.trim().toUpperCase());
+    }
+}
