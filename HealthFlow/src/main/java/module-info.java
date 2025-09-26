@@ -10,6 +10,11 @@ module com.example.healthflow {
     requires java.net.http;
     requires java.desktop;
 
+    // Ikonli
+    requires org.kordamp.ikonli.javafx;
+    requires org.kordamp.ikonli.fontawesome5;
+
+
     // Open controllers package for JavaFX FXML
     opens com.example.healthflow.controllers to javafx.fxml;
 
