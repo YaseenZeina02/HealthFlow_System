@@ -1,14 +1,20 @@
 package com.example.healthflow.controllers;
 import com.example.healthflow.controllers.Navigation;
+import com.example.healthflow.net.ConnectivityMonitor;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.fxml.FXML;
+import javafx.fxml.FXMLLoader;
+import javafx.scene.Parent;
+import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.layout.AnchorPane;
 import javafx.stage.Stage;
 import javafx.scene.control.DatePicker;
 import javafx.util.StringConverter;
 
+import java.io.IOException;
+import java.time.Duration;
 import java.time.LocalDate;
 
 public class ReceptionController {
@@ -53,6 +59,7 @@ public class ReceptionController {
 
     @FXML
     private void initialize() {
+
 
         // ربط الزر بفتح الواجهة الرئيسية
         DachboardButton.setOnAction(e -> showDashboardPane());
@@ -126,24 +133,48 @@ public class ReceptionController {
         return id.matches("\\d{9}");
     }
 */
+//    @FXML
+//    private void BackAction(){
+////         الحصول على الـ Stage الحالي من الـ Scene
+////        Stage currentStage = (Stage) DashboardAnchorPane.getScene().getWindow();  // الحصول على الـ Stage الحالي
+////
+////        // إغلاق نافذة الاستقبال الحالية
+////        currentStage.close();
+////        // فتح نافذة تسجيل الدخول باستخدام نفس الـ Stage
+////        // منع تغيير الحجم في Stage تسجيل الدخول
+////        Stage loginStage = new Stage(); // Stage جديد لواجهة تسجيل الدخول
+////        navigation.navigateTo(loginStage, navigation.Login_Fxml);  // استخدام نفس الـ Stage ولكن فتح نافذة تسجيل الدخول
+////        // منع تغيير حجم نافذة تسجيل الدخول
+////        loginStage.setResizable(false);
+////        loginStage.show();  // عرض نافذة تسجيل الدخول
+//        Stage stage = (Stage) BackButton.getScene().getWindow(); // لو عندك المتغير BackButton
+//        Navigation navigation = new Navigation();
+//        navigation.navigateTo(stage, navigation.Login_Fxml);
+//        stage.setResizable(false);
+//        // لا داعي لـ stage.show() إذا كان ظاهر أصلاً، لكن لا تضر
+//        stage.show();
+//
+//
+//    }
+
     @FXML
-    private void BackAction(){
-        // الحصول على الـ Stage الحالي من الـ Scene
-        Stage currentStage = (Stage) DashboardAnchorPane.getScene().getWindow();  // الحصول على الـ Stage الحالي
+    private void BackAction() {
+        Stage stage = (Stage) BackButton.getScene().getWindow();
 
-        // إغلاق نافذة الاستقبال الحالية
-        currentStage.close();
+        try {
+            FXMLLoader loader = new FXMLLoader(getClass().getResource(new Navigation().Login_Fxml));
+            loader.setControllerFactory(type ->
+                    type == LoginController.class ? new LoginController(new ConnectivityMonitor()) : null
+            );
+            Parent root = loader.load();
 
-        // فتح نافذة تسجيل الدخول باستخدام نفس الـ Stage
-        // منع تغيير الحجم في Stage تسجيل الدخول
-        Stage loginStage = new Stage(); // Stage جديد لواجهة تسجيل الدخول
-        navigation.navigateTo(loginStage, navigation.Login_Fxml);  // استخدام نفس الـ Stage ولكن فتح نافذة تسجيل الدخول
-
-        // منع تغيير حجم نافذة تسجيل الدخول
-        loginStage.setResizable(false);
-        loginStage.show();  // عرض نافذة تسجيل الدخول
+            stage.setScene(new Scene(root));
+            stage.setResizable(false);
+            stage.show();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
-
 
     private void showAlert(String title, String message) {
         Alert alert = new Alert(Alert.AlertType.ERROR);

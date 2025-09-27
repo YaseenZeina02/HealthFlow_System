@@ -132,6 +132,7 @@
                                                         <String fx:value="bg-color-1" />
                                                         <String fx:value="shadow" />
                                                         <String fx:value="radius" />
+                                          <String fx:value="contain1" />
                                                     </styleClass>
                                                     <children>
                                                         <Label fx:id="TotalDoctors" alignment="TOP_CENTER" contentDisplay="CENTER" layoutX="45.0" layoutY="14.0" prefHeight="20.0" prefWidth="140.0" text="Active Doctors" textFill="WHITE" textOverrun="CENTER_ELLIPSIS">

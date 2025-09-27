@@ -8,6 +8,8 @@ import javafx.fxml.FXML;
 import javafx.geometry.Insets;
 import javafx.scene.Node;
 import javafx.scene.control.*;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyEvent;
 import javafx.scene.layout.AnchorPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Pane;
@@ -16,12 +18,17 @@ import javafx.stage.Stage;
 import javafx.util.Duration;
 import org.mindrot.jbcrypt.BCrypt;
 import java.util.Map;
+import java.util.Objects;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyEvent;
 
 import com.example.healthflow.dao.UserDAO;
 import com.example.healthflow.model.User;
 import com.example.healthflow.model.Role;
 
 public class LoginController {
+
+
     private final UserDAO userDao = new UserDAO();
     // ====== injected from FXML (ids must match Login.fxml) ======
     @FXML private TextField UserNameTextField;
@@ -29,6 +36,7 @@ public class LoginController {
     @FXML private CheckBox ShowPasswordCheckBox;
     @FXML private AnchorPane rootPane;
     @FXML private Button LoginButton;    // fx:id="LoginButton" موجود في FXML
+
 
     private String getPasswordValue() {
         return ShowPasswordCheckBox.isSelected()
@@ -102,7 +110,7 @@ public class LoginController {
         User u = userDao.findByEmail(email == null ? null : email.trim().toLowerCase());
         if (u == null || !u.isActive()) return null;
         // مقارنة نصية مباشرة (مؤقتًا فقط)
-        return java.util.Objects.equals(plainPassword, u.getPasswordHash()) ? u : null;
+        return Objects.equals(plainPassword, u.getPasswordHash()) ? u : null;
     }
     // نفس الدالة ولكن ببيانات مشفرة وليست نصوص عادية
     /*
@@ -242,5 +250,11 @@ public class LoginController {
             overlay = null;
         });
         ft.play();
+    }
+
+    public void handleEnterKey(KeyEvent keyEvent) {
+        if (keyEvent.getCode() == KeyCode.ENTER) {
+            LoginAction();  // نفس الميثود تبعت زر تسجيل الدخول
+        }
     }
 }

@@ -31,23 +31,25 @@
                                 <Font name="System Bold Italic" size="12.0" />
                             </font>
                         </Label>
-                        <TextField fx:id="UserNameTextField" layoutX="104.0" layoutY="190.0" prefHeight="30.0" prefWidth="294.0" promptText="Enter user name" styleClass="input-field" stylesheets="@../Design/LoginDesign.css" />
+                        <TextField fx:id="UserNameTextField"  onKeyPressed="#handleEnterKey" layoutX="104.0" layoutY="190.0" prefHeight="30.0" prefWidth="294.0" promptText="Enter user name" styleClass="input-field" stylesheets="@../Design/LoginDesign.css" />
                         <Label layoutX="104.0" layoutY="233.0" prefHeight="10.0" prefWidth="70.0" styleClass="label-color-1" stylesheets="@../Design/LoginDesign.css" text="Password" textFill="#4a90e2">
                             <font>
                                 <Font name="System Bold Italic" size="12.0" />
                             </font>
                         </Label>
-                        <PasswordField fx:id="PasswordTextField" layoutX="104.0" layoutY="253.0" prefHeight="30.0" prefWidth="293.0" promptText="Enter Password" styleClass="input-field" stylesheets="@../Design/LoginDesign.css">
+                        <PasswordField fx:id="PasswordTextField" onKeyPressed="#handleEnterKey" layoutX="104.0" layoutY="253.0" prefHeight="30.0" prefWidth="293.0" promptText="Enter Password" styleClass="input-field" stylesheets="@../Design/LoginDesign.css">
                             <font>
                                 <Font name="System Italic" size="12.0" />
                             </font>
                         </PasswordField>
+
+
                         <CheckBox fx:id="ShowPasswordCheckBox" layoutX="104.0" layoutY="289.0" mnemonicParsing="false" opacity="0.8" prefHeight="18.0" prefWidth="105.0" text="Show Password">
                             <font>
                                 <Font name="System Italic" size="11.0" />
                             </font>
                         </CheckBox>
-                        <Button fx:id="LoginButton" layoutX="104.0" layoutY="368.0" mnemonicParsing="false" onAction="#LoginAction" prefHeight="30.0" prefWidth="293.0" styleClass="btn" stylesheets="@../Design/LoginDesign.css" text="Login" textFill="WHITE">
+                        <Button fx:id="LoginButton" layoutX="104.0" layoutY="368.0"  onKeyPressed="#handleEnterKey" mnemonicParsing="false" onAction="#LoginAction" prefHeight="30.0" prefWidth="293.0" styleClass="btn" stylesheets="@../Design/LoginDesign.css" text="Login" textFill="WHITE">
                             <font>
                                 <Font name="System Bold Italic" size="14.0" />
                             </font>

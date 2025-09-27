@@ -5,10 +5,11 @@ import javafx.scene.Scene;
 import javafx.stage.Stage;
 
 import java.io.IOException;
+import java.net.URL;
 import java.util.Objects;
 
 public class Navigation {
-    public final String Login_Fxml = "Login.fxml";
+    public final String Login_Fxml = "/com/example/healthflow/views/Login.fxml";
     public final String Reception_Fxml = "/com/example/healthflow/views/Reception.fxml";
     public final String Admin_Fxml = "/com/example/healthflow/views/Admin.fxml";
     public final String Doctor_Fxml = "/com/example/healthflow/views/Doctor.fxml";
@@ -40,6 +41,7 @@ public class Navigation {
             e.printStackTrace();
 
         }
+
     }
 
 

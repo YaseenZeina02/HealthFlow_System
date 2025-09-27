@@ -35,12 +35,18 @@
     -fx-border-color: #ffffff;             /* was #fff */
     -fx-border-width: 0.5 px;
     -fx-cursor: hand;
-    -fx-alignment: CENTER_LEFT;
+    -fx-alignment: CENTER;
 }
 .btn-1:hover {
     -fx-background-color: #ffffff;
     -fx-text-fill: #000000;
 }
+
+/*.contain1{*/
+/*    -fx-display: flex ;*/
+/*    -fx-justify-content: center;*/
+/*    -fx-align-items: center;*/
+/*}*/
 
 .btn-2 {
     -fx-background-color: linear-gradient(to bottom right, #188ba7, #306090);

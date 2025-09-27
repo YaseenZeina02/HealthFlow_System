@@ -1,6 +1,8 @@
 module com.example.healthflow {
     requires javafx.controls;
     requires javafx.fxml;
+    requires javafx.graphics;
+
     requires com.zaxxer.hikari;
     requires java.sql;
     requires org.postgresql.jdbc;
@@ -18,5 +20,5 @@ module com.example.healthflow {
     // Export packages containing public classes
     opens com.example.healthflow to javafx.fxml;
     exports com.example.healthflow;
-    exports com.example.healthflow.controllers;
+    exports com.example.healthflow.controllers to javafx.fxml;
 }
