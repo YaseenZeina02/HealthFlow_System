@@ -44,6 +44,10 @@ public class ReceptionController {
 
     @FXML private TextField AddressTextField;
 
+    @FXML
+    private TextField search;
+
+
 
     private final Navigation navigation = new Navigation();
 
@@ -90,6 +94,7 @@ public class ReceptionController {
         AppointmentsButton.setOnAction(e -> showAppointmentPane());
 
         BackButton.setOnAction(e -> BackAction());
+        GenderComboBox.setItems(FXCollections.observableArrayList(Gender.values()));
     }
 
 

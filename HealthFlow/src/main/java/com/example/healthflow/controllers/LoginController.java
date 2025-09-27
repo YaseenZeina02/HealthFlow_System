@@ -158,9 +158,9 @@ public class LoginController {
                 if (r == Role.RECEPTIONIST) {
                     navigation.navigateTo(new Stage(), navigation.Reception_Fxml);
                 } else if (r == Role.DOCTOR) {
-                    // navigation.navigateTo(new Stage(), navigation.Doctor_Fxml);
+                     navigation.navigateTo(new Stage(), navigation.Doctor_Fxml);
                 } else if (r == Role.PHARMACIST) {
-                    // navigation.navigateTo(new Stage(), navigation.Pharmacy_Fxml);
+                     navigation.navigateTo(new Stage(), navigation.Pharmacy_Fxml);
                 } else if (r == Role.ADMIN) {
                     navigation.navigateTo(new Stage(), navigation.Admin_Fxml);
                 } else if (r == Role.PATIENT) {
