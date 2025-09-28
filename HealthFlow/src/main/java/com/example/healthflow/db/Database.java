@@ -1,5 +1,5 @@
 package com.example.healthflow.db;
-import com.example.healthflow.config.DatabaseConfig;
+
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 
@@ -12,46 +12,52 @@ import java.util.Properties;
 
 public class Database {
     private static HikariDataSource ds;
-//    private static HikariDataSource dataSource;
-
 
     static {
+        init();
+    }
+
+    private static void init() {
         try (InputStream in = Database.class.getClassLoader()
                 .getResourceAsStream("application.properties")) {
+
             if (in == null) {
-                throw new RuntimeException("application.properties not found in resources!");
+                throw new RuntimeException("⚠️ application.properties not found in resources/");
             }
+
             Properties props = new Properties();
             props.load(in);
 
-            HikariConfig cfg = DatabaseConfig.from(props);
+            String url  = props.getProperty("db.url");
+            String user = props.getProperty("db.user");
+            String pass = props.getProperty("db.password");
+
+            if (url == null || user == null) {
+                throw new IllegalStateException("db.url / db.user missing from application.properties");
+            }
+
+            HikariConfig cfg = new HikariConfig();
+            cfg.setJdbcUrl(url);
+            cfg.setUsername(user);
+            cfg.setPassword(pass);
+
+            cfg.setMaximumPoolSize(Integer.parseInt(props.getProperty("db.pool.max", "10")));
+            cfg.setMinimumIdle(Integer.parseInt(props.getProperty("db.pool.min", "2")));
+
+            // تأكد إنه يشتغل مع Neon
+            cfg.addDataSourceProperty("sslmode", "require");
+
             ds = new HikariDataSource(cfg);
 
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to initialize database pool", e);
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to load application.properties", e);
         }
     }
 
     public static DataSource getDataSource() {
-        if (ds == null) {
-            try (InputStream in = Database.class.getClassLoader().getResourceAsStream("application.properties")) {
-
-                if (in == null) {
-                    throw new IllegalStateException("⚠️ application.properties not found in resources/");
-                }
-
-                Properties props = new Properties();
-                props.load(in);
-
-                HikariConfig config = DatabaseConfig.from(props);
-                ds = new HikariDataSource(config);
-
-            } catch (IOException e) {
-                throw new RuntimeException("Failed to load application.properties", e);
-            }
-        }
         return ds;
     }
+
     /** Get a pooled connection (always close() after use). */
     public static Connection get() throws SQLException {
         return ds.getConnection();

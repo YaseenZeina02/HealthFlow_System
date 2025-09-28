@@ -13,8 +13,9 @@ module com.example.healthflow {
     requires java.desktop;
     requires org.kordamp.ikonli.javafx;
     requires org.kordamp.ikonli.fontawesome5;
+    requires javafx.base;
 
-    // Open controllers package for JavaFX FXML
+    opens com.example.healthflow.model to javafx.base;
     opens com.example.healthflow.controllers to javafx.fxml;
 
     // Export packages containing public classes

@@ -33,7 +33,7 @@
     -fx-font-size: 13px;
     -fx-font-family: "Arial";
     -fx-border-color: #ffffff;             /* was #fff */
-    -fx-border-width: 0.5 px;
+    -fx-border-width: 0.5px;
     -fx-cursor: hand;
     -fx-alignment: CENTER;
 }
@@ -64,8 +64,58 @@
     -fx-font-family: "Arial";
 }
 
+
+
+/*!* لوّن شريط التحديد مع وبدون فوكس (اختياري بس مفيد) *!*/
+/*.table-view {*/
+/*    -fx-selection-bar: #2d6aa6;*/
+/*    -fx-selection-bar-non-focused: #8aaed3;*/
+/*}*/
+
+/*!* نص الخلايا – أسود، وخلفية الخلية نفسها شفافة*/
+/*   (عشان ما تغطي لون التحديد) *!*/
+/*.table-view .table-cell {*/
+/*    -fx-background-color: transparent;   !* مهم: لا تكون بيضاء *!*/
+/*    -fx-text-fill: #000000;*/
+/*    -fx-font-family: "Arial";*/
+/*    -fx-font-size: 13px;*/
+/*}*/
+
+/*!* لبعض السكِنات التي تستخدم Node Text داخل الخلية *!*/
+/*.table-view .table-row-cell .text {*/
+/*    -fx-fill: #000000;*/
+/*}*/
+
+/*!* خلفية الصفوف (غير محددة) تبقى بيضاء عشان شكل الجدول ما يتغيّر *!*/
+/*.table-view .table-row-cell {*/
+/*    -fx-background-color: #ffffff;*/
+/*}*/
+
+/*!* الصف المحدد مع وجود فوكس *!*/
+/*.table-view:focused .table-row-cell:filled:selected {*/
+/*    -fx-background-color: -fx-selection-bar;*/
+/*}*/
+
+/*!* الصف المحدد بدون فوكس *!*/
+/*.table-view .table-row-cell:filled:selected {*/
+/*    -fx-background-color: -fx-selection-bar-non-focused;*/
+/*}*/
+
+/*!* خلي نص الخلايا أبيض وقت التحديد *!*/
+/*.table-view .table-row-cell:filled:selected .table-cell {*/
+/*    -fx-text-fill: #ffffff;*/
+/*}*/
+/*.table-view .table-row-cell:filled:selected .text {*/
+/*    -fx-fill: #ffffff;*/
+/*}*/
+
+
+
 /* table view styling */
 .table-view {
+    -fx-selection-bar: #2d6aa6;
+    -fx-selection-bar-non-focused: #8aaed3;
+
     -fx-padding: 0;
     -fx-border-radius: 8px;
     -fx-background-insets: 0;
@@ -79,7 +129,7 @@
 .table-view .column-header,
 .table-view .filter {                     /* scoped .filter under table-view */
     -fx-size: 40px;
-    -fx-background-color: transparent;
+    -fx-background-color: transparent ;
 }
 .table-view .column-header .label {
     -fx-text-fill: #ffffff;
@@ -88,12 +138,35 @@
 
 
 .table-view .table-cell {
+    -fx-background-color: transparent;
     -fx-text-fill: #000000;   /* أسود */
     -fx-font-family: "Arial";
     -fx-font-size: 13px;      /* ممكن تعدل الحجم لو بدك */
 }
 
-.table-view .table-cell {
-    -fx-background-color: #ffffff;
-    -fx-text-fill: #000000;
+/*.table-view .table-cell {*/
+/*    -fx-background-color: #3A9BDC;*/
+/*    -fx-text-fill: #000000;*/
+/*}*/
+
+.table-view:focused .table-row-cell:filled:selected {
+    -fx-background-color: -fx-selection-bar;
+}
+
+.table-view:focused .table-row-cell:filled:selected,
+.table-view .table-row-cell:filled:selected {
+    -fx-background-color: #254E70;   /* <-- اختار أي واحد من اللي فوق */
+    -fx-text-fill: #9f2a2a !important;
+}
+
+.table-view .table-row-cell:filled:selected {
+    -fx-background-color: -fx-selection-bar-non-focused;
+}
+
+/* خلي نص الخلايا أبيض وقت التحديد */
+.table-view .table-row-cell:filled:selected .table-cell {
+    -fx-text-fill: #3A9BDC !important;
+}
+.table-view .table-row-cell:filled:selected .text {
+    -fx-fill: #ffffff !important;
 }

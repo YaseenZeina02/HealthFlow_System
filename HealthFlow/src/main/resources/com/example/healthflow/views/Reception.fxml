@@ -56,7 +56,7 @@
                                 <Label fx:id="DateOfDay" layoutX="597.0" layoutY="12.5" prefHeight="18.0" prefWidth="105.0" text="MM:DD:YYYY" AnchorPane.rightAnchor="433.0" AnchorPane.topAnchor="12.0" />
                                 <Label fx:id="time" layoutX="673.0" layoutY="12.5" prefHeight="18.0" prefWidth="100.0" text="00:00:00 " AnchorPane.rightAnchor="327.0" AnchorPane.topAnchor="12.0" />
                                 <Label layoutX="815.0" layoutY="10.0" prefHeight="18.0" prefWidth="56.0" text="Welcome," AnchorPane.rightAnchor="250.0" AnchorPane.topAnchor="10.0" />
-                                <Label fx:id="welcomeUser" layoutX="850.0" layoutY="10.0" prefHeight="18.0" prefWidth="103.0" stylesheets="@../Design/ReceptionDesign.css" text="Basil" AnchorPane.rightAnchor="146.0">
+                                <Label fx:id="welcomeUser" layoutX="850.0" layoutY="10.0" prefHeight="18.0" prefWidth="103.0" stylesheets="@../Design/ReceptionDesign.css" text="user" AnchorPane.rightAnchor="146.0">
                                     <font><Font name="System Bold" size="13.0" /></font>
                                 </Label>
                                 <Circle fill="DODGERBLUE" layoutX="995.0" layoutY="24.0" radius="15.0" stroke="BLACK" strokeType="INSIDE" strokeWidth="0.0" AnchorPane.rightAnchor="90.0" />
@@ -76,11 +76,11 @@
                             <children>
                                 <FontIcon iconColor="WHITE" iconLiteral="fas-user" iconSize="80" layoutX="73.0" layoutY="83.0" />
 
-                                <Label fx:id="UsernameLabel" layoutX="86.0" layoutY="108.0" prefHeight="18.0" prefWidth="100.0" text="Basil Alserr" textFill="WHITE">
+                                <Label fx:id="UsernameLabel" layoutX="86.0" layoutY="108.0" prefHeight="18.0" prefWidth="100.0" text="User name " textFill="WHITE">
                                     <font><Font name="System Bold" size="13.0" /></font>
                                 </Label>
                                 <Label layoutX="25.0" layoutY="134.0" prefHeight="18.0" prefWidth="56.0" text="UserID:" textFill="WHITE" />
-                                <Label fx:id="UserIdLabel" layoutX="88.0" layoutY="134.0" prefHeight="18.0" prefWidth="100.0" text="1" textFill="WHITE">
+                                <Label fx:id="UserIdLabel" layoutX="88.0" layoutY="134.0" prefHeight="18.0" prefWidth="100.0" text="user id " textFill="WHITE">
                                     <font><Font name="System Bold" size="13.0" /></font>
                                 </Label>
                                 <Line endX="86.99998474121094" endY="-1.52587890625E-5" layoutX="107.0" layoutY="189.0" startX="-90.19999694824219" startY="-1.52587890625E-5" />
@@ -269,7 +269,7 @@
                                                 </Label>
                                                 <TableView fx:id="patientTable" layoutX="11.0" layoutY="54.0" prefHeight="208.0" prefWidth="844.0" styleClass="table-cell" stylesheets="@../Design/ReceptionDesign.css" AnchorPane.bottomAnchor="10.0" AnchorPane.leftAnchor="11.0" AnchorPane.rightAnchor="11.0" AnchorPane.topAnchor="54.0">
                                                     <columns>
-                                                        <TableColumn fx:id="colPatientId" prefWidth="75.0" text="Patient ID" />
+                                                        <TableColumn fx:id="colNationalId" prefWidth="75.0" text="National ID" />
                                                         <TableColumn fx:id="colName" prefWidth="75.0" text="Name" />
                                                         <TableColumn fx:id="colGender" prefWidth="75.0" text="Gender" />
                                                         <TableColumn fx:id="colDob" prefWidth="75.0" text="Date of birth" />
@@ -299,20 +299,20 @@
                                                     <font><Font size="14.0" /></font>
                                                 </Label>
 
-                                                <Button fx:id="InsertButton" layoutX="94.0" layoutY="206.0" mnemonicParsing="false" prefHeight="24.0" prefWidth="100.0" styleClass="btn-2" stylesheets="@../Design/ReceptionDesign.css" text="Insert" />
-                                                <Button fx:id="UpdateButton" layoutX="268.0" layoutY="206.0" mnemonicParsing="false" prefWidth="90.0" styleClass="btn-2" stylesheets="@../Design/ReceptionDesign.css" text="Update" />
-                                                <Button fx:id="clearBtn" layoutX="431.0" layoutY="206.0" mnemonicParsing="false" prefWidth="90.0" styleClass="btn-2" stylesheets="@../Design/ReceptionDesign.css" text="Clear" />
-                                                <Button fx:id="deleteButton" layoutX="603.0" layoutY="206.0" mnemonicParsing="false" prefWidth="90.0" styleClass="btn-2" stylesheets="@../Design/ReceptionDesign.css" text="Delete" />
+                                                <Button fx:id="InsertButton" layoutX="655.0" layoutY="82.0" mnemonicParsing="false" prefHeight="25.0" prefWidth="96.0" styleClass="btn-2" stylesheets="@../Design/ReceptionDesign.css" text="Insert" />
+                                                <Button fx:id="UpdateButton" layoutX="655.0" layoutY="116.0" mnemonicParsing="false" prefHeight="25.0" prefWidth="95.0" styleClass="btn-2" stylesheets="@../Design/ReceptionDesign.css" text="Update" />
+                                                <Button fx:id="clearBtn" layoutX="764.0" layoutY="82.0" mnemonicParsing="false" prefHeight="25.0" prefWidth="96.0" styleClass="btn-2" stylesheets="@../Design/ReceptionDesign.css" text="Clear" />
+                                                <Button fx:id="deleteButton" layoutX="764.0" layoutY="116.0" mnemonicParsing="false" prefHeight="25.0" prefWidth="95.0" styleClass="btn-2" stylesheets="@../Design/ReceptionDesign.css" text="Delete" />
 
-                                                <Label layoutX="594.0" layoutY="47.0" prefHeight="34.0" prefWidth="110.0" styleClass="text-gradient" stylesheets="@../Design/ReceptionDesign.css" text="Medical History">
+                                                <Label layoutX="283.0" layoutY="134.0" prefHeight="34.0" prefWidth="110.0" styleClass="text-gradient" stylesheets="@../Design/ReceptionDesign.css" text="Medical History">
                                                     <font><Font name="System Bold Italic" size="20.0" /></font>
                                                 </Label>
-                                                <TextArea fx:id="medicalHistory" layoutX="594.0" layoutY="81.0" prefHeight="86.0" prefWidth="251.0" />
+                                                <TextArea fx:id="medicalHistory" layoutX="397.0" layoutY="128.0" prefHeight="86.0" prefWidth="251.0" />
 
-                                                <Label layoutX="14.0" layoutY="91.0" prefHeight="30.0" prefWidth="80.0" styleClass="text-gradient" stylesheets="@../Design/ReceptionDesign.css" text="Patient ID">
+                                                <Label layoutX="14.0" layoutY="91.0" prefHeight="30.0" prefWidth="80.0" styleClass="text-gradient" stylesheets="@../Design/ReceptionDesign.css" text="National ID">
                                                     <font><Font name="System Bold Italic" size="20.0" /></font>
                                                 </Label>
-                                                <TextField fx:id="PatientIdTextField" layoutX="98.0" layoutY="94.0" promptText="Enter National ID" />
+                                                <TextField fx:id="PatientIdTextField" layoutX="98.0" layoutY="94.0" />
 
                                                 <TextField fx:id="FullNameTextField" layoutX="98.0" layoutY="54.0" />
 
@@ -321,7 +321,7 @@
                                                     <font><Font name="System Bold Italic" size="20.0" /></font>
                                                 </Label>
 
-                                                <Label layoutX="14.0" layoutY="52.0" prefHeight="30.0" prefWidth="80.0" styleClass="text-gradient" stylesheets="@../Design/ReceptionDesign.css" text="Full name">
+                                                <Label layoutX="14.0" layoutY="52.0" prefHeight="30.0" prefWidth="80.0" styleClass="text-gradient" stylesheets="@../Design/ReceptionDesign.css" text="Name">
                                                     <font><Font name="System Bold Italic" size="20.0" /></font>
                                                 </Label>
 
@@ -330,7 +330,7 @@
                                                 </Label>
                                                 <DatePicker fx:id="DateOfBirthPicker" layoutX="397.0" layoutY="50.0" />
 
-                                                <Label layoutX="287.0" layoutY="87.0" prefHeight="30.0" prefWidth="120.0" styleClass="text-gradient" stylesheets="@../Design/ReceptionDesign.css" text="Phone">
+                                                <Label layoutX="285.0" layoutY="91.0" prefHeight="30.0" prefWidth="106.0" styleClass="text-gradient" stylesheets="@../Design/ReceptionDesign.css" text="Phone">
                                                     <font><Font name="System Bold Italic" size="20.0" /></font>
                                                 </Label>
                                                 <TextField fx:id="PhoneTextField" layoutX="397.0" layoutY="91.0" />
