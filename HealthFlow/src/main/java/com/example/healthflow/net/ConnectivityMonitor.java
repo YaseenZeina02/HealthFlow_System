@@ -17,6 +17,10 @@ public class ConnectivityMonitor {
     private final Duration interval;
     private final Duration timeout;
 
+    public ConnectivityMonitor() {
+        this("https://www.google.com/generate_204", Duration.ofSeconds(5), Duration.ofSeconds(2));
+    }
+
     private final BooleanProperty online = new SimpleBooleanProperty(false);
     private final HttpClient client = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(2))

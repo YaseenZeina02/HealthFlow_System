@@ -1,4 +1,6 @@
 package com.example.healthflow.service.AuthService;
+
+
 import com.example.healthflow.dao.UserDAO;
 import com.example.healthflow.db.Database;
 import com.example.healthflow.model.Role;
@@ -58,3 +60,4 @@ public class AuthService {
         return BCrypt.checkpw(rawPassword, u.getPasswordHash()) ? u : null;
     }
 }
+

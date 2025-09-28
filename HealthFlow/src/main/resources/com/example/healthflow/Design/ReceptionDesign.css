@@ -86,3 +86,14 @@
     -fx-font-family: "Arial";
 }
 
+
+.table-view .table-cell {
+    -fx-text-fill: #000000;   /* أسود */
+    -fx-font-family: "Arial";
+    -fx-font-size: 13px;      /* ممكن تعدل الحجم لو بدك */
+}
+
+.table-view .table-cell {
+    -fx-background-color: #ffffff;
+    -fx-text-fill: #000000;
+}
