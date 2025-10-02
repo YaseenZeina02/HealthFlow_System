@@ -20,7 +20,7 @@ public class DatabaseConfig {
         c.setUsername(dbUser);
         c.setPassword(dbPassword);
         c.setMaximumPoolSize(Integer.parseInt(p.getProperty("db.pool.max","10")));
-        c.setMinimumIdle(Integer.parseInt(p.getProperty("db.pool.min","2")));
+        c.setMinimumIdle(Integer.parseInt(p.getProperty("db.pool.min","0")));
         c.setDriverClassName("org.postgresql.Driver");
         c.setPoolName("HealthFlowPool");
 

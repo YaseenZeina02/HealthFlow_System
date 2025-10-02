@@ -1,8 +1,6 @@
-
-package com.example.healthflow.dao;
+package com.example.healthflow.model.dto;
 
 import com.example.healthflow.model.User;
-import com.example.healthflow.model.dto.UserDTO;
 
 import java.sql.Connection;
 import java.sql.SQLException;
@@ -19,9 +17,6 @@ public interface UserDAO {
 
     User findByEmail(String email) throws SQLException;
 
-    // اختياري: مختصر لإدخال User بالكامل (خارج الترانزاكشن)
+    // ميثود اختياري لإدخال User كامل (لو بدك)
     User insert(User u);
-
-    void updateLastLogin(Long id);
 }
-
