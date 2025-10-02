@@ -5,6 +5,7 @@ import com.example.healthflow.dao.UserDAO;
 import com.example.healthflow.dao.PatientJdbcDAO;
 import com.example.healthflow.dao.UserJdbcDAO;
 import com.example.healthflow.db.Database;
+import com.example.healthflow.model.Role;
 import com.example.healthflow.model.dto.PatientView;
 
 import java.sql.Connection;
@@ -22,6 +23,7 @@ public class PatientService {
     /** إضافة مريض جديد */
     public PatientView createPatient(String fullName, String nid, String phone,
                                      LocalDate dob, String gender, String history) throws SQLException {
+
         String hash = org.mindrot.jbcrypt.BCrypt.hashpw(
                 DEFAULT_PATIENT_PASSWORD, org.mindrot.jbcrypt.BCrypt.gensalt()
         );
@@ -29,10 +31,18 @@ public class PatientService {
         try (Connection c = Database.get()) {
             c.setAutoCommit(false);
             try {
-                long userId = userDAO.insert(nid, fullName, null, hash, phone, com.example.healthflow.model.Role.PATIENT.name(), c);
-                long patientId = patientDAO.insert(userId, dob, gender, history, c);
+                // 1) users: الآن gender هنا
+                long userId = userDAO.insertWithGender(
+                        nid, fullName, null, hash, phone, Role.PATIENT.name(), gender, c);
+
+                // 2) patients: بدون gender بعد الترحيل
+                long patientId = patientDAO.insert(userId, dob, history, c);
+
                 c.commit();
-                return new PatientView(patientId, userId, fullName, nid, phone, dob, gender, history);
+
+                return new PatientView(
+                        patientId, userId, fullName, nid, phone, dob, gender, history
+                );
             } catch (Exception e) {
                 c.rollback();
                 throw e;
@@ -48,8 +58,12 @@ public class PatientService {
         try (Connection c = Database.get()) {
             c.setAutoCommit(false);
             try {
-                userDAO.update(userId, fullName, phone, nid, c);
-                patientDAO.update(patientId, dob, gender, history, c);
+                // users: حدّث الاسم/الهاتف/الرقم الوطني + gender
+                userDAO.updateWithGender(userId, fullName, phone, nid, gender, c);
+
+                // patients: حدّث التاريخ والسجل الطبي فقط
+                patientDAO.update(patientId, dob, history, c);
+
                 c.commit();
             } catch (Exception e) {
                 c.rollback();
@@ -63,12 +77,13 @@ public class PatientService {
     /** حذف مريض */
     public void deletePatientByUserId(long userId) throws SQLException {
         try (Connection c = Database.get()) {
-            userDAO.delete(userId, c); // لو FK ON DELETE CASCADE موجود هيحذف المريض كمان
+            userDAO.delete(userId, c); // FK CASCADE سيحذف من patients
         }
     }
 
     /** قراءة كل المرضى */
     public List<PatientView> listPatients() throws SQLException {
+        // مهم: DAO لازم يعمل JOIN على users ويرجع u.gender AS gender
         return patientDAO.findAll();
     }
 }

@@ -147,18 +147,18 @@ public class LoginController {
                 return;
             }
 
-            // 2) فحص قاعدة البيانات الآن فقط (ليس عند الإقلاع)
-            Database.Status dbStatus = Database.ping();
-            if (dbStatus != Database.Status.ONLINE) {
-                showAlert("Database Offline",
-                        switch (dbStatus) {
-                            case OFFLINE_NETWORK -> "Cannot reach the database server. Check your internet/VPN or DB host.";
-                            case BAD_CREDENTIALS -> "Database credentials are invalid. Please verify db.user/db.password.";
-                            case CONFIG_MISSING -> "Database config missing in application.properties.";
-                            default -> "Database is currently unavailable. Please try again.";
-                        });
-                return;
-            }
+//            // 2) فحص قاعدة البيانات الآن فقط (ليس عند الإقلاع)
+//            Database.Status dbStatus = Database.ping();
+//            if (dbStatus != Database.Status.ONLINE) {
+//                showAlert("Database Offline",
+//                        switch (dbStatus) {
+//                            case OFFLINE_NETWORK -> "Cannot reach the database server. Check your internet/VPN or DB host.";
+//                            case BAD_CREDENTIALS -> "Database credentials are invalid. Please verify db.user/db.password.";
+//                            case CONFIG_MISSING -> "Database config missing in application.properties.";
+//                            default -> "Database is currently unavailable. Please try again.";
+//                        });
+//                return;
+//            }
 
             // 3) تحقّق من القاعدة فعليًا
             User user = authenticate(username, password);
