@@ -79,4 +79,27 @@ public class DoctorDAO {
             return ps.executeUpdate() == 1;
         }
     }
+    public Doctor findByUserId(Connection c, long userId) throws SQLException {
+        final String sql = "SELECT * FROM doctors WHERE user_id = ?";
+        try (PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setLong(1, userId);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (!rs.next()) return null;
+                Doctor d = new Doctor();
+                d.setId(rs.getLong("id"));
+                d.setUserId(rs.getLong("user_id"));
+                d.setSpecialty(rs.getString("specialty"));
+                d.setBio(rs.getString("bio"));
+                d.setUpdatedAt(rs.getObject("updated_at", java.time.OffsetDateTime.class));
+                return d;
+            }
+        }
+    }
+
+    public Doctor ensureProfileForUser(Connection c, long userId) throws SQLException {
+        Doctor d = findByUserId(c, userId);
+        if (d != null) return d;
+        // create a minimal profile if missing
+        return insert(c, userId, "GENERAL", null);
+    }
 }

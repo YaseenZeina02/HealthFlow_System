@@ -234,7 +234,7 @@
                   </AnchorPane>
 
                   <!-- ===== Patients pane (unchanged functionally) ===== -->
-                  <AnchorPane fx:id="PatientAnchorPane" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+                  <AnchorPane fx:id="PatientAnchorPane" visible="false" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
                      <children>
                         <AnchorPane prefHeight="533.0" prefWidth="866.0" stylesheets="@../Design/ReceptionDesign.css" AnchorPane.bottomAnchor="11.0" AnchorPane.leftAnchor="11.0" AnchorPane.rightAnchor="12.0" AnchorPane.topAnchor="14.0">
                            <children>
@@ -242,7 +242,7 @@
                                  <font><Font size="14.0" /></font>
                               </Label>
 
-                              <TableView fx:id="patientTable" layoutX="11.0" layoutY="54.0" prefHeight="208.0" prefWidth="844.0" styleClass="table-cell" stylesheets="@../Design/ReceptionDesign.css" AnchorPane.bottomAnchor="10.0" AnchorPane.leftAnchor="11.0" AnchorPane.rightAnchor="11.0" AnchorPane.topAnchor="54.0">
+                              <TableView fx:id="patientTable" layoutX="11.0" layoutY="54.0" prefHeight="208.0" prefWidth="844.0" stylesheets="@../Design/ReceptionDesign.css" AnchorPane.bottomAnchor="10.0" AnchorPane.leftAnchor="11.0" AnchorPane.rightAnchor="11.0" AnchorPane.topAnchor="54.0">
                                  <columns>
                                     <TableColumn fx:id="colNationalId" prefWidth="75.0" text="National ID" />
                                     <TableColumn fx:id="colName" prefWidth="75.0" text="Name" />

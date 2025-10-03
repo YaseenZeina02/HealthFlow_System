@@ -16,7 +16,7 @@ module com.example.healthflow {
     requires javafx.base;
 
     opens com.example.healthflow.model to javafx.base;
-    opens com.example.healthflow.controllers to javafx.fxml;
+    opens com.example.healthflow.controllers to javafx.fxml, javafx.base;
 
     // Export packages containing public classes
     opens com.example.healthflow to javafx.fxml;
