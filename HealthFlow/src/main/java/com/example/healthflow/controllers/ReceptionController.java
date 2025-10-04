@@ -211,7 +211,7 @@ public class ReceptionController {
         tl.setCycleCount(Timeline.INDEFINITE);
         tl.play();
 
-        DateTimeFormatter df = DateTimeFormatter.ofPattern("MM:dd:yyyy");
+        DateTimeFormatter df = DateTimeFormatter.ofPattern("MM/dd/yyyy");
         DateOfDay.setText(LocalDate.now().format(df));
     }
 

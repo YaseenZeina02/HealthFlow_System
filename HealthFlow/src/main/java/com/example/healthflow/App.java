@@ -15,6 +15,7 @@ import javafx.scene.layout.StackPane;
 import javafx.stage.Stage;
 import org.mindrot.jbcrypt.BCrypt;
 
+import java.sql.Connection;
 import java.sql.SQLException;
 import java.time.Duration;
 import java.time.LocalDate;
@@ -29,14 +30,25 @@ public class App extends Application {
 
     @Override
     public void start(Stage stage) throws Exception {
+        // 1) شغل مراقبة الاتصال
         monitor.start();
         monitor.checkNow();
 
+        // 2) اعمل warm-up للـ Database في ثريد منفصل
+        new Thread(() -> {
+            try (Connection c = Database.get()) {
+                System.out.println("Database warm-up connection successful!");
+            } catch (Exception e) {
+                System.err.println("Database warm-up failed: " + e.getMessage());
+            }
+        }, "db-warmup").start();
+
+        // 3) حمّل شاشة الـ Login
         FXMLLoader loader = new FXMLLoader(
                 getClass().getResource("/com/example/healthflow/views/Login.fxml")
         );
 
-        // نمرر الـ monitor للـ LoginController عبر factory
+        // مرر الـ monitor للـ LoginController
         loader.setControllerFactory(type -> {
             try {
                 if (type == com.example.healthflow.controllers.LoginController.class) {
@@ -51,7 +63,7 @@ public class App extends Application {
         Parent loginRoot = loader.load();
         var controller = (com.example.healthflow.controllers.LoginController) loader.getController();
 
-        // لما يرجع النت: نفّذ إعادة تحميل في شاشة login
+        // اربط إعادة التحميل عند رجوع النت
         monitor.onlineProperty().addListener((obs, wasOnline, isOnline) -> {
             if (isOnline) controller.onBecameOnline();
         });
@@ -72,33 +84,5 @@ public class App extends Application {
     public static void main(String[] args) throws SQLException {
         launch(args);
 
-//        try (var c = Database.get()) {
-//            c.setAutoCommit(false);
-//            try {
-//                // 1) أنشئ مريض جديد (user+patient)
-//                var pdao = new PatientDAO();
-//                var patient = pdao.createWithUser(
-//                        c,
-//                        "Ali Hasan",
-//                        null,                               // email غير مطلوب للمريض
-//                        BCrypt.hashpw("123456", BCrypt.gensalt()),
-//                        "555666777",                        // أو null
-//                        "0599000010",
-//                        LocalDate.of(2001,3,15),
-//                        Gender.MALE,
-//                        "Diabetes type 2"
-//                );
-//
-//                // 2) سجل حركة في اللوج
-//                new ActivityLogDAO().log(c, null, "CREATE_PATIENT", "patient", patient.getId(), "{\"source\":\"reception\"}");
-//
-//                c.commit();
-//            } catch (Exception ex) {
-//                c.rollback();
-//                throw ex;
-//            } finally {
-//                c.setAutoCommit(true);
-//            }
-//        }
     }
 }

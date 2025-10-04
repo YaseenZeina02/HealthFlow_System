@@ -10,7 +10,10 @@ import com.example.healthflow.ui.OnlineBindings;
 import javafx.animation.FadeTransition;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
+import javafx.fxml.FXMLLoader;
 import javafx.geometry.Insets;
+import javafx.scene.Parent;
+import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
@@ -22,6 +25,7 @@ import javafx.stage.Stage;
 import javafx.util.Duration;
 import org.mindrot.jbcrypt.BCrypt;
 
+import java.sql.Connection;
 import java.util.Objects;
 
 public class LoginController {
@@ -90,6 +94,7 @@ public class LoginController {
             OnlineBindings.disableWhenOffline(monitor, LoginButton);
         }
     }
+
 
     /** تحقّق مرن: يجرّب BCrypt ثم مساواة نصّية (لبيانات قديمة غير مشفرة) */
     private User authenticate(String emailOrUser, String plainPassword) throws Exception {

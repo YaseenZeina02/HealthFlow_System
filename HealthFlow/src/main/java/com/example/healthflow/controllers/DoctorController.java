@@ -83,7 +83,7 @@ public class DoctorController {
     @FXML private TableColumn<PatientRow, Integer> colDob; // age
     @FXML private TableColumn<PatientRow, String> colMedicalHistory;
     @FXML private TableColumn<PatientRow, PatientRow> colAction2;
-    @FXML private TextField search;  // patients search (future)
+    @FXML private TextField search;      // patients search (future)
     @FXML private TextField searchLabel; // appointments search (future)
     private FilteredList<PatientRow> filtered;
     private SortedList<PatientRow> sorted;
@@ -122,45 +122,14 @@ public class DoctorController {
         // disable left buttons when offline (if OnlineBindings exists)
         try { OnlineBindings.disableWhenOffline(monitor, DachboardButton, PatientsButton); } catch (Throwable ignored) {}
 
-        // default pane
-
-
         // tables wiring
         wireAppointmentsTable();
-        setBlackTextCells(colNationalId);
-        setBlackTextCells(colName);
-        setBlackTextCells(colGender);
-        setBlackTextCells(colDob);
-        setBlackTextCells(colMedicalHistory);
-
-        setBlackTextCells(colPatientName);
-        setBlackTextCells(colDate);
-        setBlackTextCells(colTime);
-        setBlackTextCells(colStatus);
         wirePatientsTable();
         wireSearch();
 
-
-        // load user + ensure doctor + load data
-        Platform.runLater(() -> {
-            if (loadUserAndEnsureDoctorProfile()) {
-                reloadAll();
-            }
-        });
-    }
-    private <S, T> void setBlackTextCells(TableColumn<S, T> col) {
-        col.setCellFactory(tc -> new TableCell<S, T>() {
-            @Override
-            protected void updateItem(T item, boolean empty) {
-                super.updateItem(item, empty);
-                if (empty || item == null) {
-                    setText(null);
-                } else {
-                    setText(item.toString());
-                }
-                setTextFill(javafx.scene.paint.Color.BLACK);
-            }
-        });
+        if (loadUserAndEnsureDoctorProfile()) {
+            reloadAll();
+        }
     }
     /* ================= Header time & date (12h) ================= */
     private void startClock() {
@@ -172,7 +141,7 @@ public class DoctorController {
         tl.setCycleCount(Timeline.INDEFINITE);
         tl.play();
 
-        DateTimeFormatter df = DateTimeFormatter.ofPattern("MM:dd:yyyy");
+        DateTimeFormatter df = DateTimeFormatter.ofPattern("MM/dd/yyyy");
         DateOfDay.setText(LocalDate.now().format(df));
     }
 
