@@ -6,6 +6,7 @@ import com.example.healthflow.dao.UserDAO;
 import com.example.healthflow.model.Role;
 import com.example.healthflow.model.User;
 import com.example.healthflow.net.ConnectivityMonitor;
+import com.example.healthflow.ui.ConnectivityBanner;
 import com.example.healthflow.ui.OnlineBindings;
 import javafx.animation.FadeTransition;
 import javafx.application.Platform;
@@ -60,6 +61,10 @@ public class LoginController {
     @FXML
     private void initialize() {
         // --- show/hide password (UI فقط) ---
+        if (rootPane != null) {
+            rootPane.getChildren().add(0, new ConnectivityBanner(monitor));
+        }
+
         visiblePasswordField.setLayoutX(PasswordTextField.getLayoutX());
         visiblePasswordField.setLayoutY(PasswordTextField.getLayoutY());
         visiblePasswordField.setPrefWidth(PasswordTextField.getPrefWidth());

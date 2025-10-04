@@ -20,7 +20,7 @@
 <?import javafx.scene.text.Font?>
 <?import org.kordamp.ikonli.javafx.FontIcon?>
 
-<StackPane maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="600.0" prefWidth="1100.0" xmlns="http://javafx.com/javafx/19" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.example.healthflow.controllers.ReceptionController">
+<StackPane fx:id="rootPane" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="600.0" prefWidth="1100.0" xmlns="http://javafx.com/javafx/19" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.example.healthflow.controllers.ReceptionController">
 
     <children>
         <AnchorPane prefHeight="200.0" prefWidth="200.0">
@@ -362,7 +362,7 @@
                                 </AnchorPane>
 
                                 <!-- ===== Appointments Pane ===== -->
-                                <AnchorPane fx:id="AppointmentsAnchorPane" layoutX="5.0" layoutY="10.0" prefHeight="538.0" prefWidth="879.0" stylesheets="@../Design/ReceptionDesign.css" AnchorPane.bottomAnchor="9.6" AnchorPane.leftAnchor="4.8" AnchorPane.rightAnchor="5.4" AnchorPane.topAnchor="10.0">
+                                <AnchorPane fx:id="AppointmentsAnchorPane" layoutX="5.0" layoutY="10.0" prefHeight="538.0" prefWidth="879.0" stylesheets="@../Design/ReceptionDesign.css" visible="false" AnchorPane.bottomAnchor="9.6" AnchorPane.leftAnchor="4.8" AnchorPane.rightAnchor="5.4" AnchorPane.topAnchor="10.0">
                                     <children>
                               <AnchorPane layoutY="233.0" prefHeight="310.0" prefWidth="881.0">
                                  <children>

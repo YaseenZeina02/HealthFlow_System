@@ -1,9 +1,7 @@
 package com.example.healthflow;
 
-import com.example.healthflow.dao.ActivityLogDAO;
-import com.example.healthflow.dao.PatientDAO;
+import com.example.healthflow.controllers.Navigation;
 import com.example.healthflow.db.Database;
-import com.example.healthflow.model.Gender;
 import com.example.healthflow.net.ConnectivityMonitor;
 import com.example.healthflow.ui.ConnectivityBanner;
 import javafx.application.Application;
@@ -13,12 +11,12 @@ import javafx.scene.Scene;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.StackPane;
 import javafx.stage.Stage;
-import org.mindrot.jbcrypt.BCrypt;
 
 import java.sql.Connection;
-import java.sql.SQLException;
 import java.time.Duration;
-import java.time.LocalDate;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 public class App extends Application {
 
@@ -28,27 +26,33 @@ public class App extends Application {
             Duration.ofSeconds(2)
     );
 
+    // لإدارة مهمة الـ warm-up
+    private ExecutorService warmupExec;
+    private Future<?> warmupTask;
+
     @Override
     public void start(Stage stage) throws Exception {
-        // 1) شغل مراقبة الاتصال
+        // 1) شغّل مراقبة الاتصال
         monitor.start();
         monitor.checkNow();
 
-        // 2) اعمل warm-up للـ Database في ثريد منفصل
-        new Thread(() -> {
+        // 2) اعمل warm-up للداتابيز في Executor دايمون، وبنقدر نلغيه عند الإغلاق
+        warmupExec = Executors.newSingleThreadExecutor(r -> {
+            Thread t = new Thread(r, "db-warmup");
+            t.setDaemon(true);            // لو النافذة اتسكرت، ما يمنع JVM من الخروج
+            return t;
+        });
+        warmupTask = warmupExec.submit(() -> {
             try (Connection c = Database.get()) {
+                if (Thread.currentThread().isInterrupted()) return;
                 System.out.println("Database warm-up connection successful!");
             } catch (Exception e) {
                 System.err.println("Database warm-up failed: " + e.getMessage());
             }
-        }, "db-warmup").start();
+        });
 
-        // 3) حمّل شاشة الـ Login
-        FXMLLoader loader = new FXMLLoader(
-                getClass().getResource("/com/example/healthflow/views/Login.fxml")
-        );
-
-        // مرر الـ monitor للـ LoginController
+        // 3) حمّل شاشة الـ Login ومرّر الـ monitor للكنترولر
+        FXMLLoader loader = new FXMLLoader(getClass().getResource(new Navigation().Login_Fxml));
         loader.setControllerFactory(type -> {
             try {
                 if (type == com.example.healthflow.controllers.LoginController.class) {
@@ -63,7 +67,6 @@ public class App extends Application {
         Parent loginRoot = loader.load();
         var controller = (com.example.healthflow.controllers.LoginController) loader.getController();
 
-        // اربط إعادة التحميل عند رجوع النت
         monitor.onlineProperty().addListener((obs, wasOnline, isOnline) -> {
             if (isOnline) controller.onBecameOnline();
         });
@@ -78,11 +81,32 @@ public class App extends Application {
         stage.setScene(scene);
         stage.show();
 
-        stage.setOnCloseRequest(e -> monitor.stop());
+        // عند إغلاق النافذة: أوقف المونيتور + الغِ مهمة الـ warm-up فورًا
+        stage.setOnCloseRequest(e -> {
+            cleanupAsyncStuff();
+        });
     }
 
-    public static void main(String[] args) throws SQLException {
-        launch(args);
+    @Override
+    public void stop() {
+        // لو التطبيق اتقفل من غير onCloseRequest (مثلاً من النظام)، نضمن التنظيف
+        cleanupAsyncStuff();
+    }
 
+    private void cleanupAsyncStuff() {
+        try {
+            monitor.stop();
+        } catch (Throwable ignored) {}
+
+        if (warmupTask != null) {
+            warmupTask.cancel(true);   // يطلب إيقاف المهمة لو لسه شغالة
+        }
+        if (warmupExec != null) {
+            warmupExec.shutdownNow();  // يمنع أي مهام جديدة ويحاول يوقف الحالية
+        }
+    }
+
+    public static void main(String[] args) {
+        launch(args);
     }
 }

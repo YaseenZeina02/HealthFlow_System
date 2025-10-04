@@ -22,7 +22,7 @@ import javafx.scene.Scene;
 import javafx.scene.chart.BarChart;
 import javafx.scene.control.*;
 import javafx.scene.layout.AnchorPane;
-import javafx.scene.layout.VBox;
+import javafx.scene.layout.StackPane;
 import javafx.scene.shape.Circle;
 import javafx.stage.Stage;
 import javafx.util.Duration;
@@ -40,7 +40,7 @@ public class ReceptionController {
     @FXML private AnchorPane PatientAnchorPane;
     @FXML private AnchorPane AppointmentsAnchorPane;
     @FXML private AnchorPane DoctorAnchorPane;
-    @FXML private VBox rootPane;
+    @FXML private StackPane rootPane;
 
     @FXML private Button DachboardButton;
     @FXML private Button PatientsButton;
@@ -172,6 +172,9 @@ public class ReceptionController {
     /* ============ Init ============ */
     @FXML
     private void initialize() {
+        if (rootPane != null) {
+            rootPane.getChildren().add(0, new ConnectivityBanner(monitor));
+        }
         monitor.start();
 
         if (rootPane != null) {
@@ -194,10 +197,10 @@ public class ReceptionController {
                     lastNotifiedOnline = isOnline;
                     return;
                 }
+                // Skip duplicate notifications; UI reacts via bindings and banner.
                 if (lastNotifiedOnline != null && lastNotifiedOnline == isOnline) return;
                 lastNotifiedOnline = isOnline;
-                if (!isOnline) showWarn("Offline", "No internet connection. Some actions are disabled.");
-                else showInfo("Back online", "Connection restored.");
+                // No alerts here — the ConnectivityBanner and OnlineBindings handle UX.
             });
         }
 
@@ -276,6 +279,20 @@ public class ReceptionController {
     }
 
     /* ============ Navigation ============ */
+//    @FXML
+//    private void BackAction() {
+//        Stage stage = (Stage) BackButton.getScene().getWindow();
+//        try {
+//            FXMLLoader loader = new FXMLLoader(getClass().getResource(new Navigation().Login_Fxml));
+//            loader.setControllerFactory(type ->
+//                    type == LoginController.class ? new LoginController(monitor) : null
+//            );
+//            Parent root = loader.load();
+//            stage.setScene(new Scene(root));
+//            stage.setResizable(false);
+//            stage.show();
+//        } catch (IOException e) { showError("Navigation", e); }
+//    }
     @FXML
     private void BackAction() {
         Stage stage = (Stage) BackButton.getScene().getWindow();
@@ -284,11 +301,21 @@ public class ReceptionController {
             loader.setControllerFactory(type ->
                     type == LoginController.class ? new LoginController(monitor) : null
             );
-            Parent root = loader.load();
+            Parent loginRoot = loader.load();
+
+            // لفّ loginRoot ببوردر بان ومعاه البانر
+            var banner = new com.example.healthflow.ui.ConnectivityBanner(monitor);
+            javafx.scene.layout.BorderPane root = new javafx.scene.layout.BorderPane();
+            root.setTop(banner);
+            root.setCenter(loginRoot);
+
             stage.setScene(new Scene(root));
+            stage.setTitle("HealthFlow");   // ← غيّر العنوان
             stage.setResizable(false);
             stage.show();
-        } catch (IOException e) { showError("Navigation", e); }
+        } catch (IOException e) {
+            showError("Navigation", e);
+        }
     }
 
     /* ============ Panes ============ */

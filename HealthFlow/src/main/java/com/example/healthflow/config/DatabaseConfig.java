@@ -27,13 +27,7 @@ public class DatabaseConfig {
         return c;
     }
 
-    /**
-     * Gets a value from an environment variable if available, otherwise from properties.
-     * @param envName Environment variable name
-     * @param props Properties object
-     * @param propName Property name
-     * @return The value from environment or properties
-     */
+
     private static String getEnvOrProperty(String envName, Properties props, String propName) {
         String envValue = System.getenv(envName);
         return (envValue != null && !envValue.isEmpty()) ? envValue : props.getProperty(propName);
