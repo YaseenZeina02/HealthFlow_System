@@ -14,6 +14,7 @@ module com.example.healthflow {
     requires org.kordamp.ikonli.javafx;
     requires org.kordamp.ikonli.fontawesome5;
     requires javafx.base;
+    requires org.jetbrains.annotations;
 
     opens com.example.healthflow.model to javafx.base;
     opens com.example.healthflow.controllers to javafx.fxml, javafx.base;

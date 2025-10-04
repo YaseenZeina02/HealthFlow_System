@@ -417,3 +417,24 @@ ALTER TABLE patients
 DROP COLUMN IF EXISTS gender;
 
 -- (لو عندك أي فهارس/أكواد كانت تشير إلى patients.gender، احذفها قبل هذا السطر)
+
+
+--      اضافة حالة الدكتور
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'doctor_status') THEN
+CREATE TYPE doctor_status AS ENUM (
+      'AVAILABLE',
+      'IN_APPOINTMENT',
+      'ON_BREAK'
+    );
+END IF;
+END $$;
+
+-- 2) أضف العمود للجدول
+ALTER TABLE doctors
+    ADD COLUMN IF NOT EXISTS availability_status doctor_status NOT NULL DEFAULT 'AVAILABLE';
+
+-- 3) أضف فهرس للبحث السريع
+CREATE INDEX IF NOT EXISTS idx_doctor_availability
+    ON doctors(availability_status);

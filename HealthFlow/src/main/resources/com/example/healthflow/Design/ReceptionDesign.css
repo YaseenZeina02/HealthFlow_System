@@ -66,49 +66,6 @@
 
 
 
-/*!* لوّن شريط التحديد مع وبدون فوكس (اختياري بس مفيد) *!*/
-/*.table-view {*/
-/*    -fx-selection-bar: #2d6aa6;*/
-/*    -fx-selection-bar-non-focused: #8aaed3;*/
-/*}*/
-
-/*!* نص الخلايا – أسود، وخلفية الخلية نفسها شفافة*/
-/*   (عشان ما تغطي لون التحديد) *!*/
-/*.table-view .table-cell {*/
-/*    -fx-background-color: transparent;   !* مهم: لا تكون بيضاء *!*/
-/*    -fx-text-fill: #000000;*/
-/*    -fx-font-family: "Arial";*/
-/*    -fx-font-size: 13px;*/
-/*}*/
-
-/*!* لبعض السكِنات التي تستخدم Node Text داخل الخلية *!*/
-/*.table-view .table-row-cell .text {*/
-/*    -fx-fill: #000000;*/
-/*}*/
-
-/*!* خلفية الصفوف (غير محددة) تبقى بيضاء عشان شكل الجدول ما يتغيّر *!*/
-/*.table-view .table-row-cell {*/
-/*    -fx-background-color: #ffffff;*/
-/*}*/
-
-/*!* الصف المحدد مع وجود فوكس *!*/
-/*.table-view:focused .table-row-cell:filled:selected {*/
-/*    -fx-background-color: -fx-selection-bar;*/
-/*}*/
-
-/*!* الصف المحدد بدون فوكس *!*/
-/*.table-view .table-row-cell:filled:selected {*/
-/*    -fx-background-color: -fx-selection-bar-non-focused;*/
-/*}*/
-
-/*!* خلي نص الخلايا أبيض وقت التحديد *!*/
-/*.table-view .table-row-cell:filled:selected .table-cell {*/
-/*    -fx-text-fill: #ffffff;*/
-/*}*/
-/*.table-view .table-row-cell:filled:selected .text {*/
-/*    -fx-fill: #ffffff;*/
-/*}*/
-
 
 
 /* table view styling */
@@ -144,10 +101,7 @@
     -fx-font-size: 13px;      /* ممكن تعدل الحجم لو بدك */
 }
 
-/*.table-view .table-cell {*/
-/*    -fx-background-color: #3A9BDC;*/
-/*    -fx-text-fill: #000000;*/
-/*}*/
+
 
 .table-view:focused .table-row-cell:filled:selected {
     -fx-background-color: -fx-selection-bar;
@@ -169,4 +123,24 @@
 }
 .table-view .table-row-cell:filled:selected .text {
     -fx-fill: #ffffff !important;
+}
+
+.nav-btn {
+    -fx-background-color: transparent;
+    -fx-text-fill: #e6f2f6;
+    -fx-alignment: CENTER_LEFT;
+    -fx-padding: 8 14 8 14;
+    -fx-background-radius: 3;
+}
+
+/*.nav-btn:hover {*/
+/*    -fx-background-color: rgba(255,255,255,0.08);*/
+/*}*/
+
+/* الزر النشط */
+.nav-btn.current {
+    -fx-background-color: linear-gradient(to right, #1e88e5, #28b6f6);
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.25), 8, 0, 0, 2);
 }
