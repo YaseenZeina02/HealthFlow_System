@@ -25,7 +25,7 @@ public class App extends Application {
             Duration.ofSeconds(5),
             Duration.ofSeconds(2)
     );
-
+    // لإدارة مهمة الـ warm-up
     // لإدارة مهمة الـ warm-up
     private ExecutorService warmupExec;
     private Future<?> warmupTask;
