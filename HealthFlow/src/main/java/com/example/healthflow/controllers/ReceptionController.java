@@ -29,7 +29,7 @@ import javafx.stage.Stage;
 import javafx.util.Duration;
 import org.controlsfx.control.textfield.AutoCompletionBinding;
 import org.controlsfx.control.textfield.TextFields;
-
+import javafx.beans.property.ReadOnlyObjectWrapper;
 
 import java.io.IOException;
 import java.sql.*;
@@ -44,114 +44,203 @@ import java.util.TreeSet;
 public class ReceptionController {
 
     /* ============ UI ============ */
-    @FXML private AnchorPane DashboardAnchorPane;
-    @FXML private AnchorPane PatientAnchorPane;
-    @FXML private AnchorPane AppointmentsAnchorPane;
-    @FXML private AnchorPane DoctorAnchorPane;
-    @FXML private StackPane rootPane;
+    @FXML
+    private AnchorPane DashboardAnchorPane;
+    @FXML
+    private AnchorPane PatientAnchorPane;
+    @FXML
+    private AnchorPane AppointmentsAnchorPane;
+    @FXML
+    private AnchorPane DoctorAnchorPane;
+    @FXML
+    private StackPane rootPane;
 
-    @FXML private Button DachboardButton;
-    @FXML private Button PatientsButton;
-    @FXML private Button AppointmentsButton;
-    @FXML private Button BackButton;
-    @FXML private Button DoctorsButton;
+    @FXML
+    private Button DachboardButton;
+    @FXML
+    private Button PatientsButton;
+    @FXML
+    private Button AppointmentsButton;
+    @FXML
+    private Button BackButton;
+    @FXML
+    private Button DoctorsButton;
 
-    @FXML private Label DateOfDay;
-    @FXML private Label time;
-    @FXML private Label welcomeUser;
+    @FXML
+    private Label DateOfDay;
+    @FXML
+    private Label time;
+    @FXML
+    private Label welcomeUser;
 
-    @FXML private Label UsernameLabel;
-    @FXML private Label UserIdLabel;
+    @FXML
+    private Label UsernameLabel;
+    @FXML
+    private Label UserIdLabel;
 
     // ===== Patients form =====
-    @FXML private TextField FullNameTextField;
-    @FXML private TextField PatientIdTextField;   // National Id
-    @FXML private ComboBox<Gender> GenderComboBox;
-    @FXML private DatePicker DateOfBirthPicker;
-    @FXML private TextField PhoneTextField;
-    @FXML private TextArea  medicalHistory;
-
-    @FXML private Button InsertButton;
-    @FXML private Button UpdateButton;
-    @FXML private Button deleteButton;
-    @FXML private Button clearBtn;
-
-    @FXML private TextField search;
-
-    @FXML private TableView<PatientRow> patientTable;
-    @FXML private TableColumn<PatientRow, String>    colNationalId;
-    @FXML private TableColumn<PatientRow, String>    colName;
-    @FXML private TableColumn<PatientRow, String>    colGender;
-    @FXML private TableColumn<PatientRow, LocalDate> colDob;
-    @FXML private TableColumn<PatientRow, String>    colPhoneNumber;
-    @FXML private TableColumn<PatientRow, String>    colMedicalHistory;
-
-    @FXML private Label NumberOfTotalAppointments;
-    @FXML private Label NumberOfTotalDoctors;
-    @FXML private Label NumberOfTotalPatients;
-
-    @FXML private Circle ActiveStatus;
-
-    @FXML private TableColumn<?, ?> AppointmentIdColumn;
-    @FXML private AnchorPane Appointments;
-    @FXML private AnchorPane CenterAnchorPane;
-    @FXML private AnchorPane Doctors;
-    @FXML private AnchorPane Patients;
-
-    @FXML private Label TotalAppointments;
-    @FXML private Label TotalDoctors;
+    @FXML
+    private TextField FullNameTextField;
+    @FXML
+    private TextField PatientIdTextField;   // National Id
+    @FXML
+    private ComboBox<Gender> GenderComboBox;
+    @FXML
+    private DatePicker DateOfBirthPicker;
+    @FXML
+    private TextField PhoneTextField;
+    @FXML
+    private TextArea medicalHistory;
 
     @FXML
-    private TableView<?> TableAppInDashboard;
-    @FXML private TableColumn<?, ?> colActionDash;
-    @FXML private TableColumn<?, ?> colAppintementDateDash;
-    @FXML private TableColumn<?, ?> colAppintementTimeDash;
-    @FXML private TableColumn<?, ?> colDoctorNameDash;
-    @FXML private TableColumn<?, ?> colPatientNameDash;
-    @FXML private BarChart<?, ?> patientDetails;
-    @FXML private Button clearSelectionDach;
+    private Button InsertButton;
+    @FXML
+    private Button UpdateButton;
+    @FXML
+    private Button deleteButton;
+    @FXML
+    private Button clearBtn;
 
-    @FXML private TextField searchAppointmentDach;
-    @FXML private TextField searchDoctor;
+    @FXML
+    private TextField search;
 
-    @FXML private Button insertAppointments;
-    @FXML private Label TotalPatients;
-    @FXML private Button BookAppointmentFromPateint;
-    @FXML private Button updateAppointments;
-    @FXML private ComboBox<String> DoctorspecialtyApp;           // list of specialties
-    @FXML private ComboBox<DoctorDAO.DoctorOption> avilabelDoctorApp; // available doctors for selected specialty
-    @FXML private Button clear_Appointments;
-    @FXML private Button deleteAppointments;
+    @FXML
+    private TableView<PatientRow> patientTable;
+    @FXML
+    private TableColumn<PatientRow, String> colNationalId;
+    @FXML
+    private TableColumn<PatientRow, String> colName;
+    @FXML
+    private TableColumn<PatientRow, String> colGender;
+    @FXML
+    private TableColumn<PatientRow, LocalDate> colDob;
+    @FXML
+    private TableColumn<PatientRow, String> colPhoneNumber;
+    @FXML
+    private TableColumn<PatientRow, String> colMedicalHistory;
+
+    @FXML
+    private Label NumberOfTotalAppointments;
+    @FXML
+    private Label NumberOfTotalDoctors;
+    @FXML
+    private Label NumberOfTotalPatients;
+    @FXML
+    private Label patientCompleteNum;
+    @FXML
+    private Label RemainingNum;
+    private final ObservableList<DoctorDAO.AppointmentRow> apptData = FXCollections.observableArrayList();
+
+    @FXML
+    private Circle ActiveStatus;
+
+    @FXML
+    private TableColumn<?, ?> AppointmentIdColumn;
+    @FXML
+    private AnchorPane Appointments;
+    @FXML
+    private AnchorPane CenterAnchorPane;
+    @FXML
+    private AnchorPane Doctors;
+    @FXML
+    private AnchorPane Patients;
+
+    @FXML
+    private Label TotalAppointments;
+    @FXML
+    private Label TotalDoctors;
+
+    @FXML private TableView<DoctorDAO.AppointmentRow> TableAppInDashboard;
+
+    @FXML private TableColumn<DoctorDAO.AppointmentRow, Number>      colAppointmentID;
+    @FXML private TableColumn<DoctorDAO.AppointmentRow, Void>      colActionDash;
+    @FXML private TableColumn<DoctorDAO.AppointmentRow, LocalDate>  colAppintementDateDash;
+    @FXML private TableColumn<DoctorDAO.AppointmentRow, String>     colAppintementTimeDash;
+    @FXML private TableColumn<DoctorDAO.AppointmentRow, String>     colDoctorNameDash;
+    @FXML private TableColumn<DoctorDAO.AppointmentRow, String>     colPatientNameDash;
+    @FXML
+    private BarChart<?, ?> patientDetails;
+    @FXML
+    private Button clearSelectionDach;
+
+    @FXML
+    private TextField searchAppointmentDach;
+    @FXML
+    private TextField searchDoctor;
+
+    @FXML
+    private Button insertAppointments;
+    @FXML
+    private Label TotalPatients;
+    @FXML
+    private Button BookAppointmentFromPateint;
+    @FXML
+    private Button updateAppointments;
+    @FXML
+    private ComboBox<String> DoctorspecialtyApp;           // list of specialties
+    @FXML
+    private ComboBox<DoctorDAO.DoctorOption> avilabelDoctorApp; // available doctors for selected specialty
+    @FXML
+    private Button clear_Appointments;
+    @FXML
+    private Button deleteAppointments;
 
     // In Appointment Anchorpane
+//    @FXML
+//    private TableView<?> TableINAppointment;
+//    @FXML
+//    private TableColumn<?, ?> colAppointmentIDAppointment;
+//    @FXML
+//    private TableColumn<?, ?> colDateAppointment;
+//    @FXML
+//    private TableColumn<?, ?> colDoctorNameAppointment;
+//    @FXML
+//    private TableColumn<?, ?> colPatientNameAppointment;
+//    @FXML
+//    private TableColumn<?, ?> colSpecialty;
+//    @FXML
+//    private TableColumn<?, ?> colStatusAppointment;
+//    @FXML
+//    private TableColumn<?, ?> colTimeAppointment;
+
+    @FXML private TableView<DoctorDAO.AppointmentRow> TableINAppointment;
+    @FXML private TableColumn<DoctorDAO.AppointmentRow, Number> colAppointmentIDAppointment;
+    @FXML private TableColumn<DoctorDAO.AppointmentRow, LocalDate> colDateAppointment;
+    @FXML private TableColumn<DoctorDAO.AppointmentRow, String> colDoctorNameAppointment;
+    @FXML private TableColumn<DoctorDAO.AppointmentRow, String> colPatientNameAppointment;
+    @FXML private TableColumn<DoctorDAO.AppointmentRow, String> colSpecialty;
+    @FXML private TableColumn<DoctorDAO.AppointmentRow, String> colStatusAppointment;
+    @FXML private TableColumn<DoctorDAO.AppointmentRow, String> colTimeAppointment;
+
     @FXML
-    private TableView<?> TableINAppointment;
-    @FXML private TableColumn<?, ?> colAppointmentIDAppointment;
-    @FXML private TableColumn<?, ?> colDateAppointment;
-    @FXML private TableColumn<?, ?> colDoctorNameAppointment;
-    @FXML private TableColumn<?, ?> colPatientNameAppointment;
-    @FXML private TableColumn<?, ?> colSpecialty;
-    @FXML private TableColumn<?, ?> colStatusAppointment;
-    @FXML private TableColumn<?, ?> colTimeAppointment;
-    @FXML private Button deleteButtonAppointment;
-    @FXML private Label getPatientName;
-    @FXML private Label getPatientID;
+    private Button deleteButtonAppointment;
+    @FXML
+    private Label getPatientName;
+    @FXML
+    private Label getPatientID;
 
     // ===== Doctors table (تأكّد من fx:id في FXML) =====
-    @FXML private TableView<DoctorRow> DocTable_Recption;
-    @FXML private TableColumn<DoctorRow, String>  colDoctor_name;
-    @FXML private TableColumn<DoctorRow, String>  colDoctor_Gender;
-    @FXML private TableColumn<DoctorRow, String>  colDoctor_Phone;
-    @FXML private TableColumn<DoctorRow, String>  colDoctor_Specialty;
-    @FXML private TableColumn<DoctorRow, String>  colDoctor_bio;
-    @FXML private TableColumn<DoctorRow, String>  colDoctor_Status;
-    @FXML private TableColumn<DoctorRow, Boolean> colDoctor_available;
+    @FXML
+    private TableView<DoctorRow> DocTable_Recption;
+    @FXML
+    private TableColumn<DoctorRow, String> colDoctor_name;
+    @FXML
+    private TableColumn<DoctorRow, String> colDoctor_Gender;
+    @FXML
+    private TableColumn<DoctorRow, String> colDoctor_Phone;
+    @FXML
+    private TableColumn<DoctorRow, String> colDoctor_Specialty;
+    @FXML
+    private TableColumn<DoctorRow, String> colDoctor_bio;
+    @FXML
+    private TableColumn<DoctorRow, String> colDoctor_Status;
+    @FXML
+    private TableColumn<DoctorRow, Boolean> colDoctor_available;
 
 
     @FXML
     private DatePicker AppointmentDate;
 //    -----
-
 
 
     @FXML
@@ -166,17 +255,15 @@ public class ReceptionController {
 
     //    @FXML
     //    private DatePicker setAppointmentDate;
-    @FXML private ComboBox<DoctorDAO.Slot> cmbSlots;
-
-
-
-
+    @FXML
+    private ComboBox<DoctorDAO.Slot> cmbSlots;
 
 
     // To color current nav button
     private static final String ACTIVE_CLASS = "current";
     private static final java.time.format.DateTimeFormatter SLOT_FMT_12H =
             java.time.format.DateTimeFormatter.ofPattern("hh:mm a");
+
     private void markNavActive(Button active) {
         Button[] all = {DachboardButton, DoctorsButton, PatientsButton, AppointmentsButton};
         for (Button b : all) {
@@ -189,7 +276,7 @@ public class ReceptionController {
     }
 
     /* ============ Types ============ */
-    public enum Gender { MALE, FEMALE }
+    public enum Gender {MALE, FEMALE}
 
     /* ============ State ============ */
     private final ObservableList<PatientRow> patientData = FXCollections.observableArrayList();
@@ -211,7 +298,10 @@ public class ReceptionController {
     public ReceptionController(ConnectivityMonitor monitor) {
         this.monitor = monitor;
     }
-    public ReceptionController() { this(new ConnectivityMonitor()); }
+
+    public ReceptionController() {
+        this(new ConnectivityMonitor());
+    }
 
     /* ============ Init ============ */
     @FXML
@@ -233,7 +323,7 @@ public class ReceptionController {
 
         if (!listenerRegistered) {
             listenerRegistered = true;
-            final boolean[] firstEmissionHandled = { false };
+            final boolean[] firstEmissionHandled = {false};
             monitor.onlineProperty().addListener((obs, wasOnline, isOnline) -> {
                 if (!firstEmissionHandled[0]) {
                     firstEmissionHandled[0] = true;
@@ -273,9 +363,15 @@ public class ReceptionController {
         wireSearchDoctors();
         setupDoctorFilters();
 
-        InsertButton.setOnAction(e -> { if (ensureOnlineOrAlert()) doInsertPatient(); });
-        UpdateButton.setOnAction(e -> { if (ensureOnlineOrAlert()) doUpdatePatient(); });
-        deleteButton.setOnAction(e -> { if (ensureOnlineOrAlert()) doDeletePatient(); });
+        InsertButton.setOnAction(e -> {
+            if (ensureOnlineOrAlert()) doInsertPatient();
+        });
+        UpdateButton.setOnAction(e -> {
+            if (ensureOnlineOrAlert()) doUpdatePatient();
+        });
+        deleteButton.setOnAction(e -> {
+            if (ensureOnlineOrAlert()) doDeletePatient();
+        });
         clearBtn.setOnAction(e -> clearForm());
         BookAppointmentFromPateint.setOnAction(e -> {
             PatientRow row = (patientTable == null) ? null : patientTable.getSelectionModel().getSelectedItem();
@@ -289,14 +385,19 @@ public class ReceptionController {
             }
             // Pre-fill appointment panel labels (if present)
             if (getPatientName != null) getPatientName.setText(row.getFullName());
-            if (getPatientID != null)   getPatientID.setText(row.getNationalId());
+            if (getPatientID != null) getPatientID.setText(row.getNationalId());
             // Navigate to the appointment pane
             showAppointmentPane();
             if (DoctorspecialtyApp != null && DoctorspecialtyApp.getItems().isEmpty()) loadSpecialtiesAsync();
         });
 
         Platform.runLater(() -> {
-            new Thread(() -> { try { loadHeaderUser(); } catch (Exception ignored) {} }, "hdr-user-load").start();
+            new Thread(() -> {
+                try {
+                    loadHeaderUser();
+                } catch (Exception ignored) {
+                }
+            }, "hdr-user-load").start();
             new Thread(this::loadPatientsBG, "patients-load").start();
             new Thread(this::loadDoctorsBG, "doctors-load").start();
         });
@@ -308,7 +409,7 @@ public class ReceptionController {
                 super.updateItem(s, empty);
                 setText(empty || s == null ? null :
                         s.from().toLocalTime().format(SLOT_FMT_12H) + " \u2192 " +
-                        s.to().toLocalTime().format(SLOT_FMT_12H));
+                                s.to().toLocalTime().format(SLOT_FMT_12H));
             }
         });
         cmbSlots.setButtonCell(new ListCell<DoctorDAO.Slot>() {
@@ -317,7 +418,7 @@ public class ReceptionController {
                 super.updateItem(s, empty);
                 setText(empty || s == null ? "Select a slot"
                         : s.from().toLocalTime().format(SLOT_FMT_12H) + " \u2192 " +
-                          s.to().toLocalTime().format(SLOT_FMT_12H));
+                        s.to().toLocalTime().format(SLOT_FMT_12H));
             }
         });
 
@@ -328,7 +429,31 @@ public class ReceptionController {
             avilabelDoctorApp.valueProperty().addListener((o, a, b) -> refreshSlots());
         }
         showDashboardPane();
+
+        // appointments wiring + load
+        wireAppointmentsTables();
+        wireDashboardAppointmentsSearch();
+        if (clearSelectionDach != null) clearSelectionDach.setOnAction(e -> {
+            if (TableAppInDashboard != null)
+                TableAppInDashboard.getSelectionModel().clearSelection();
+            if (patientDetails != null)
+                patientDetails.getData().clear(); // يمسح البار-تشارت
+            if (searchAppointmentDach != null)
+                searchAppointmentDach.clear();    // يمسح البحث
+        });
+
+        // CRUD buttons
+        if (insertAppointments != null) insertAppointments.setOnAction(e -> doInsertAppointment());
+        if (updateAppointments != null) updateAppointments.setOnAction(e -> doUpdateAppointment());
+        if (deleteAppointments != null) deleteAppointments.setOnAction(e -> doDeleteAppointment());
+        if (clear_Appointments != null) clear_Appointments.setOnAction(e -> doClearAppointmentForm());
+
+        // initial data loads
+        new Thread(this::loadAppointmentsTable, "appt-load").start();
+        new Thread(this::updateAppointmentCounters, "appt-counts").start();
     }
+
+
 
 //    private void refreshSlots() {
 //        if (cmbSlots == null) return;
@@ -380,7 +505,7 @@ public class ReceptionController {
             return;
         }
 
-        final LocalTime open  = LocalTime.of(9, 0);   // بداية الدوام
+        final LocalTime open = LocalTime.of(9, 0);   // بداية الدوام
         final LocalTime close = LocalTime.of(15, 0);  // نهاية الدوام
         final int slotMinutes = 20;
 
@@ -459,13 +584,15 @@ public class ReceptionController {
 
     /* ============ Load header user ============ */
     private void loadHeaderUser() {
-        var u = Session.get(); if (u == null) return;
+        var u = Session.get();
+        if (u == null) return;
         String sql = "SELECT id, full_name FROM users WHERE id = ?";
         try (Connection c = Database.get(); PreparedStatement ps = c.prepareStatement(sql)) {
             ps.setLong(1, u.getId());
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
-                    long id = rs.getLong("id"); String fullName = rs.getString("full_name");
+                    long id = rs.getLong("id");
+                    String fullName = rs.getString("full_name");
                     Platform.runLater(() -> {
                         UsernameLabel.setText(fullName);
                         UserIdLabel.setText(Long.toString(id));
@@ -474,13 +601,15 @@ public class ReceptionController {
                     return;
                 }
             }
-        } catch (SQLException ignored) {}
+        } catch (SQLException ignored) {
+        }
         Platform.runLater(() -> {
             UsernameLabel.setText(u.getFullName());
             UserIdLabel.setText(String.valueOf(u.getId()));
             welcomeUser.setText(firstName(u.getFullName()));
         });
     }
+
     private String firstName(String full) {
         if (full == null || full.isBlank()) return "";
         return full.trim().split("\\s+")[0];
@@ -534,6 +663,7 @@ public class ReceptionController {
         DoctorAnchorPane.setVisible(false);
         markNavActive(DachboardButton);
     }
+
     private void showDoctorPane() {
         DashboardAnchorPane.setVisible(false);
         PatientAnchorPane.setVisible(false);
@@ -541,6 +671,7 @@ public class ReceptionController {
         DoctorAnchorPane.setVisible(true);
         markNavActive(DoctorsButton);
     }
+
     private void showPatientsPane() {
         DashboardAnchorPane.setVisible(false);
         PatientAnchorPane.setVisible(true);
@@ -548,6 +679,7 @@ public class ReceptionController {
         DoctorAnchorPane.setVisible(false);
         markNavActive(PatientsButton);
     }
+
     private void showAppointmentPane() {
         DashboardAnchorPane.setVisible(false);
         PatientAnchorPane.setVisible(false);
@@ -597,7 +729,9 @@ public class ReceptionController {
         patientTable.setItems(sorted);
     }
 
-    private boolean contains(String v, String q) { return v != null && v.toLowerCase().contains(q); }
+    private boolean contains(String v, String q) {
+        return v != null && v.toLowerCase().contains(q);
+    }
 
     private void loadPatientsBG() {
         try {
@@ -619,13 +753,15 @@ public class ReceptionController {
     /* ============ Doctors: table, search, load ============ */
     private void wireDoctorTable() {
         // ربط الأعمدة
-        if (colDoctor_name != null)       colDoctor_name.setCellValueFactory(cd -> cd.getValue().fullNameProperty());
-        if (colDoctor_Gender != null)     colDoctor_Gender.setCellValueFactory(cd -> cd.getValue().genderProperty());
-        if (colDoctor_Phone != null)      colDoctor_Phone.setCellValueFactory(cd -> cd.getValue().phoneProperty());
-        if (colDoctor_Specialty != null)  colDoctor_Specialty.setCellValueFactory(cd -> cd.getValue().specialtyProperty());
-        if (colDoctor_bio != null)        colDoctor_bio.setCellValueFactory(cd -> cd.getValue().bioProperty());
-        if (colDoctor_Status != null)     colDoctor_Status.setCellValueFactory(cd -> cd.getValue().statusTextProperty());
-        if (colDoctor_available != null)  colDoctor_available.setCellValueFactory(cd -> cd.getValue().availableProperty());
+        if (colDoctor_name != null) colDoctor_name.setCellValueFactory(cd -> cd.getValue().fullNameProperty());
+        if (colDoctor_Gender != null) colDoctor_Gender.setCellValueFactory(cd -> cd.getValue().genderProperty());
+        if (colDoctor_Phone != null) colDoctor_Phone.setCellValueFactory(cd -> cd.getValue().phoneProperty());
+        if (colDoctor_Specialty != null)
+            colDoctor_Specialty.setCellValueFactory(cd -> cd.getValue().specialtyProperty());
+        if (colDoctor_bio != null) colDoctor_bio.setCellValueFactory(cd -> cd.getValue().bioProperty());
+        if (colDoctor_Status != null) colDoctor_Status.setCellValueFactory(cd -> cd.getValue().statusTextProperty());
+        if (colDoctor_available != null)
+            colDoctor_available.setCellValueFactory(cd -> cd.getValue().availableProperty());
 
         if (DocTable_Recption != null) DocTable_Recption.setItems(doctorData);
     }
@@ -653,7 +789,9 @@ public class ReceptionController {
         }
     }
 
-    /** Load specialties into DoctorspecialtyApp and react to changes to fill avilabelDoctorApp. */
+    /**
+     * Load specialties into DoctorspecialtyApp and react to changes to fill avilabelDoctorApp.
+     */
     private void setupDoctorFilters() {
         // Guard if FXML nodes are absent in this view
         if (DoctorspecialtyApp != null) {
@@ -668,13 +806,15 @@ public class ReceptionController {
             avilabelDoctorApp.setPromptText("Available doctor");
             // Render doctor nicely in drop-down
             avilabelDoctorApp.setCellFactory(list -> new ListCell<>() {
-                @Override protected void updateItem(DoctorDAO.DoctorOption item, boolean empty) {
+                @Override
+                protected void updateItem(DoctorDAO.DoctorOption item, boolean empty) {
                     super.updateItem(item, empty);
-                    setText(empty || item == null ? null : item.fullName + "  (id: " + item.doctorId+")");
+                    setText(empty || item == null ? null : item.fullName + "  (id: " + item.doctorId + ")");
                 }
             });
             avilabelDoctorApp.setButtonCell(new ListCell<>() {
-                @Override protected void updateItem(DoctorDAO.DoctorOption item, boolean empty) {
+                @Override
+                protected void updateItem(DoctorDAO.DoctorOption item, boolean empty) {
                     super.updateItem(item, empty);
                     setText(empty || item == null ? null : item.fullName);
                 }
@@ -682,7 +822,9 @@ public class ReceptionController {
         }
     }
 
-    /** Async: fetch distinct specialties (with available doctors only) and populate DoctorspecialtyApp. */
+    /**
+     * Async: fetch distinct specialties (with available doctors only) and populate DoctorspecialtyApp.
+     */
     private void loadSpecialtiesAsync() {
         if (DoctorspecialtyApp == null) return;
         new Thread(() -> {
@@ -702,7 +844,9 @@ public class ReceptionController {
         }, "recp-specialties").start();
     }
 
-    /** Async: fetch available doctors for a given specialty (null = all). */
+    /**
+     * Async: fetch available doctors for a given specialty (null = all).
+     */
     private void loadAvailableDoctorsForSpecialty(String specialty) {
         if (avilabelDoctorApp == null) return;
         // If no specialty selected, clear list (or you can load all available doctors)
@@ -726,7 +870,9 @@ public class ReceptionController {
     }
 
 
-    /** تحميل كل الدكاترة مع حالتهم */
+    /**
+     * تحميل كل الدكاترة مع حالتهم
+     */
     private void loadDoctorsBG() {
         final String sql = """
             SELECT d.id AS doctor_id,
@@ -769,11 +915,11 @@ public class ReceptionController {
     /* ============ CRUD via Service (patients) ============ */
     private void doInsertPatient() {
         String fullName = trimOrNull(FullNameTextField.getText());
-        String nid      = trimOrNull(PatientIdTextField.getText());
-        Gender gender   = GenderComboBox.getValue();
-        LocalDate dob   = DateOfBirthPicker.getValue();
-        String phone    = trimOrNull(PhoneTextField.getText());
-        String history  = trimOrNull(medicalHistory.getText());
+        String nid = trimOrNull(PatientIdTextField.getText());
+        Gender gender = GenderComboBox.getValue();
+        LocalDate dob = DateOfBirthPicker.getValue();
+        String phone = trimOrNull(PhoneTextField.getText());
+        String history = trimOrNull(medicalHistory.getText());
 
         if (fullName == null || dob == null || gender == null) {
             showWarn("Validation", "Full name, gender and date of birth are required.");
@@ -792,19 +938,24 @@ public class ReceptionController {
             ));
             clearForm();
             showInfo("Insert", "Patient inserted successfully.");
-        } catch (Exception ex) { showError("Insert Patient", ex); }
+        } catch (Exception ex) {
+            showError("Insert Patient", ex);
+        }
     }
 
     private void doUpdatePatient() {
         PatientRow row = patientTable.getSelectionModel().getSelectedItem();
-        if (row == null) { showWarn("Update", "Select a patient row first."); return; }
+        if (row == null) {
+            showWarn("Update", "Select a patient row first.");
+            return;
+        }
 
         String fullName = trimOrNull(FullNameTextField.getText());
-        String nid      = trimOrNull(PatientIdTextField.getText());
-        String phone    = trimOrNull(PhoneTextField.getText());
-        String history  = trimOrNull(medicalHistory.getText());
-        Gender gender   = GenderComboBox.getValue();
-        LocalDate dob   = DateOfBirthPicker.getValue();
+        String nid = trimOrNull(PatientIdTextField.getText());
+        String phone = trimOrNull(PhoneTextField.getText());
+        String history = trimOrNull(medicalHistory.getText());
+        Gender gender = GenderComboBox.getValue();
+        LocalDate dob = DateOfBirthPicker.getValue();
 
         if (fullName == null || dob == null || gender == null) {
             showWarn("Validation", "Full name, gender and date of birth are required.");
@@ -824,12 +975,17 @@ public class ReceptionController {
             patientTable.refresh();
 
             showInfo("Update", "Patient updated successfully.");
-        } catch (Exception ex) { showError("Update Patient", ex); }
+        } catch (Exception ex) {
+            showError("Update Patient", ex);
+        }
     }
 
     private void doDeletePatient() {
         PatientRow row = patientTable.getSelectionModel().getSelectedItem();
-        if (row == null) { showWarn("Delete", "Select a patient row first."); return; }
+        if (row == null) {
+            showWarn("Delete", "Select a patient row first.");
+            return;
+        }
         if (!confirm("Delete", "Are you sure you want to delete this patient?")) return;
 
         try {
@@ -837,7 +993,9 @@ public class ReceptionController {
             patientData.remove(row);
             clearForm();
             showInfo("Delete", "Patient deleted.");
-        } catch (Exception e) { showError("Delete Patient", e); }
+        } catch (Exception e) {
+            showError("Delete Patient", e);
+        }
     }
 
     private void clearForm() {
@@ -907,7 +1065,7 @@ public class ReceptionController {
     /* ============ Row models ============ */
     public static class PatientRow {
         private final LongProperty patientId = new SimpleLongProperty();
-        private final LongProperty userId    = new SimpleLongProperty();
+        private final LongProperty userId = new SimpleLongProperty();
         private final StringProperty fullName = new SimpleStringProperty();
         private final StringProperty nationalId = new SimpleStringProperty();
         private final StringProperty phone = new SimpleStringProperty();
@@ -917,45 +1075,116 @@ public class ReceptionController {
 
         public PatientRow(Long patientId, Long userId, String fullName, String nationalId,
                           String phone, LocalDate dob, String gender, String medicalHistory) {
-            setPatientId(patientId); setUserId(userId); setFullName(fullName);
-            setNationalId(nationalId); setPhone(phone); setDateOfBirth(dob);
-            setGender(gender); setMedicalHistory(medicalHistory);
+            setPatientId(patientId);
+            setUserId(userId);
+            setFullName(fullName);
+            setNationalId(nationalId);
+            setPhone(phone);
+            setDateOfBirth(dob);
+            setGender(gender);
+            setMedicalHistory(medicalHistory);
         }
 
-        public long getPatientId() { return patientId.get(); }
-        public void setPatientId(long v) { patientId.set(v); }
-        public LongProperty patientIdProperty() { return patientId; }
+        public long getPatientId() {
+            return patientId.get();
+        }
 
-        public long getUserId() { return userId.get(); }
-        public void setUserId(long v) { userId.set(v); }
-        public LongProperty userIdProperty() { return userId; }
+        public void setPatientId(long v) {
+            patientId.set(v);
+        }
 
-        public String getFullName() { return fullName.get(); }
-        public void setFullName(String v) { fullName.set(v); }
-        public StringProperty fullNameProperty() { return fullName; }
+        public LongProperty patientIdProperty() {
+            return patientId;
+        }
 
-        public String getNationalId() { return nationalId.get(); }
-        public void setNationalId(String v) { nationalId.set(v); }
-        public StringProperty nationalIdProperty() { return nationalId; }
+        public long getUserId() {
+            return userId.get();
+        }
 
-        public String getPhone() { return phone.get(); }
-        public void setPhone(String v) { phone.set(v); }
-        public StringProperty phoneProperty() { return phone; }
+        public void setUserId(long v) {
+            userId.set(v);
+        }
 
-        public LocalDate getDateOfBirth() { return dateOfBirth.get(); }
-        public void setDateOfBirth(LocalDate v) { dateOfBirth.set(v); }
-        public ObjectProperty<LocalDate> dateOfBirthProperty() { return dateOfBirth; }
+        public LongProperty userIdProperty() {
+            return userId;
+        }
 
-        public String getGender() { return gender.get(); }
-        public void setGender(String v) { gender.set(v); }
-        public StringProperty genderProperty() { return gender; }
+        public String getFullName() {
+            return fullName.get();
+        }
 
-        public String getMedicalHistory() { return medicalHistory.get(); }
-        public void setMedicalHistory(String v) { medicalHistory.set(v); }
-        public StringProperty medicalHistoryProperty() { return medicalHistory; }
+        public void setFullName(String v) {
+            fullName.set(v);
+        }
+
+        public StringProperty fullNameProperty() {
+            return fullName;
+        }
+
+        public String getNationalId() {
+            return nationalId.get();
+        }
+
+        public void setNationalId(String v) {
+            nationalId.set(v);
+        }
+
+        public StringProperty nationalIdProperty() {
+            return nationalId;
+        }
+
+        public String getPhone() {
+            return phone.get();
+        }
+
+        public void setPhone(String v) {
+            phone.set(v);
+        }
+
+        public StringProperty phoneProperty() {
+            return phone;
+        }
+
+        public LocalDate getDateOfBirth() {
+            return dateOfBirth.get();
+        }
+
+        public void setDateOfBirth(LocalDate v) {
+            dateOfBirth.set(v);
+        }
+
+        public ObjectProperty<LocalDate> dateOfBirthProperty() {
+            return dateOfBirth;
+        }
+
+        public String getGender() {
+            return gender.get();
+        }
+
+        public void setGender(String v) {
+            gender.set(v);
+        }
+
+        public StringProperty genderProperty() {
+            return gender;
+        }
+
+        public String getMedicalHistory() {
+            return medicalHistory.get();
+        }
+
+        public void setMedicalHistory(String v) {
+            medicalHistory.set(v);
+        }
+
+        public StringProperty medicalHistoryProperty() {
+            return medicalHistory;
+        }
     }
 
-    /** صفّ عرض للدكتور */
+    /**
+     * صفّ عرض للدكتور
+     */
     public static class DoctorRow {
         private final LongProperty doctorId = new SimpleLongProperty();
         private final StringProperty fullName = new SimpleStringProperty();
@@ -978,36 +1207,369 @@ public class ReceptionController {
             setAvailable("AVAILABLE".equalsIgnoreCase(statusText));
         }
 
-        public long getDoctorId() { return doctorId.get(); }
-        public void setDoctorId(long v) { doctorId.set(v); }
-        public LongProperty doctorIdProperty() { return doctorId; }
+        public long getDoctorId() {
+            return doctorId.get();
+        }
 
-        public String getFullName() { return fullName.get(); }
-        public void setFullName(String v) { fullName.set(v); }
-        public StringProperty fullNameProperty() { return fullName; }
+        public void setDoctorId(long v) {
+            doctorId.set(v);
+        }
 
-        public String getGender() { return gender.get(); }
-        public void setGender(String v) { gender.set(v); }
-        public StringProperty genderProperty() { return gender; }
+        public LongProperty doctorIdProperty() {
+            return doctorId;
+        }
 
-        public String getPhone() { return phone.get(); }
-        public void setPhone(String v) { phone.set(v); }
-        public StringProperty phoneProperty() { return phone; }
+        public String getFullName() {
+            return fullName.get();
+        }
 
-        public String getSpecialty() { return specialty.get(); }
-        public void setSpecialty(String v) { specialty.set(v); }
-        public StringProperty specialtyProperty() { return specialty; }
+        public void setFullName(String v) {
+            fullName.set(v);
+        }
 
-        public String getBio() { return bio.get(); }
-        public void setBio(String v) { bio.set(v); }
-        public StringProperty bioProperty() { return bio; }
+        public StringProperty fullNameProperty() {
+            return fullName;
+        }
 
-        public String getStatusText() { return statusText.get(); }
-        public void setStatusText(String v) { statusText.set(v); }
-        public StringProperty statusTextProperty() { return statusText; }
+        public String getGender() {
+            return gender.get();
+        }
 
-        public boolean isAvailable() { return available.get(); }
-        public void setAvailable(boolean v) { available.set(v); }
-        public BooleanProperty availableProperty() { return available; }
+        public void setGender(String v) {
+            gender.set(v);
+        }
+
+        public StringProperty genderProperty() {
+            return gender;
+        }
+
+        public String getPhone() {
+            return phone.get();
+        }
+
+        public void setPhone(String v) {
+            phone.set(v);
+        }
+
+        public StringProperty phoneProperty() {
+            return phone;
+        }
+
+        public String getSpecialty() {
+            return specialty.get();
+        }
+
+        public void setSpecialty(String v) {
+            specialty.set(v);
+        }
+
+        public StringProperty specialtyProperty() {
+            return specialty;
+        }
+
+        public String getBio() {
+            return bio.get();
+        }
+
+        public void setBio(String v) {
+            bio.set(v);
+        }
+
+        public StringProperty bioProperty() {
+            return bio;
+        }
+
+        public String getStatusText() {
+            return statusText.get();
+        }
+
+        public void setStatusText(String v) {
+            statusText.set(v);
+        }
+
+        public StringProperty statusTextProperty() {
+            return statusText;
+        }
+
+        public boolean isAvailable() {
+            return available.get();
+        }
+
+        public void setAvailable(boolean v) {
+            available.set(v);
+        }
+
+        public BooleanProperty availableProperty() {
+            return available;
+        }
+    }
+
+
+    /**
+     * Wire both appointments tables (main & dashboard) to display AppointmentRow.
+     */
+    private void wireAppointmentsTables() {
+        // Appointments main table
+        if (TableINAppointment != null) {
+            colAppointmentIDAppointment.setCellValueFactory(cd -> new SimpleLongProperty(cd.getValue().id));
+            colDateAppointment.setCellValueFactory(cd -> new SimpleObjectProperty<>(cd.getValue().startAt.toLocalDate()));
+            colTimeAppointment.setCellValueFactory(cd -> new SimpleStringProperty(cd.getValue().startAt.toLocalTime().format(SLOT_FMT_12H)));
+            colDoctorNameAppointment.setCellValueFactory(cd -> new SimpleStringProperty(cd.getValue().doctorName));
+            colPatientNameAppointment.setCellValueFactory(cd -> new SimpleStringProperty(cd.getValue().patientName));
+            colSpecialty.setCellValueFactory(cd -> new SimpleStringProperty(cd.getValue().specialty));
+            colStatusAppointment.setCellValueFactory(cd -> new SimpleStringProperty(cd.getValue().status));
+
+            TableINAppointment.setItems(apptData);
+        }
+
+        // Dashboard table
+        if (TableAppInDashboard != null) {
+//            if (colAppointmentID != null) {
+                colAppointmentID.setCellValueFactory(cd ->
+                        new ReadOnlyObjectWrapper<>(cd.getValue().id));
+//            }
+            colAppintementDateDash.setCellValueFactory(cd -> new SimpleObjectProperty<>(cd.getValue().startAt.toLocalDate()));
+            colAppintementTimeDash.setCellValueFactory(cd -> new SimpleStringProperty(cd.getValue().startAt.toLocalTime().format(SLOT_FMT_12H)));
+            colDoctorNameDash.setCellValueFactory(cd -> new SimpleStringProperty(cd.getValue().doctorName));
+            colPatientNameDash.setCellValueFactory(cd -> new SimpleStringProperty(cd.getValue().patientName));
+
+            if (colActionDash != null) {
+                colActionDash.setCellFactory(col -> new TableCell<DoctorDAO.AppointmentRow, Void>() {
+                    final Button btn = new Button("Complete");
+
+                    {
+                        btn.setOnAction(e -> {
+                            DoctorDAO.AppointmentRow row =
+                                    getTableView().getItems().get(getIndex());
+                            if (row == null) return;
+
+                            if (!confirm("Complete Appointment",
+                                    "Mark this appointment as completed?")) return;
+
+                            new Thread(() -> {
+                                try {
+                                    // 1) حدّث الحالة في الداتابيز
+                                    doctorDAO.markAppointmentCompleted(row.id);
+
+                                    // 2) شيل السطر من الجدول وحدّث العدّادات والرسم
+                                    Platform.runLater(() -> {
+                                        apptData.remove(row);
+                                        updateAppointmentCounters();
+                                        if (patientDetails != null) patientDetails.getData().clear();
+                                    });
+                                } catch (Exception ex) {
+                                    Platform.runLater(() -> showError("Complete Appointment", ex));
+                                }
+                            }, "appt-complete").start();
+                        });
+                    }
+
+                    @Override
+                    protected void updateItem(Void item, boolean empty) {
+                        super.updateItem(item, empty);
+                        setGraphic(empty ? null : btn);
+                    }
+                });
+            }
+
+            TableAppInDashboard.setItems(apptData);
+
+            TableAppInDashboard.getSelectionModel().selectedItemProperty()
+                    .addListener((obs, old, row) -> { if (row != null) updatePatientDetailsChart(row); });
+
+
+            TableAppInDashboard.setItems(apptData);
+
+            TableAppInDashboard.getSelectionModel().selectedItemProperty().addListener((obs, old, row) -> {
+                if (row != null) updatePatientDetailsChart(row);
+            });
+        }
+    }
+
+    private void updatePatientDetailsChart(DoctorDAO.AppointmentRow row) {
+        if (patientDetails == null) return;
+        patientDetails.getData().clear();
+        var series = new javafx.scene.chart.XYChart.Series<String, Number>();
+        series.setName("Selected");
+        // Example: show 1 bar for specialty and 1 for status length (purely illustrative)
+        series.getData().add(new javafx.scene.chart.XYChart.Data<>(row.specialty, 1));
+        series.getData().add(new javafx.scene.chart.XYChart.Data<>(row.status, 1));
+        //noinspection unchecked
+        ((BarChart<String, Number>) (BarChart<?, ?>) patientDetails).getData().add(series);
+    }
+
+    private void loadAppointmentsTable() {
+        try {
+            var rows = doctorDAO.listScheduledAppointments(); // فقط الـ SCHEDULED
+            Platform.runLater(() -> apptData.setAll(rows));
+        } catch (Exception e) {
+            showError("Load Appointments", e);
+        }
+    }
+
+    private void updateAppointmentCounters() {
+        try {
+            int doctors = doctorDAO.countAvailableDoctors();
+            int appts = doctorDAO.countAppointments();
+            int patients = doctorDAO.countPatients();
+            int completed = doctorDAO.countCompletedAppointments();
+            int pending = doctorDAO.countPendingAppointments();
+
+            Platform.runLater(() -> {
+                if (NumberOfTotalDoctors != null) NumberOfTotalDoctors.setText(String.valueOf(doctors));
+                if (NumberOfTotalAppointments != null) NumberOfTotalAppointments.setText(String.valueOf(appts));
+                if (NumberOfTotalPatients != null) NumberOfTotalPatients.setText(String.valueOf(patients));
+                if (patientCompleteNum != null) patientCompleteNum.setText(String.valueOf(completed));
+                if (RemainingNum != null) RemainingNum.setText(String.valueOf(pending));
+            });
+        } catch (Exception e) {
+            showError("Counters", e);
+        }
+    }
+
+//    private void wireDashboardAppointmentsSearch() {
+//        if (searchAppointmentDach == null || TableAppInDashboard == null) return;
+//
+//        // filtered/sorted view
+//        FilteredList<DoctorDAO.AppointmentRow> filteredAppts = new FilteredList<>(apptData, a -> true);
+//        searchAppointmentDach.textProperty().addListener((obs, old, q) -> {
+//            String s = (q == null) ? "" : q.trim().toLowerCase();
+//            if (s.isEmpty()) {
+//                filteredAppts.setPredicate(a -> true);
+//            } else {
+//                filteredAppts.setPredicate(a ->
+//                        a.doctorName.toLowerCase().contains(s) ||
+//                                a.patientName.toLowerCase().contains(s) ||
+//                                a.specialty.toLowerCase().contains(s) ||
+//                                a.status.toLowerCase().contains(s) ||
+//                                a.startAt.toLocalDate().toString().contains(s)
+//                );
+//            }
+//        });
+//        SortedList<DoctorDAO.AppointmentRow> sorted = new SortedList<>(filteredAppts);
+//        sorted.comparatorProperty().bind(TableAppInDashboard.comparatorProperty());
+//        TableAppInDashboard.setItems(sorted);
+//    }
+    // هذه بعرض المواعيد المجدولة فقط
+    private void wireDashboardAppointmentsSearch() {
+        if (searchAppointmentDach == null || TableAppInDashboard == null) return;
+
+        searchAppointmentDach.textProperty().addListener((obs, old, q) -> {
+            new Thread(() -> {
+                try {
+                    var rows = (q == null || q.isBlank())
+                            ? doctorDAO.listScheduledAppointments()
+                            : doctorDAO.searchScheduledAppointments(q);
+                    Platform.runLater(() -> apptData.setAll(rows));
+                } catch (Exception e) {
+                    Platform.runLater(() -> showError("Search Appointments", e));
+                }
+            }, "search-appts").start();
+        });
+    }
+
+    private void doInsertAppointment() {
+        try {
+            var doc = (avilabelDoctorApp != null) ? avilabelDoctorApp.getValue() : null;
+            if (doc == null) {
+                showWarn("Validation", "Select a doctor.");
+                return;
+            }
+
+            String nid = (getPatientID != null) ? getPatientID.getText() : null;
+            if (nid == null || nid.isBlank()) {
+                showWarn("Validation", "Select a patient first.");
+                return;
+            }
+
+            var patientId = doctorDAO.findPatientIdByNationalId(nid);
+            if (patientId == null) {
+                showWarn("Validation", "Patient not found.");
+                return;
+            }
+
+            var day = (AppointmentDate != null) ? AppointmentDate.getValue() : null;
+            var slot = (cmbSlots != null) ? cmbSlots.getValue() : null;
+            if (day == null || slot == null) {
+                showWarn("Validation", "Select date and slot.");
+                return;
+            }
+
+            var startAt = slot.from().atOffset(java.time.ZoneOffset.UTC);
+            Long createdBy = null;
+            if (UserIdLabel != null && !UserIdLabel.getText().isBlank()) {
+                try {
+                    createdBy = Long.parseLong(UserIdLabel.getText().trim());
+                } catch (Exception ignored) {
+                }
+            }
+
+            doctorDAO.insertAppointment(doc.doctorId, patientId, startAt, 20, createdBy);
+            showInfo("Insert", "Appointment inserted successfully!");
+            loadAppointmentsTable();
+            updateAppointmentCounters();
+            refreshSlots(); // حتى يختفي الوقت الذي حُجز للتو
+        } catch (Exception e) {
+            showError("Insert Appointment", e);
+        }
+    }
+
+    private void doUpdateAppointment() {
+        if (TableINAppointment == null) {
+            showWarn("Update", "Appointments table not available.");
+            return;
+        }
+        //noinspection unchecked
+        var row = (DoctorDAO.AppointmentRow) ((TableView<?>) TableINAppointment).getSelectionModel().getSelectedItem();
+        if (row == null) {
+            showWarn("Update", "Select an appointment.");
+            return;
+        }
+        var slot = (cmbSlots != null) ? cmbSlots.getValue() : null;
+        if (slot == null) {
+            showWarn("Update", "Select new slot.");
+            return;
+        }
+
+        try {
+            doctorDAO.updateAppointmentTime(row.id, slot.from().atOffset(java.time.ZoneOffset.UTC), 20);
+            showInfo("Update", "Appointment updated.");
+            loadAppointmentsTable();
+            refreshSlots();
+        } catch (Exception e) {
+            showError("Update Appointment", e);
+        }
+    }
+
+    private void doDeleteAppointment() {
+        if (TableINAppointment == null) {
+            showWarn("Delete", "Appointments table not available.");
+            return;
+        }
+        //noinspection unchecked
+        var row = (DoctorDAO.AppointmentRow) ((TableView<?>) TableINAppointment).getSelectionModel().getSelectedItem();
+        if (row == null) {
+            showWarn("Delete", "Select an appointment.");
+            return;
+        }
+
+        try {
+            doctorDAO.deleteAppointment(row.id);
+            showInfo("Delete", "Appointment deleted.");
+            loadAppointmentsTable();
+            updateAppointmentCounters();
+            refreshSlots();
+        } catch (Exception e) {
+            showError("Delete Appointment", e);
+        }
+    }
+
+    private void doClearAppointmentForm() {
+        if (PatientNameForAppointment != null) PatientNameForAppointment.clear();
+        if (PatientIDForAppointment != null) PatientIDForAppointment.clear();
+        if (AppointmentDate != null) AppointmentDate.setValue(LocalDate.now());
+        if (cmbSlots != null) cmbSlots.getItems().clear();
+        if (DoctorspecialtyApp != null) DoctorspecialtyApp.getSelectionModel().clearSelection();
+        if (avilabelDoctorApp != null) avilabelDoctorApp.getItems().clear();
     }
 }

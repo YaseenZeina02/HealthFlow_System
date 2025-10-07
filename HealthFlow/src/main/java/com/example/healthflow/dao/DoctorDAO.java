@@ -479,6 +479,65 @@ public class DoctorDAO {
         }
     }
 
+    /**
+     * Search appointments by free-text over doctor/patient names or status.
+     * If query is null/blank, returns all (same as listAppointments()).
+     */
+    public java.util.List<AppointmentRow> searchAppointments(String query) throws SQLException {
+        String base = """
+            SELECT
+                a.id,
+                a.appointment_date,
+                du.full_name AS doctor_name,
+                pu.full_name AS patient_name,
+                d.specialty,
+                a.status::text AS status
+            FROM appointments a
+            JOIN doctors d      ON d.id = a.doctor_id
+            JOIN users  du      ON du.id = d.user_id
+            JOIN patients p     ON p.id = a.patient_id
+            JOIN users  pu      ON pu.id = p.user_id
+        """;
+        String where = "";
+        boolean hasQ = (query != null && !query.trim().isEmpty());
+        if (hasQ) {
+            where = """
+                WHERE
+                    du.full_name ILIKE ? OR
+                    pu.full_name ILIKE ? OR
+                    d.specialty   ILIKE ? OR
+                    a.status::text ILIKE ?
+            """;
+        }
+        String order = " ORDER BY a.appointment_date DESC";
+        final String sql = base + where + order;
+
+        try (var c = Database.get();
+             var ps = c.prepareStatement(sql)) {
+            if (hasQ) {
+                String q = "%" + query.trim() + "%";
+                ps.setString(1, q);
+                ps.setString(2, q);
+                ps.setString(3, q);
+                ps.setString(4, q);
+            }
+            try (var rs = ps.executeQuery()) {
+                var out = new java.util.ArrayList<AppointmentRow>();
+                while (rs.next()) {
+                    out.add(new AppointmentRow(
+                            rs.getLong("id"),
+                            rs.getObject("appointment_date", java.time.OffsetDateTime.class),
+                            rs.getString("doctor_name"),
+                            rs.getString("patient_name"),
+                            rs.getString("specialty"),
+                            rs.getString("status")
+                    ));
+                }
+                return out;
+            }
+        }
+    }
+
     /* ==================== Counters ==================== */
 
     public int countAvailableDoctors() throws SQLException {
@@ -578,6 +637,92 @@ public class DoctorDAO {
             ps.setString(1, nationalId);
             try (var rs = ps.executeQuery()) {
                 return rs.next() ? rs.getLong(1) : null;
+            }
+        }
+    }
+
+    public void markAppointmentCompleted(long apptId) throws SQLException {
+        String sql = "UPDATE appointments SET status = 'COMPLETED', updated_at = NOW() WHERE id = ?";
+        try (Connection c = Database.get();
+             PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setLong(1, apptId);
+            ps.executeUpdate();
+        }
+    }
+
+    public List<AppointmentRow> listScheduledAppointments() throws SQLException {
+        final String sql = """
+        SELECT
+            a.id,
+            a.appointment_date,
+            du.full_name AS doctor_name,
+            pu.full_name AS patient_name,
+            d.specialty,
+            a.status::text AS status
+        FROM appointments a
+        JOIN doctors d  ON d.id = a.doctor_id
+        JOIN users du   ON du.id = d.user_id
+        JOIN patients p ON p.id = a.patient_id
+        JOIN users pu   ON pu.id = p.user_id
+        WHERE a.status = 'SCHEDULED'
+        ORDER BY a.appointment_date
+    """;
+        try (var c = Database.get(); var ps = c.prepareStatement(sql); var rs = ps.executeQuery()) {
+            var out = new ArrayList<AppointmentRow>();
+            while (rs.next()) {
+                out.add(new AppointmentRow(
+                        rs.getLong("id"),
+                        rs.getObject("appointment_date", java.time.OffsetDateTime.class),
+                        rs.getString("doctor_name"),
+                        rs.getString("patient_name"),
+                        rs.getString("specialty"),
+                        rs.getString("status")
+                ));
+            }
+            return out;
+        }
+    }
+
+    public List<AppointmentRow> searchScheduledAppointments(String query) throws SQLException {
+        final String base = """
+        SELECT
+            a.id,
+            a.appointment_date,
+            du.full_name AS doctor_name,
+            pu.full_name AS patient_name,
+            d.specialty,
+            a.status::text AS status
+        FROM appointments a
+        JOIN doctors d  ON d.id = a.doctor_id
+        JOIN users du   ON du.id = d.user_id
+        JOIN patients p ON p.id = a.patient_id
+        JOIN users pu   ON pu.id = p.user_id
+        WHERE a.status = 'SCHEDULED'
+    """;
+        boolean hasQ = query != null && !query.isBlank();
+        String sql = hasQ ? base + """
+            AND (du.full_name ILIKE ? OR pu.full_name ILIKE ? OR d.specialty ILIKE ?)
+        """ : base;
+        sql += " ORDER BY a.appointment_date";
+
+        try (var c = Database.get(); var ps = c.prepareStatement(sql)) {
+            if (hasQ) {
+                String q = "%" + query.trim() + "%";
+                ps.setString(1, q); ps.setString(2, q); ps.setString(3, q);
+            }
+            try (var rs = ps.executeQuery()) {
+                var out = new ArrayList<AppointmentRow>();
+                while (rs.next()) {
+                    out.add(new AppointmentRow(
+                            rs.getLong("id"),
+                            rs.getObject("appointment_date", java.time.OffsetDateTime.class),
+                            rs.getString("doctor_name"),
+                            rs.getString("patient_name"),
+                            rs.getString("specialty"),
+                            rs.getString("status")
+                    ));
+                }
+                return out;
             }
         }
     }

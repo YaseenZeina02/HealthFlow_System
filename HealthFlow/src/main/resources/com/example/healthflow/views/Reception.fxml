@@ -268,7 +268,7 @@
                                                 </Label>
                                                 <TableView fx:id="TableAppInDashboard" layoutX="15.0" layoutY="49.0" prefHeight="290.0" prefWidth="576.0" stylesheets="@../Design/ReceptionDesign.css" AnchorPane.bottomAnchor="14.0" AnchorPane.leftAnchor="15.0" AnchorPane.rightAnchor="12.0" AnchorPane.topAnchor="49.0">
                                                     <columns>
-                                                        <TableColumn fx:id="AppointmentIdColumn" prefWidth="113.0" text="Appointment ID" />
+                                                        <TableColumn fx:id="colAppointmentID" prefWidth="113.0" text="Appointment ID" />
                                                         <TableColumn fx:id="colPatientNameDash" prefWidth="79.0" text="Patient Name" />
                                                         <TableColumn fx:id="colDoctorNameDash" prefWidth="75.0" text="Doctor name" />
                                                         <TableColumn fx:id="colAppintementDateDash" prefWidth="114.0" text="Date" />
