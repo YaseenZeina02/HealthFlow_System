@@ -101,12 +101,15 @@ public class ReceptionController {
     @FXML private Label TotalAppointments;
     @FXML private Label TotalDoctors;
 
+    @FXML
+    private TableView<?> TableAppInDashboard;
     @FXML private TableColumn<?, ?> colActionDash;
     @FXML private TableColumn<?, ?> colAppintementDateDash;
     @FXML private TableColumn<?, ?> colAppintementTimeDash;
     @FXML private TableColumn<?, ?> colDoctorNameDash;
     @FXML private TableColumn<?, ?> colPatientNameDash;
     @FXML private BarChart<?, ?> patientDetails;
+    @FXML private Button clearSelectionDach;
 
     @FXML private TextField searchAppointmentDach;
     @FXML private TextField searchDoctor;
@@ -120,14 +123,17 @@ public class ReceptionController {
     @FXML private Button clear_Appointments;
     @FXML private Button deleteAppointments;
 
-    @FXML private TableColumn<?, ?> colAppointmentIDAppointemnt;
-    @FXML private TableColumn<?, ?> colDateAppointemnt;
-    @FXML private TableColumn<?, ?> colDoctorNameAppointemnt;
-    @FXML private TableColumn<?, ?> colPatientNameAppointemnt;
+    // In Appointment Anchorpane
+    @FXML
+    private TableView<?> TableINAppointment;
+    @FXML private TableColumn<?, ?> colAppointmentIDAppointment;
+    @FXML private TableColumn<?, ?> colDateAppointment;
+    @FXML private TableColumn<?, ?> colDoctorNameAppointment;
+    @FXML private TableColumn<?, ?> colPatientNameAppointment;
     @FXML private TableColumn<?, ?> colSpecialty;
-    @FXML private TableColumn<?, ?> colStatusAppointemnt;
-    @FXML private TableColumn<?, ?> colTimeAppointemnt;
-    @FXML private Button deleteButtonAppointemnt;
+    @FXML private TableColumn<?, ?> colStatusAppointment;
+    @FXML private TableColumn<?, ?> colTimeAppointment;
+    @FXML private Button deleteButtonAppointment;
     @FXML private Label getPatientName;
     @FXML private Label getPatientID;
 
@@ -150,6 +156,12 @@ public class ReceptionController {
 
     @FXML
     private TextField appointmentSetTime;
+
+    @FXML
+    private TextField PatientNameForAppointment;
+
+    @FXML
+    private TextField PatientIDForAppointment;
 
 
     //    @FXML

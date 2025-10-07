@@ -416,4 +416,169 @@ public class DoctorDAO {
             }
         }
     }
+    /**
+     * صفّ مواعيد جاهز للعرض في الجداول (داشبورد/شاشة المواعيد).
+     */
+    public static final class AppointmentRow {
+        public final long id;
+        public final java.time.OffsetDateTime startAt;
+        public final String doctorName;
+        public final String patientName;
+        public final String specialty;
+        public final String status;
+
+        public AppointmentRow(long id,
+                              java.time.OffsetDateTime startAt,
+                              String doctorName,
+                              String patientName,
+                              String specialty,
+                              String status) {
+            this.id = id;
+            this.startAt = startAt;
+            this.doctorName = doctorName;
+            this.patientName = patientName;
+            this.specialty = specialty;
+            this.status = status;
+        }
+    }
+
+    /**
+     * يعيد كل المواعيد مع اسم الدكتور/المريض والتخصص والحالة.
+     */
+    public java.util.List<AppointmentRow> listAppointments() throws SQLException {
+        final String sql = """
+            SELECT
+                a.id,
+                a.appointment_date,
+                du.full_name AS doctor_name,
+                pu.full_name AS patient_name,
+                d.specialty,
+                a.status::text AS status
+            FROM appointments a
+            JOIN doctors d      ON d.id = a.doctor_id
+            JOIN users  du      ON du.id = d.user_id
+            JOIN patients p     ON p.id = a.patient_id
+            JOIN users  pu      ON pu.id = p.user_id
+            ORDER BY a.appointment_date DESC
+        """;
+        try (var c = Database.get();
+             var ps = c.prepareStatement(sql);
+             var rs = ps.executeQuery()) {
+            var out = new java.util.ArrayList<AppointmentRow>();
+            while (rs.next()) {
+                out.add(new AppointmentRow(
+                        rs.getLong("id"),
+                        rs.getObject("appointment_date", java.time.OffsetDateTime.class),
+                        rs.getString("doctor_name"),
+                        rs.getString("patient_name"),
+                        rs.getString("specialty"),
+                        rs.getString("status")
+                ));
+            }
+            return out;
+        }
+    }
+
+    /* ==================== Counters ==================== */
+
+    public int countAvailableDoctors() throws SQLException {
+        final String sql = "SELECT COUNT(*) FROM doctors WHERE availability_status = 'AVAILABLE'";
+        try (var c = Database.get(); var ps = c.prepareStatement(sql); var rs = ps.executeQuery()) {
+            rs.next(); return rs.getInt(1);
+        }
+    }
+
+    public int countAppointments() throws SQLException {
+        final String sql = "SELECT COUNT(*) FROM appointments";
+        try (var c = Database.get(); var ps = c.prepareStatement(sql); var rs = ps.executeQuery()) {
+            rs.next(); return rs.getInt(1);
+        }
+    }
+
+    public int countPatients() throws SQLException {
+        final String sql = "SELECT COUNT(*) FROM patients";
+        try (var c = Database.get(); var ps = c.prepareStatement(sql); var rs = ps.executeQuery()) {
+            rs.next(); return rs.getInt(1);
+        }
+    }
+
+    public int countCompletedAppointments() throws SQLException {
+        final String sql = "SELECT COUNT(*) FROM appointments WHERE status = 'COMPLETED'";
+        try (var c = Database.get(); var ps = c.prepareStatement(sql); var rs = ps.executeQuery()) {
+            rs.next(); return rs.getInt(1);
+        }
+    }
+
+    public int countPendingAppointments() throws SQLException {
+        final String sql = "SELECT COUNT(*) FROM appointments WHERE status = 'PENDING'";
+        try (var c = Database.get(); var ps = c.prepareStatement(sql); var rs = ps.executeQuery()) {
+            rs.next(); return rs.getInt(1);
+        }
+    }
+
+    /* ==================== CRUD (appointments) ==================== */
+
+    public long insertAppointment(long doctorId, long patientId,
+                                  java.time.OffsetDateTime startAt,
+                                  int durationMinutes,
+                                  Long createdByUserId) throws SQLException {
+        final String sql = """
+            INSERT INTO appointments
+                (doctor_id, patient_id, appointment_date, duration_minutes, status, created_by)
+            VALUES
+                (?, ?, ?, ?, 'SCHEDULED', ?)
+            RETURNING id
+        """;
+        try (var c = Database.get(); var ps = c.prepareStatement(sql)) {
+            ps.setLong(1, doctorId);
+            ps.setLong(2, patientId);
+            ps.setObject(3, startAt);
+            ps.setInt(4, durationMinutes);
+            if (createdByUserId == null) ps.setNull(5, java.sql.Types.BIGINT);
+            else ps.setLong(5, createdByUserId);
+            try (var rs = ps.executeQuery()) {
+                rs.next(); return rs.getLong(1);
+            }
+        }
+    }
+
+    public void updateAppointmentTime(long apptId,
+                                      java.time.OffsetDateTime startAt,
+                                      int durationMinutes) throws SQLException {
+        final String sql = """
+            UPDATE appointments
+            SET appointment_date = ?, duration_minutes = ?
+            WHERE id = ?
+        """;
+        try (var c = Database.get(); var ps = c.prepareStatement(sql)) {
+            ps.setObject(1, startAt);
+            ps.setInt(2, durationMinutes);
+            ps.setLong(3, apptId);
+            ps.executeUpdate();
+        }
+    }
+
+    public void deleteAppointment(long apptId) throws SQLException {
+        final String sql = "DELETE FROM appointments WHERE id = ?";
+        try (var c = Database.get(); var ps = c.prepareStatement(sql)) {
+            ps.setLong(1, apptId);
+            ps.executeUpdate();
+        }
+    }
+
+    /** إيجاد patient.id من national_id (users.national_id) */
+    public Long findPatientIdByNationalId(String nationalId) throws SQLException {
+        final String sql = """
+            SELECT p.id
+            FROM patients p
+            JOIN users u ON u.id = p.user_id
+            WHERE u.national_id = ?
+        """;
+        try (var c = Database.get(); var ps = c.prepareStatement(sql)) {
+            ps.setString(1, nationalId);
+            try (var rs = ps.executeQuery()) {
+                return rs.next() ? rs.getLong(1) : null;
+            }
+        }
+    }
 }
