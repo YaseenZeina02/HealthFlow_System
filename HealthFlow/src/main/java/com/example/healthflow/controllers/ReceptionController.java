@@ -1,6 +1,7 @@
 package com.example.healthflow.controllers;
 
 import com.example.healthflow.db.Database;
+import com.example.healthflow.dao.DoctorDAO;
 import com.example.healthflow.net.ConnectivityMonitor;
 import com.example.healthflow.service.AuthService.Session;
 import com.example.healthflow.model.dto.PatientView;
@@ -26,6 +27,8 @@ import javafx.scene.layout.StackPane;
 import javafx.scene.shape.Circle;
 import javafx.stage.Stage;
 import javafx.util.Duration;
+import org.controlsfx.control.textfield.AutoCompletionBinding;
+import org.controlsfx.control.textfield.TextFields;
 
 import java.io.IOException;
 import java.sql.*;
@@ -105,9 +108,10 @@ public class ReceptionController {
 
     @FXML private Button insertAppointments;
     @FXML private Label TotalPatients;
-    @FXML private Button UpdateButton1;
+    @FXML private Button BookAppointmentFromPateint;
     @FXML private Button updateAppointments;
-    @FXML private ComboBox<?> avilabelDoctorApp;
+    @FXML private ComboBox<String> DoctorspecialtyApp;           // list of specialties
+    @FXML private ComboBox<DoctorDAO.DoctorOption> avilabelDoctorApp; // available doctors for selected specialty
     @FXML private Button clear_Appointments;
     @FXML private Button deleteAppointments;
 
@@ -131,6 +135,23 @@ public class ReceptionController {
     @FXML private TableColumn<DoctorRow, String>  colDoctor_bio;
     @FXML private TableColumn<DoctorRow, String>  colDoctor_Status;
     @FXML private TableColumn<DoctorRow, Boolean> colDoctor_available;
+
+
+
+//    -----
+
+
+
+    @FXML
+    private TextField appointmentSetTime;
+
+
+    @FXML
+    private DatePicker setAppointmentDate;
+
+
+
+
 
     // To color current nav button
     private static final String ACTIVE_CLASS = "current";
@@ -157,6 +178,7 @@ public class ReceptionController {
 
     private final Navigation navigation = new Navigation();
     private final PatientService patientService = new PatientService();
+    private final DoctorDAO doctorDAO = new DoctorDAO();
 
     /* ============ Connectivity ============ */
     private final ConnectivityMonitor monitor;
@@ -172,14 +194,13 @@ public class ReceptionController {
     /* ============ Init ============ */
     @FXML
     private void initialize() {
-        if (rootPane != null) {
-            rootPane.getChildren().add(0, new ConnectivityBanner(monitor));
-        }
+
         monitor.start();
 
         if (rootPane != null) {
             ConnectivityBanner banner = new ConnectivityBanner(monitor);
             rootPane.getChildren().add(0, banner);
+            banner.prefWidthProperty().bind(rootPane.widthProperty());
         }
 
         OnlineBindings.disableWhenOffline(
@@ -220,11 +241,29 @@ public class ReceptionController {
         wireDoctorTable();
         wireSearchPatients();
         wireSearchDoctors();
+        setupDoctorFilters();
 
         InsertButton.setOnAction(e -> { if (ensureOnlineOrAlert()) doInsertPatient(); });
         UpdateButton.setOnAction(e -> { if (ensureOnlineOrAlert()) doUpdatePatient(); });
         deleteButton.setOnAction(e -> { if (ensureOnlineOrAlert()) doDeletePatient(); });
         clearBtn.setOnAction(e -> clearForm());
+        BookAppointmentFromPateint.setOnAction(e -> {
+            PatientRow row = (patientTable == null) ? null : patientTable.getSelectionModel().getSelectedItem();
+            if (row == null) {
+                Alert a = new Alert(Alert.AlertType.WARNING);
+                a.setTitle("Select a patient");
+                a.setHeaderText(null);
+                a.setContentText("Please select a patient from the table first.");
+                a.showAndWait();
+                return;
+            }
+            // Pre-fill appointment panel labels (if present)
+            if (getPatientName != null) getPatientName.setText(row.getFullName());
+            if (getPatientID != null)   getPatientID.setText(row.getNationalId());
+            // Navigate to the appointment pane
+            showAppointmentPane();
+            if (DoctorspecialtyApp != null && DoctorspecialtyApp.getItems().isEmpty()) loadSpecialtiesAsync();
+        });
 
         Platform.runLater(() -> {
             new Thread(() -> { try { loadHeaderUser(); } catch (Exception ignored) {} }, "hdr-user-load").start();
@@ -444,6 +483,72 @@ public class ReceptionController {
             DocTable_Recption.setItems(sorted);
         }
     }
+
+    /** Load specialties into DoctorspecialtyApp and react to changes to fill avilabelDoctorApp. */
+    private void setupDoctorFilters() {
+        // Guard if FXML nodes are absent in this view
+        if (DoctorspecialtyApp != null) {
+            DoctorspecialtyApp.setPromptText("Select specialty");
+            loadSpecialtiesAsync();
+            DoctorspecialtyApp.valueProperty().addListener((obs, old, sp) -> {
+                loadAvailableDoctorsForSpecialty(sp);
+            });
+        }
+
+        if (avilabelDoctorApp != null) {
+            avilabelDoctorApp.setPromptText("Available doctor");
+            // Render doctor nicely in drop-down
+            avilabelDoctorApp.setCellFactory(list -> new ListCell<>() {
+                @Override protected void updateItem(DoctorDAO.DoctorOption item, boolean empty) {
+                    super.updateItem(item, empty);
+                    setText(empty || item == null ? null : item.fullName + " (" + item.specialty + ")");
+                }
+            });
+            avilabelDoctorApp.setButtonCell(new ListCell<>() {
+                @Override protected void updateItem(DoctorDAO.DoctorOption item, boolean empty) {
+                    super.updateItem(item, empty);
+                    setText(empty || item == null ? null : item.fullName + " (" + item.specialty + ")");
+                }
+            });
+        }
+    }
+
+    /** Async: fetch distinct specialties and populate DoctorspecialtyApp. */
+    private void loadSpecialtiesAsync() {
+        if (DoctorspecialtyApp == null) return;
+        new Thread(() -> {
+            try {
+                var list = doctorDAO.listSpecialties();
+                Platform.runLater(() -> DoctorspecialtyApp.setItems(FXCollections.observableArrayList(list)));
+            } catch (Exception e) {
+                Platform.runLater(() -> showWarn("Doctors", "Failed to load specialties."));
+            }
+        }, "recp-specialties").start();
+    }
+
+    /** Async: fetch available doctors for a given specialty (null = all). */
+    private void loadAvailableDoctorsForSpecialty(String specialty) {
+        if (avilabelDoctorApp == null) return;
+        // If no specialty selected, clear list (or you can load all available doctors)
+        if (specialty == null || specialty.isBlank()) {
+            avilabelDoctorApp.getItems().clear();
+            avilabelDoctorApp.setValue(null);
+            return;
+        }
+        new Thread(() -> {
+            try {
+                var list = doctorDAO.listAvailableBySpecialty(specialty);
+                Platform.runLater(() -> {
+                    avilabelDoctorApp.setItems(FXCollections.observableArrayList(list));
+                    // select first by default (optional)
+                    if (!list.isEmpty()) avilabelDoctorApp.getSelectionModel().select(0);
+                });
+            } catch (Exception e) {
+                Platform.runLater(() -> showWarn("Doctors", "Failed to load available doctors."));
+            }
+        }, "recp-avail-docs").start();
+    }
+
 
     /** تحميل كل الدكاترة مع حالتهم */
     private void loadDoctorsBG() {
