@@ -5,6 +5,10 @@ import com.example.healthflow.db.Database;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -314,6 +318,101 @@ public class DoctorDAO {
                     ));
                 }
                 return out;
+            }
+        }
+    }
+
+    public record Slot(LocalDateTime from, LocalDateTime to) {
+        private static final DateTimeFormatter TIME_12 = DateTimeFormatter.ofPattern("hh:mm a");
+        @Override public String toString() {
+            return from.toLocalTime().format(TIME_12) + " \u2192 " + to.toLocalTime().format(TIME_12);
+        }
+    }
+
+
+    // تعرض الأوقات المتاحة للدكتور المختار
+    public List<Slot> listFreeSlots(long doctorId, LocalDate day,
+                                    LocalTime open, LocalTime close, int slotMin) throws SQLException {
+        String sql = """
+            WITH params AS (
+              SELECT
+                ?::bigint     AS doc_id,     -- 1: doctorId
+                ?::date       AS d,          -- 2: day
+                ?::timestamp  AS open_at,    -- 3: day + open
+                ?::timestamp  AS close_at,   -- 4: day + close
+                ?::int        AS slot_min    -- 5: slotMin
+            ),
+            series AS (
+              SELECT
+                generate_series(
+                  p.open_at,
+                  p.close_at - (p.slot_min || ' min')::interval,
+                  (p.slot_min || ' min')::interval
+                ) AS slot_start,
+                p.slot_min,
+                p.d       AS day,
+                p.doc_id  AS doc_id,
+                /* أول فتحة اليوم (لو اليوم = تاريخ النظام نقرّب للسلوت التالي) */
+                CASE
+                  WHEN p.d = CURRENT_DATE THEN
+                    GREATEST(
+                      p.open_at,
+                      date_trunc('minute', NOW())
+                      + make_interval(mins => (p.slot_min - ((EXTRACT(EPOCH FROM NOW())/60)::int % p.slot_min)) % p.slot_min)
+                    )
+                  ELSE p.open_at
+                END AS first_slot
+              FROM params p
+            ),
+            booked AS (
+              SELECT
+                a.doctor_id,
+                a.appointment_date::date AS day,
+                a.appointment_date AS start_at,
+                a.appointment_date + (a.duration_minutes || ' min')::interval AS end_at
+              FROM appointments a
+            )
+            SELECT
+              s.slot_start                                    AS free_from,
+              s.slot_start + (s.slot_min || ' min')::interval AS free_to,
+              to_char(s.slot_start::timestamptz, 'HH12:MI AM') AS free_from_12,
+              to_char((s.slot_start + (s.slot_min || ' min')::interval)::timestamptz, 'HH12:MI AM') AS free_to_12
+            FROM series s
+            WHERE s.slot_start >= s.first_slot
+              AND NOT EXISTS (
+                SELECT 1
+                FROM booked b
+                WHERE b.doctor_id = s.doc_id
+                  AND b.day       = s.day
+                  AND tstzrange(b.start_at, b.end_at, '[)')
+                      && tstzrange(
+                            s.slot_start::timestamptz,
+                            (s.slot_start + (s.slot_min || ' min')::interval)::timestamptz,
+                            '[)'
+                         )
+              )
+            ORDER BY free_from;
+        """;
+
+
+        try (var c = Database.get();
+             var ps = c.prepareStatement(sql)) {
+
+            ps.setLong(1, doctorId);
+            ps.setObject(2, day); // ::date
+            ps.setObject(3, LocalDateTime.of(day, open));  // ::timestamp
+            ps.setObject(4, LocalDateTime.of(day, close)); // ::timestamp
+            ps.setInt(5, slotMin);                         // ::int
+
+            try (var rs = ps.executeQuery()) {
+                var list = new ArrayList<Slot>();
+                while (rs.next()) {
+                    list.add(new Slot(
+                            rs.getTimestamp("free_from").toLocalDateTime(),
+                            rs.getTimestamp("free_to").toLocalDateTime()
+                    ));
+                }
+                return list;
             }
         }
     }

@@ -30,11 +30,16 @@ import javafx.util.Duration;
 import org.controlsfx.control.textfield.AutoCompletionBinding;
 import org.controlsfx.control.textfield.TextFields;
 
+
 import java.io.IOException;
 import java.sql.*;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Objects;
+import java.util.Set;
+import java.util.TreeSet;
 
 public class ReceptionController {
 
@@ -137,7 +142,8 @@ public class ReceptionController {
     @FXML private TableColumn<DoctorRow, Boolean> colDoctor_available;
 
 
-
+    @FXML
+    private DatePicker AppointmentDate;
 //    -----
 
 
@@ -146,8 +152,10 @@ public class ReceptionController {
     private TextField appointmentSetTime;
 
 
-    @FXML
-    private DatePicker setAppointmentDate;
+    //    @FXML
+    //    private DatePicker setAppointmentDate;
+    @FXML private ComboBox<DoctorDAO.Slot> cmbSlots;
+
 
 
 
@@ -155,6 +163,8 @@ public class ReceptionController {
 
     // To color current nav button
     private static final String ACTIVE_CLASS = "current";
+    private static final java.time.format.DateTimeFormatter SLOT_FMT_12H =
+            java.time.format.DateTimeFormatter.ofPattern("hh:mm a");
     private void markNavActive(Button active) {
         Button[] all = {DachboardButton, DoctorsButton, PatientsButton, AppointmentsButton};
         for (Button b : all) {
@@ -237,6 +247,14 @@ public class ReceptionController {
         GenderComboBox.setValue(Gender.MALE);
         DateOfBirthPicker.setValue(null);
 
+        // Default appointment date pickers to today (can still be changed by the user)
+        if (AppointmentDate != null && AppointmentDate.getValue() == null) {
+            AppointmentDate.setValue(java.time.LocalDate.now());
+        }
+//        if (setAppointmentDate != null && setAppointmentDate.getValue() == null) {
+//            setAppointmentDate.setValue(java.time.LocalDate.now());
+//        }
+
         wirePatientTable();
         wireDoctorTable();
         wireSearchPatients();
@@ -271,8 +289,147 @@ public class ReceptionController {
             new Thread(this::loadDoctorsBG, "doctors-load").start();
         });
 
+//        ------------------------
+        cmbSlots.setCellFactory(cb -> new ListCell<DoctorDAO.Slot>() {
+            @Override
+            protected void updateItem(DoctorDAO.Slot s, boolean empty) {
+                super.updateItem(s, empty);
+                setText(empty || s == null ? null :
+                        s.from().toLocalTime().format(SLOT_FMT_12H) + " \u2192 " +
+                        s.to().toLocalTime().format(SLOT_FMT_12H));
+            }
+        });
+        cmbSlots.setButtonCell(new ListCell<DoctorDAO.Slot>() {
+            @Override
+            protected void updateItem(DoctorDAO.Slot s, boolean empty) {
+                super.updateItem(s, empty);
+                setText(empty || s == null ? "Select a slot"
+                        : s.from().toLocalTime().format(SLOT_FMT_12H) + " \u2192 " +
+                          s.to().toLocalTime().format(SLOT_FMT_12H));
+            }
+        });
+
+        if (AppointmentDate != null) {
+            AppointmentDate.valueProperty().addListener((o, a, b) -> refreshSlots());
+        }
+        if (avilabelDoctorApp != null) {
+            avilabelDoctorApp.valueProperty().addListener((o, a, b) -> refreshSlots());
+        }
         showDashboardPane();
     }
+
+//    private void refreshSlots() {
+//        if (cmbSlots == null) return;
+//
+//        var doc = (avilabelDoctorApp == null) ? null : avilabelDoctorApp.getValue();
+//        var day = (AppointmentDate == null) ? null : AppointmentDate.getValue();
+//
+//        if (doc == null || day == null) {
+//            cmbSlots.setItems(FXCollections.observableArrayList());
+//            return;
+//        }
+//
+//        final LocalTime open  = LocalTime.of(9, 0);   // دوام العيادة
+//        final LocalTime close = LocalTime.of(15, 0);  // انتهاء الدواء الدوام الساعة 3
+//        final int slotMinutes = 20;
+//
+//        new Thread(() -> {
+//            try {
+//                var slots = doctorDAO.listFreeSlots(doc.doctorId, day, open, close, slotMinutes);
+//
+//                // فلترة أوقات الماضي لو اليوم = اليوم الحالي
+//                if (day.equals(LocalDate.now())) {
+//                    LocalDateTime now = LocalDateTime.now().withSecond(0).withNano(0);
+//                    int mod = now.getMinute() % slotMinutes;
+//                    // قرب للسلوت القادم
+//                    LocalDateTime cutoff = (mod == 0) ? now : now.plusMinutes(slotMinutes - mod);
+//
+//                    final LocalDateTime cutoffFinal = cutoff; // لازم يكون effectively final للامبدا
+//                    slots.removeIf(s -> s.from().isBefore(cutoffFinal));
+//                }
+//
+//                var data = FXCollections.observableArrayList(slots);
+//                Platform.runLater(() -> cmbSlots.setItems(data));
+//            } catch (Exception e) {
+//                e.printStackTrace();
+//                Platform.runLater(() -> showWarn("Slots", "Failed to load free slots: " + e.getMessage()));
+//            }
+//        }, "load-slots").start();
+//    }
+
+    private void refreshSlots() {
+        if (cmbSlots == null) return;
+
+        var doc = (avilabelDoctorApp == null) ? null : avilabelDoctorApp.getValue();
+        var day = (AppointmentDate == null) ? null : AppointmentDate.getValue();
+
+        if (doc == null || day == null) {
+            cmbSlots.setItems(FXCollections.observableArrayList());
+            return;
+        }
+
+        final LocalTime open  = LocalTime.of(9, 0);   // بداية الدوام
+        final LocalTime close = LocalTime.of(15, 0);  // نهاية الدوام
+        final int slotMinutes = 20;
+
+        new Thread(() -> {
+            try {
+                var slots = doctorDAO.listFreeSlots(doc.doctorId, day, open, close, slotMinutes);
+
+                // فلترة أوقات الماضي لو اليوم = اليوم الحالي
+                if (day.equals(LocalDate.now())) {
+                    LocalDateTime now = LocalDateTime.now().withSecond(0).withNano(0);
+                    int mod = now.getMinute() % slotMinutes;
+                    // نقرب للسلوت القادم
+                    LocalDateTime cutoff = (mod == 0) ? now : now.plusMinutes(slotMinutes - mod);
+
+                    final LocalDateTime cutoffFinal = cutoff;
+                    slots.removeIf(s -> s.from().isBefore(cutoffFinal));
+
+                    // إذا انتهى الدوام (الآن بعد آخر وقت)
+                    if (now.toLocalTime().isAfter(close)) {
+                        Platform.runLater(() -> {
+                            cmbSlots.getItems().clear();
+                            showInfo("Working Hours", "Clinic working hours are over for today.");
+                        });
+                        return;
+                    }
+                }
+
+                var data = FXCollections.observableArrayList(slots);
+                Platform.runLater(() -> cmbSlots.setItems(data));
+            } catch (Exception e) {
+                e.printStackTrace();
+                Platform.runLater(() -> showWarn("Slots", "Failed to load free slots: " + e.getMessage()));
+            }
+        }, "load-slots").start();
+    }
+
+//    private void refreshSlots() {
+//        if (cmbSlots == null) return;
+//
+//        var doc = (avilabelDoctorApp == null) ? null : avilabelDoctorApp.getValue();
+//        var day = (AppointmentDate == null) ? null : AppointmentDate.getValue();
+//
+//        if (doc == null || day == null) {
+//            cmbSlots.setItems(FXCollections.observableArrayList());
+//            return;
+//        }
+//
+//        var open  = LocalTime.of(9, 0);
+//        var close = LocalTime.of(15, 0);
+//        var slotMinutes = 20;
+//
+//        new Thread(() -> {
+//            try {
+//                var slots = doctorDAO.listFreeSlots(doc.doctorId, day, open, close, slotMinutes);
+//                Platform.runLater(() -> cmbSlots.setItems(FXCollections.observableArrayList(slots)));
+//            } catch (Exception e) {
+//                e.printStackTrace();
+//                Platform.runLater(() -> showWarn("Slots", "Failed to load free slots: " + e.getMessage()));
+//            }
+//        }, "load-slots").start();
+//    }
 
     /* ============ Clock (12h) ============ */
     private void startClock() {
@@ -501,27 +658,34 @@ public class ReceptionController {
             avilabelDoctorApp.setCellFactory(list -> new ListCell<>() {
                 @Override protected void updateItem(DoctorDAO.DoctorOption item, boolean empty) {
                     super.updateItem(item, empty);
-                    setText(empty || item == null ? null : item.fullName + " (" + item.specialty + ")");
+                    setText(empty || item == null ? null : item.fullName + "  (id: " + item.doctorId+")");
                 }
             });
             avilabelDoctorApp.setButtonCell(new ListCell<>() {
                 @Override protected void updateItem(DoctorDAO.DoctorOption item, boolean empty) {
                     super.updateItem(item, empty);
-                    setText(empty || item == null ? null : item.fullName + " (" + item.specialty + ")");
+                    setText(empty || item == null ? null : item.fullName);
                 }
             });
         }
     }
 
-    /** Async: fetch distinct specialties and populate DoctorspecialtyApp. */
+    /** Async: fetch distinct specialties (with available doctors only) and populate DoctorspecialtyApp. */
     private void loadSpecialtiesAsync() {
         if (DoctorspecialtyApp == null) return;
         new Thread(() -> {
             try {
-                var list = doctorDAO.listSpecialties();
-                Platform.runLater(() -> DoctorspecialtyApp.setItems(FXCollections.observableArrayList(list)));
+                // احصل على كل الأطباء المتاحين (بدون فلترة تخصص) ثم استخرج تخصصاتهم المميّزة
+                var available = doctorDAO.listAvailableBySpecialty((String) null);
+                Set<String> specs = new TreeSet<>(); // مرتّبة أبجديًا بدون تكرار
+                for (var opt : available) {
+                    if (opt != null && opt.specialty != null) {
+                        specs.add(opt.specialty);
+                    }
+                }
+                Platform.runLater(() -> DoctorspecialtyApp.setItems(FXCollections.observableArrayList(specs)));
             } catch (Exception e) {
-                Platform.runLater(() -> showWarn("Doctors", "Failed to load specialties."));
+                Platform.runLater(() -> showWarn("Doctors", "Failed to load specialties (available only)."));
             }
         }, "recp-specialties").start();
     }

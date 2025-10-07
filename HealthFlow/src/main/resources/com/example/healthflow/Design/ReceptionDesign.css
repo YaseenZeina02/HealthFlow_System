@@ -237,6 +237,7 @@
     /*-fx-padding: 10 14;*/
     -fx-effect: dropshadow(gaussian, rgba(16,24,40,0.06), 10, 0.2, 0, 1);
     -fx-prompt-text-fill: rgba(17,24,39,0.45);
+    -fx-pref-height: 20px;
 }
 
 .box:hover {
@@ -285,10 +286,10 @@
 /* ====== DatePicker كصندوق ====== */
 .date-picker.box {
     -fx-background-color: white;
-    -fx-max-height:3 ;
+    /*-fx-max-height:3 ;*/
 }
 .date-picker.box > .arrow-button {
-    -fx-background-color: transparent;
+    -fx-background-color: transparent !important;
     -fx-padding: 0 8 0 8;
 }
 .date-picker.box > .arrow-button > .arrow {
@@ -298,6 +299,9 @@
 .date-picker.box > .text-field {
     -fx-background-color: transparent;
     -fx-padding: 10 14;
+}
+.date-picker.box > .text-field {
+    -fx-padding: 8 12;    /* جرّب 8 بدل 10 لتقريب الارتفاع */
 }
 
 /* ========== Chips لأوقات الحجز ========== */
