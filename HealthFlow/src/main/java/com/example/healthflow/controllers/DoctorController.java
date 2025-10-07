@@ -22,18 +22,21 @@ import javafx.collections.transformation.SortedList;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.geometry.Insets;
+import javafx.geometry.Pos;
+import javafx.geometry.VPos;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.control.cell.PropertyValueFactory;
-import javafx.scene.layout.AnchorPane;
-import javafx.scene.layout.HBox;
-import javafx.scene.layout.VBox;
+import javafx.scene.input.Clipboard;
+import javafx.scene.input.ClipboardContent;
+import javafx.scene.layout.*;
 import javafx.scene.shape.Circle;
 import javafx.stage.Stage;
 import javafx.util.Duration;
 
 import java.io.IOException;
+import java.net.URL;
 import java.sql.Connection;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -90,6 +93,8 @@ public class DoctorController {
     @FXML private TextField searchLabel; // appointments search (future)
     private FilteredList<PatientRow> filtered;
     private SortedList<PatientRow> sorted;
+
+
 
     @FXML private AnchorPane rootPane;
 
@@ -183,18 +188,15 @@ public class DoctorController {
 
             Parent loginRoot = loader.load();
 
-            // Wrap login in a root that always shows the connectivity banner at the top
             ConnectivityBanner banner = new ConnectivityBanner(monitor);
             AnchorPane.setTopAnchor(banner, 0.0);
             AnchorPane container = new AnchorPane(loginRoot);
             container.setPrefSize(900, 600);
-            // Stretch login to fill container
             AnchorPane.setTopAnchor(loginRoot, 0.0);
             AnchorPane.setRightAnchor(loginRoot, 0.0);
             AnchorPane.setBottomAnchor(loginRoot, 0.0);
             AnchorPane.setLeftAnchor(loginRoot, 0.0);
 
-            // Create a stack that shows the banner on top of login
             AnchorPane root = new AnchorPane();
             AnchorPane.setTopAnchor(container, 0.0);
             AnchorPane.setRightAnchor(container, 0.0);
@@ -203,7 +205,6 @@ public class DoctorController {
             root.getChildren().addAll(container, banner);
 
             stage.setTitle("HealthFlow");
-
             stage.setScene(new Scene(root));
             stage.setResizable(false);
             stage.show();
@@ -229,7 +230,6 @@ public class DoctorController {
         try (Connection c = Database.get()) {
             c.setAutoCommit(false);
             try {
-                // ✅ تعتمد على DoctorDAO الذي أرسلته لك (يوفّر هذه الدالة)
                 doctorDAO.ensureProfileForUser(c, u.getId());
                 c.commit();
             } catch (Exception ex) {
@@ -251,7 +251,7 @@ public class DoctorController {
     private void reloadAll() {
         loadTodayStatsAsync();
         loadTodayAppointmentsAsync();
-        loadPatientsAsync();
+        loadPatientsAsync(); // الآن تُحمِّل فقط مرضى هذا الدكتور (اليوم)
     }
 
     private void loadTodayStatsAsync() {
@@ -286,69 +286,195 @@ public class DoctorController {
         }, "doc-appts").start();
     }
 
+    /**
+     * Loads all patients who have any appointment with the currently logged-in doctor (no date filter).
+     * Computes the age from patients.date_of_birth.
+     */
     private void loadPatientsAsync() {
+        var u = Session.get();
+        if (u == null) return;
+
         new Thread(() -> {
             try {
-                List<com.example.healthflow.model.dto.PatientView> list = svc.listDoctorPatients();
-                Platform.runLater(() -> {
-                    patientData.clear();
-                    for (com.example.healthflow.model.dto.PatientView pv : list) {
-                        patientData.add(new PatientRow(
-                                pv.nationalId(),
-                                pv.fullName(),
-                                pv.gender(),
-                                ageFromDob(pv.dateOfBirth()),
-                                pv.medicalHistory()
-                        ));
-                    }
-                });
+                // اجلب كل مرضى هذا الطبيب (حسب user_id) من الـ DAO
+                java.util.List<com.example.healthflow.dao.DoctorDAO.PatientWithAppt> list =
+                        doctorDAO.listPatientsWithAppointmentsForDoctor(u.getId());
+
+                var rows = FXCollections.<PatientRow>observableArrayList();
+                for (var r : list) {
+                    rows.add(new PatientRow(
+                            r.nationalId,
+                            r.patientName,
+                            r.gender,
+                            ageFromDob(r.dateOfBirth),
+                            r.medicalHistory
+                    ));
+                }
+                Platform.runLater(() -> patientData.setAll(rows));
             } catch (Exception e) {
-                Platform.runLater(() -> showWarn("Patients", "Failed to load patients."));
+                Platform.runLater(() -> showWarn("Patients", "Failed to load patients for this doctor."));
             }
         }, "doc-patients").start();
     }
 
     /* ================= Tables wiring ================= */
+
     private void wireAppointmentsTable() {
         if (AppointmentsTable == null) return;
 
+        // أعمدة البيانات
         if (colPatientName != null) colPatientName.setCellValueFactory(new PropertyValueFactory<>("patientName"));
         if (colDate != null)        colDate.setCellValueFactory(new PropertyValueFactory<>("date"));
         if (colTime != null)        colTime.setCellValueFactory(new PropertyValueFactory<>("timeStr"));
         if (colStatus != null)      colStatus.setCellValueFactory(new PropertyValueFactory<>("status"));
-        if (colAction != null) {
-            colAction.setCellValueFactory(param -> new ReadOnlyObjectWrapper<>(param.getValue()));
-            colAction.setCellFactory(col -> new TableCell<>() {
-                private final Button btnView = new Button("View");
-                private final Button btnDone = new Button("Done");
-                private final Button btnPresc = new Button("Prescription");
-                private final HBox box = new HBox(6, btnView, btnDone, btnPresc);
-                {
-                    box.setPadding(new Insets(0,0,0,0));
-                    btnDone.disableProperty().bind(monitor.onlineProperty().not());
-                    btnPresc.disableProperty().bind(monitor.onlineProperty().not());
 
-                    btnView.setOnAction(e -> {
-                        AppointmentRow row = getItem();
-                        if (row != null) showPatientDetails(row);
-                    });
-                    btnDone.setOnAction(e -> {
-                        AppointmentRow row = getItem();
-                        if (row != null) completeAppointment(row);
-                    });
-                    btnPresc.setOnAction(e -> {
-                        AppointmentRow row = getItem();
-                        if (row != null) openPrescription(row);
-                    });
-                }
-                @Override protected void updateItem(AppointmentRow row, boolean empty) {
-                    super.updateItem(row, empty);
-                    setGraphic(empty ? null : box);
-                }
-            });
-        }
+        // قياسات واضحة للأعمدة
+        colPatientName.setPrefWidth(220);
+        colDate.setPrefWidth(120);
+        colTime.setPrefWidth(110);
+        colStatus.setPrefWidth(140);
+
+        // عمود الأكشن: واسع وممنوع ينضغط
+        colAction.setPrefWidth(380);
+        colAction.setMinWidth(340);
+        colAction.setResizable(false);
+        colAction.setSortable(false);
+
+        // ✨ خلية الأكشن باستخدام FlowPane (يضمن ترتيب أفقي، ولو ضاق يلف بدون تكسير)
+        colAction.setCellValueFactory(param -> new ReadOnlyObjectWrapper<>(param.getValue()));
+        colAction.setCellFactory(tc -> new TableCell<AppointmentRow, AppointmentRow>() {
+            private final Button btnView  = new Button("View");
+            private final Button btnDone  = new Button("Done");
+            private final Button btnPresc = new Button("Prescription");
+            private final FlowPane pane   = new FlowPane();
+
+            {
+                // أبعاد الأزرار (عشان ما تنضغط لأحجام غريبة)
+                btnView.setMinWidth(80);   btnView.setMaxWidth(Region.USE_PREF_SIZE);
+                btnDone.setMinWidth(80);   btnDone.setMaxWidth(Region.USE_PREF_SIZE);
+                btnPresc.setMinWidth(120); btnPresc.setMaxWidth(Region.USE_PREF_SIZE);
+
+                // تعطيل عند الأوفلاين
+                btnDone.disableProperty().bind(monitor.onlineProperty().not());
+                btnPresc.disableProperty().bind(monitor.onlineProperty().not());
+
+                // الأحداث
+                btnView.setOnAction(e -> { var row = getItem(); if (row != null) showPatientDetails(row); });
+                btnDone.setOnAction(e -> { var row = getItem(); if (row != null) completeAppointment(row); });
+                btnPresc.setOnAction(e -> { var row = getItem(); if (row != null) openPrescription(row); });
+
+                // إعداد الـ FlowPane
+                pane.setHgap(10);
+                pane.setVgap(6);
+                pane.setRowValignment(VPos.CENTER);
+                pane.getChildren().addAll(btnView, btnDone, btnPresc);
+
+                // أهم نقطة: اربط عرض الحاوية بعرض عمود الأكشن - الهامش بسيط داخل الخلية
+                pane.prefWrapLengthProperty().bind(colAction.widthProperty().subtract(16));
+            }
+
+            @Override
+            protected void updateItem(AppointmentRow row, boolean empty) {
+                super.updateItem(row, empty);
+                setText(null);
+                setContentDisplay(ContentDisplay.GRAPHIC_ONLY);
+                setGraphic(empty ? null : pane);
+            }
+        });
+
+        // سياسة القياس: بدون قيود
+        AppointmentsTable.setColumnResizePolicy(TableView.UNCONSTRAINED_RESIZE_POLICY);
+        // Allow variable row height so the FlowPane can wrap all three buttons
+        AppointmentsTable.setFixedCellSize(-1); // <= 0 means variable size (default)
+
+        // أخيراً البيانات
         AppointmentsTable.setItems(apptData);
     }
+
+
+//    private void wireAppointmentsTable() {
+//        if (AppointmentsTable == null) return;
+//
+//        if (colPatientName != null) colPatientName.setCellValueFactory(new PropertyValueFactory<>("patientName"));
+//        if (colDate != null)        colDate.setCellValueFactory(new PropertyValueFactory<>("date"));
+//        if (colTime != null)        colTime.setCellValueFactory(new PropertyValueFactory<>("timeStr"));
+//        if (colStatus != null)      colStatus.setCellValueFactory(new PropertyValueFactory<>("status"));
+//
+//        if (colAction != null) {
+//            colAction.setPrefWidth(280);
+//            colAction.setMinWidth(240);
+//
+//            colAction.setCellValueFactory(param -> new ReadOnlyObjectWrapper<>(param.getValue()));
+//            colAction.setCellFactory(col -> new TableCell<AppointmentRow, AppointmentRow>() {
+//                private final Button btnView  = new Button("View");
+//                private final Button btnDone  = new Button("Done");
+//                private final Button btnPresc = new Button("Prescription");
+//                private final HBox box = new HBox(8, btnView, btnDone, btnPresc);
+//
+//                {
+//                    box.setAlignment(Pos.CENTER_LEFT);
+//                    btnDone.disableProperty().bind(monitor.onlineProperty().not());
+//                    btnPresc.disableProperty().bind(monitor.onlineProperty().not());
+//
+//                    btnView.setOnAction(e -> { var row = getItem(); if (row != null) showPatientDetails(row); });
+//                    btnDone.setOnAction(e -> { var row = getItem(); if (row != null) completeAppointment(row); });
+//                    btnPresc.setOnAction(e -> { var row = getItem(); if (row != null) openPrescription(row); });
+//                }
+//
+//                @Override
+//                protected void updateItem(AppointmentRow row, boolean empty) {
+//                    super.updateItem(row, empty);
+//                    setGraphic(empty ? null : box);
+//                    setText(null);
+//                }
+//            });
+//        }
+//
+//        AppointmentsTable.setItems(apptData);
+//        AppointmentsTable.setColumnResizePolicy(TableView.UNCONSTRAINED_RESIZE_POLICY); // 👈 الحل السحري
+//    }
+
+//    private void wireAppointmentsTable() {
+//        if (AppointmentsTable == null) return;
+//
+//        if (colPatientName != null) colPatientName.setCellValueFactory(new PropertyValueFactory<>("patientName"));
+//        if (colDate != null)        colDate.setCellValueFactory(new PropertyValueFactory<>("date"));
+//        if (colTime != null)        colTime.setCellValueFactory(new PropertyValueFactory<>("timeStr"));
+//        if (colStatus != null)      colStatus.setCellValueFactory(new PropertyValueFactory<>("status"));
+//        if (colAction != null) {
+//            colAction.setCellValueFactory(param -> new ReadOnlyObjectWrapper<>(param.getValue()));
+//            colAction.setCellFactory(col -> new TableCell<>() {
+//                private final Button btnView = new Button("View");
+//                private final Button btnDone = new Button("Done");
+//                private final Button btnPresc = new Button("Prescription");
+//                private final HBox box = new HBox(6, btnView, btnDone, btnPresc);
+//                {
+//                    box.setPadding(new Insets(0,0,0,0));
+//                    btnDone.disableProperty().bind(monitor.onlineProperty().not());
+//                    btnPresc.disableProperty().bind(monitor.onlineProperty().not());
+//
+//                    btnView.setOnAction(e -> {
+//                        AppointmentRow row = getItem();
+//                        if (row != null) showPatientDetails(row);
+//
+//                    });
+//                    btnDone.setOnAction(e -> {
+//                        AppointmentRow row = getItem();
+//                        if (row != null) completeAppointment(row);
+//                    });
+//                    btnPresc.setOnAction(e -> {
+//                        AppointmentRow row = getItem();
+//                        if (row != null) openPrescription(row);
+//                    });
+//                }
+//                @Override protected void updateItem(AppointmentRow row, boolean empty) {
+//                    super.updateItem(row, empty);
+//                    setGraphic(empty ? null : box);
+//                }
+//            });
+//        }
+//        AppointmentsTable.setItems(apptData);
+//    }
 
     private void wirePatientsTable() {
         if (patientTable == null) return;
@@ -359,19 +485,57 @@ public class DoctorController {
         if (colDob != null)            colDob.setCellValueFactory(new PropertyValueFactory<>("age"));
         if (colMedicalHistory != null) colMedicalHistory.setCellValueFactory(new PropertyValueFactory<>("medicalHistory"));
         if (colAction2 != null) {
-            colAction2.setCellValueFactory(param -> new ReadOnlyObjectWrapper<>(param.getValue()));
-            colAction2.setCellFactory(col -> new TableCell<>() {
-                private final Button btnView = new Button("View");
-                { btnView.setOnAction(e -> {
-                    PatientRow row = getItem();
-                    if (row != null) showPatientDetails(row.getFullName(), row.getMedicalHistory());
+
+            if (colAction2 != null) {
+                colAction2.setCellValueFactory(param -> new ReadOnlyObjectWrapper<>(param.getValue()));
+                colAction2.setCellFactory(col -> new TableCell<PatientRow, PatientRow>() {
+                    private final Button btnView   = new Button("View");
+//                    private final Button btnCopyId = new Button("Copy NID");
+//                    private final Button btnInfo   = new Button("Details");
+                    private final HBox box = new HBox(8, btnView);
+
+                    {
+                        // classes للزرار – هنستعملها في الـ CSS
+                        btnView.getStyleClass().addAll("btn", "btn--info");
+//                        btnCopyId.getStyleClass().addAll("btn", "btn--ghost");
+//                        btnInfo.getStyleClass().addAll("btn", "btn--info");
+                        box.getStyleClass().add("table-actions");
+
+                        // قياسات مريحة
+                        btnView.setMinWidth(74);   btnView.setMaxWidth(Region.USE_PREF_SIZE);
+//                        btnCopyId.setMinWidth(90); btnCopyId.setMaxWidth(Region.USE_PREF_SIZE);
+//                        btnInfo.setMinWidth(78);   btnInfo.setMaxWidth(Region.USE_PREF_SIZE);
+
+                        // أفعال
+                        btnView.setOnAction(e -> {
+                            PatientRow row = getItem();
+                            if (row != null) showPatientDetails(row.getFullName(), row.getMedicalHistory());
+                        });
+//                        btnCopyId.setOnAction(e -> {
+//                            PatientRow row = getItem();
+//                            if (row != null) {
+//                                ClipboardContent cc = new ClipboardContent();
+//                                cc.putString(row.getNationalId());
+//                                Clipboard.getSystemClipboard().setContent(cc);
+//                            }
+//                        });
+//                        btnInfo.setOnAction(e -> {
+//                            PatientRow row = getItem();
+//                            if (row != null) {
+//                                showInfo("Patient details",
+//                                        "Name: " + row.getFullName() + "\nNID: " + row.getNationalId()
+//                                                + "\n\nMedical history:\n" + safe(row.getMedicalHistory()));
+//                            }
+//                        });
+                    }
+
+                    @Override protected void updateItem(PatientRow row, boolean empty) {
+                        super.updateItem(row, empty);
+                        setText(null);
+                        setGraphic(empty ? null : box);
+                    }
                 });
-                }
-                @Override protected void updateItem(PatientRow row, boolean empty) {
-                    super.updateItem(row, empty);
-                    setGraphic(empty ? null : btnView);
-                }
-            });
+            }
         }
         patientTable.setItems(patientData);
     }
@@ -407,6 +571,8 @@ public class DoctorController {
                         "\nNational ID: " + safe(row.getNationalId()) +
                         "\nMedical history:\n" + safe(row.getMedicalHistory()));
     }
+
+
 
     private void showPatientDetails(String name, String history) {
         showInfo("Patient details",
@@ -563,4 +729,3 @@ public class DoctorController {
         public StringProperty medicalHistoryProperty() { return medicalHistory; }
     }
 }
-

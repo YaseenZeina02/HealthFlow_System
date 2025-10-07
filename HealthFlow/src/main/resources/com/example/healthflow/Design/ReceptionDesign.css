@@ -144,3 +144,203 @@
     -fx-font-weight: bold;
     -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.25), 8, 0, 0, 2);
 }
+
+/* ======= Action buttons ======= */
+.button.btn {
+    -fx-background-radius: 8;
+    -fx-padding: 6 12;
+    -fx-font-weight: 700;
+    -fx-cursor: hand;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.12), 8, 0.2, 0, 1);
+}
+.button.btn:focused {
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.25), 10, 0.25, 0, 1);
+}
+
+/* Primary (أزرق) */
+.button.btn--primary {
+    -fx-text-fill: white;
+    -fx-background-color: linear-gradient(to right, #0ea5e9, #2563eb);
+}
+.button.btn--primary:hover {
+    -fx-background-color: linear-gradient(to right, #22b6f5, #2f6ef0);
+}
+
+/* Info (تركوازي) */
+.button.btn--info {
+    -fx-text-fill: white;
+    -fx-background-color: linear-gradient(to right, #10b981, #0ea5e9);
+}
+.button.btn--info:hover {
+    -fx-background-color: linear-gradient(to right, #27c491, #19b2f0);
+}
+
+/* Ghost (شفاف بحد خفيف) */
+.button.btn--ghost {
+    -fx-background-color: transparent;
+    -fx-text-fill: #334155;          /* slate-700 */
+    -fx-border-color: rgba(51,65,85,0.35);
+    -fx-border-radius: 8;
+    -fx-border-width: 1;
+}
+.button.btn--ghost:hover {
+    -fx-background-color: rgba(2,132,199,0.08);
+    -fx-border-color: rgba(2,132,199,0.45);
+    -fx-text-fill: #0f172a;          /* slate-900 */
+}
+
+/* مسافات الحاوية */
+.table-actions {
+    -fx-alignment: center-left;
+}
+
+/* ======= Row selection colors ======= */
+.table-view .table-row-cell:filled:selected,
+.table-view .table-row-cell:filled:selected:hover {
+    -fx-background-color: linear-gradient(to right, #0ea5e9, #2563eb);
+}
+.table-view .table-row-cell:filled:selected .text {
+    -fx-fill: white;
+}
+
+/* خلي الأزرار تبان كويس فوق الصف المحدد */
+.table-view .table-row-cell:filled:selected .button.btn--ghost {
+    -fx-text-fill: white;
+    -fx-border-color: rgba(255,255,255,0.65);
+}
+.table-view .table-row-cell:filled:selected .button.btn--primary,
+.table-view .table-row-cell:filled:selected .button.btn--info {
+    /* يكفي التأثير؛ الألوان كويسة فوق الخلفية */
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.35), 10, 0.25, 0, 1);
+}
+
+/* Hover بدون اختيار */
+.table-view .table-row-cell:filled:hover {
+    -fx-background-color: rgba(2,132,199,0.08);
+}
+
+
+/* ========== Base ========== */
+.root {
+    -fx-font-size: 14px;
+    -fx-font-smoothing-type: gray;
+}
+
+/* صندوق عام: استعمله على TextField / ComboBox / DatePicker */
+.box {
+    -fx-background-color: white;
+    -fx-background-insets: 0;
+    -fx-background-radius: 0.2;
+    -fx-border-color: #84ddcb !important;
+    /*-fx-border-width: 1;*/
+    -fx-border-radius: 4;
+    /*-fx-padding: 10 14;*/
+    -fx-effect: dropshadow(gaussian, rgba(16,24,40,0.06), 10, 0.2, 0, 1);
+    -fx-prompt-text-fill: rgba(17,24,39,0.45);
+}
+
+.box:hover {
+    -fx-border-color: rgba(0,0,0,0.18);
+}
+
+.box:focused {
+    -fx-border-color: #3b82f6; /* blue-500 */
+    -fx-effect: dropshadow(gaussian, rgba(59,130,246,0.35), 14, 0.35, 0, 1);
+}
+
+/* تعطيل */
+.box:disabled {
+    -fx-opacity: 0.6;
+}
+
+/* ====== TextField كصندوق ====== */
+.text-field.box {
+    -fx-background-color: white;
+}
+
+/* ====== ComboBox كصندوق ====== */
+.combo-box.box,
+.combo-box-base.box {
+    -fx-background-color: white;
+}
+.combo-box.box > .arrow-button,
+.combo-box-base.box > .arrow-button {
+    -fx-background-color: transparent;
+    -fx-padding: 0 8 0 8;
+}
+.combo-box.box > .arrow-button > .arrow,
+.combo-box-base.box > .arrow-button > .arrow {
+    -fx-background-color: #111827;
+    /*-fx-padding: 6;*/
+}
+
+/* قائمة الـ ComboBox */
+.list-view {
+    -fx-background-color: white;
+    -fx-background-radius: 4;
+    /*-fx-padding: 4;*/
+    -fx-effect: dropshadow(gaussian, rgba(16,24,40,0.12), 12, 0.25, 0, 2);
+}
+
+/* ====== DatePicker كصندوق ====== */
+.date-picker.box {
+    -fx-background-color: white;
+    -fx-max-height:3 ;
+}
+.date-picker.box > .arrow-button {
+    -fx-background-color: transparent;
+    -fx-padding: 0 8 0 8;
+}
+.date-picker.box > .arrow-button > .arrow {
+    -fx-background-color: #111827;
+    -fx-padding: 6;
+}
+.date-picker.box > .text-field {
+    -fx-background-color: transparent;
+    -fx-padding: 10 14;
+}
+
+/* ========== Chips لأوقات الحجز ========== */
+/* استعملها على ToggleButton */
+.toggle-button.time-chip {
+    -fx-background-color: white;
+    -fx-text-fill: #111827;
+    -fx-border-color: rgba(0,0,0,0.14);
+    -fx-border-width: 1;
+    -fx-background-radius: 8;
+    -fx-border-radius: 8;
+    -fx-padding: 8 16;
+    -fx-cursor: hand;
+    -fx-effect: null;
+}
+.toggle-button.time-chip:hover {
+    -fx-border-color: #60a5fa;            /* blue-400 */
+}
+.toggle-button.time-chip:selected {
+    -fx-background-color: linear-gradient(to bottom, #3b82f6, #2563eb);
+    -fx-text-fill: white;
+    -fx-border-color: transparent;
+    -fx-effect: dropshadow(gaussian, rgba(37,99,235,0.35), 10, 0.3, 0, 1);
+}
+.toggle-button.time-chip:disabled {
+    -fx-opacity: 0.55;
+}
+
+/* ========== أزرار الإجراءات ========== */
+.button.btn-primary {
+    -fx-background-color: linear-gradient(to bottom, #3b82f6, #2563eb);
+    -fx-text-fill: white;
+    -fx-background-radius: 10;
+    -fx-padding: 10 22;
+    -fx-font-weight: bold;
+    -fx-effect: dropshadow(gaussian, rgba(37,99,235,0.35), 12, 0.35, 0, 1);
+}
+.button.btn-primary:hover { -fx-background-color: linear-gradient(to bottom, #60a5fa, #3b82f6); }
+.button.btn-secondary {
+    -fx-background-color: #f3f4f6;
+    -fx-text-fill: #111827;
+    -fx-background-radius: 10;
+    -fx-padding: 10 22;
+    -fx-border-color: rgba(0,0,0,0.12);
+    -fx-border-radius: 10;
+}
