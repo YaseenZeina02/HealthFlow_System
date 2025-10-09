@@ -8,6 +8,7 @@ import java.sql.SQLException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
@@ -421,19 +422,23 @@ public class DoctorDAO {
      */
     public static final class AppointmentRow {
         public final long id;
+        public final long doctorId;   // NEW
+        public final long patientId;
         public final java.time.OffsetDateTime startAt;
         public final String doctorName;
         public final String patientName;
         public final String specialty;
         public final String status;
 
-        public AppointmentRow(long id,
+        public AppointmentRow(long id, long doctorId, long patientId,
                               java.time.OffsetDateTime startAt,
                               String doctorName,
                               String patientName,
                               String specialty,
                               String status) {
             this.id = id;
+            this.doctorId = doctorId;
+            this.patientId = patientId;
             this.startAt = startAt;
             this.doctorName = doctorName;
             this.patientName = patientName;
@@ -445,22 +450,58 @@ public class DoctorDAO {
     /**
      * يعيد كل المواعيد مع اسم الدكتور/المريض والتخصص والحالة.
      */
+//    public java.util.List<AppointmentRow> listAppointments() throws SQLException {
+//        final String sql = """
+//            SELECT
+//                a.id,
+//                a.appointment_date,
+//                du.full_name AS doctor_name,
+//                pu.full_name AS patient_name,
+//                d.specialty,
+//                a.status::text AS status
+//            FROM appointments a
+//            JOIN doctors d      ON d.id = a.doctor_id
+//            JOIN users  du      ON du.id = d.user_id
+//            JOIN patients p     ON p.id = a.patient_id
+//            JOIN users  pu      ON pu.id = p.user_id
+//            ORDER BY a.appointment_date DESC
+//        """;
+//        try (var c = Database.get();
+//             var ps = c.prepareStatement(sql);
+//             var rs = ps.executeQuery()) {
+//            var out = new java.util.ArrayList<AppointmentRow>();
+//            while (rs.next()) {
+//                out.add(new AppointmentRow(
+//                        rs.getLong("id"),
+//                        rs.getLong("doctor_id"),
+//                        rs.getLong("patient_id"),
+//                        rs.getObject("appointment_date", OffsetDateTime.class),
+//                        rs.getString("doctor_name"),
+//                        rs.getString("patient_name"),
+//                        rs.getString("specialty"), rs.getString("status")));
+//            }
+//            return out;
+//        }
+//    }
+
     public java.util.List<AppointmentRow> listAppointments() throws SQLException {
         final String sql = """
-            SELECT
-                a.id,
-                a.appointment_date,
-                du.full_name AS doctor_name,
-                pu.full_name AS patient_name,
-                d.specialty,
-                a.status::text AS status
-            FROM appointments a
-            JOIN doctors d      ON d.id = a.doctor_id
-            JOIN users  du      ON du.id = d.user_id
-            JOIN patients p     ON p.id = a.patient_id
-            JOIN users  pu      ON pu.id = p.user_id
-            ORDER BY a.appointment_date DESC
-        """;
+        SELECT
+            a.id,
+            a.doctor_id,
+            a.patient_id,
+            a.appointment_date AT TIME ZONE 'UTC' AS start_at,
+            du.full_name AS doctor_name,
+            pu.full_name AS patient_name,
+            d.specialty,
+            a.status::text AS status
+        FROM appointments a
+        JOIN doctors d  ON d.id = a.doctor_id
+        JOIN users  du  ON du.id = d.user_id
+        JOIN patients p ON p.id = a.patient_id
+        JOIN users  pu  ON pu.id = p.user_id
+        ORDER BY a.appointment_date DESC
+    """;
         try (var c = Database.get();
              var ps = c.prepareStatement(sql);
              var rs = ps.executeQuery()) {
@@ -468,7 +509,9 @@ public class DoctorDAO {
             while (rs.next()) {
                 out.add(new AppointmentRow(
                         rs.getLong("id"),
-                        rs.getObject("appointment_date", java.time.OffsetDateTime.class),
+                        rs.getLong("doctor_id"),
+                        rs.getLong("patient_id"),
+                        rs.getObject("start_at", OffsetDateTime.class),
                         rs.getString("doctor_name"),
                         rs.getString("patient_name"),
                         rs.getString("specialty"),
@@ -478,6 +521,7 @@ public class DoctorDAO {
             return out;
         }
     }
+
 
     /**
      * Search appointments by free-text over doctor/patient names or status.
@@ -498,7 +542,7 @@ public class DoctorDAO {
             JOIN patients p     ON p.id = a.patient_id
             JOIN users  pu      ON pu.id = p.user_id
         """;
-        String where = "";
+        String where ="";
         boolean hasQ = (query != null && !query.trim().isEmpty());
         if (hasQ) {
             where = """
@@ -526,12 +570,12 @@ public class DoctorDAO {
                 while (rs.next()) {
                     out.add(new AppointmentRow(
                             rs.getLong("id"),
-                            rs.getObject("appointment_date", java.time.OffsetDateTime.class),
+                            rs.getLong("doctor_id"),
+                            rs.getLong("patient_id"),
+                            rs.getObject("appointment_date", OffsetDateTime.class),
                             rs.getString("doctor_name"),
                             rs.getString("patient_name"),
-                            rs.getString("specialty"),
-                            rs.getString("status")
-                    ));
+                            rs.getString("specialty"), rs.getString("status")));
                 }
                 return out;
             }
@@ -543,6 +587,7 @@ public class DoctorDAO {
     public int countAvailableDoctors() throws SQLException {
         final String sql = "SELECT COUNT(*) FROM doctors WHERE availability_status = 'AVAILABLE'";
         try (var c = Database.get(); var ps = c.prepareStatement(sql); var rs = ps.executeQuery()) {
+            var out = new ArrayList<AppointmentRow>();
             rs.next(); return rs.getInt(1);
         }
     }
@@ -570,6 +615,12 @@ public class DoctorDAO {
 
     public int countPendingAppointments() throws SQLException {
         final String sql = "SELECT COUNT(*) FROM appointments WHERE status = 'PENDING'";
+        try (var c = Database.get(); var ps = c.prepareStatement(sql); var rs = ps.executeQuery()) {
+            rs.next(); return rs.getInt(1);
+        }
+    }
+    public int countScheduledAppointments() throws SQLException {
+        final String sql = "SELECT COUNT(*) FROM appointments WHERE status = 'SCHEDULED'";
         try (var c = Database.get(); var ps = c.prepareStatement(sql); var rs = ps.executeQuery()) {
             rs.next(); return rs.getInt(1);
         }
@@ -652,27 +703,131 @@ public class DoctorDAO {
 
     public List<AppointmentRow> listScheduledAppointments() throws SQLException {
         final String sql = """
-        SELECT
-            a.id,
-            a.appointment_date,
-            du.full_name AS doctor_name,
-            pu.full_name AS patient_name,
-            d.specialty,
-            a.status::text AS status
+            SELECT a.id,
+                   a.doctor_id,
+                   a.patient_id,
+                   a.appointment_date AT TIME ZONE 'UTC' AS start_at,
+                   udoc.full_name  AS doctor_name,
+                   up.full_name    AS patient_name,
+                   a.status::text  AS status,
+                   d.specialty     AS specialty
+            FROM appointments a
+            JOIN doctors d  ON d.id = a.doctor_id
+            JOIN users udoc ON udoc.id = d.user_id
+            JOIN patients p ON p.id = a.patient_id
+            JOIN users up   ON up.id = p.user_id
+            WHERE a.status = 'SCHEDULED'
+            ORDER BY a.appointment_date
+            """;
+
+        try (var c = Database.get();
+             var ps = c.prepareStatement(sql);
+             var rs = ps.executeQuery()) {
+
+            var rows = new ArrayList<AppointmentRow>();
+            while (rs.next()) {
+                rows.add(new AppointmentRow(
+                        rs.getLong("id"),
+                        rs.getLong("doctor_id"),
+                        rs.getLong("patient_id"),
+                        rs.getObject("start_at", java.time.OffsetDateTime.class),
+                        rs.getString("doctor_name"),
+                        rs.getString("patient_name"),
+                        rs.getString("specialty"),
+                        rs.getString("status")
+                ));
+            }
+            return rows;
+        }
+    }
+
+//    public List<AppointmentRow> searchScheduledAppointments(String query) throws SQLException {
+//        final String sql = """
+//            SELECT a.id,
+//                   a.doctor_id,
+//                   a.patient_id,
+//                   a.appointment_date AT TIME ZONE 'UTC' AS start_at,
+//                   udoc.full_name  AS doctor_name,
+//                   up.full_name    AS patient_name,
+//                   a.status::text  AS status,
+//                   d.specialty     AS specialty
+//            FROM appointments a
+//            JOIN doctors d  ON d.id = a.doctor_id
+//            JOIN users udoc ON udoc.id = d.user_id
+//            JOIN patients p ON p.id = a.patient_id
+//            JOIN users up   ON up.id = p.user_id
+//            WHERE a.status = 'SCHEDULED'
+//              AND (
+//                  udoc.full_name ILIKE ? OR up.full_name ILIKE ? OR d.specialty ILIKE ?
+//              )
+//            ORDER BY a.appointment_date
+//            """;
+//// … ثم نفس الـ mapping أعلاه …
+//        boolean hasQ = query != null && !query.isBlank();
+//        String sql = hasQ ? base + """
+//            AND (du.full_name ILIKE ? OR pu.full_name ILIKE ? OR d.specialty ILIKE ?)
+//        """ : base;
+//        sql += " ORDER BY a.appointment_date";
+//
+//        try (var c = Database.get(); var ps = c.prepareStatement(sql)) {
+//            if (hasQ) {
+//                String q = "%" + query.trim() + "%";
+//                ps.setString(1, q); ps.setString(2, q); ps.setString(3, q);
+//            }
+//            try (var rs = ps.executeQuery()) {
+//                var out = new ArrayList<AppointmentRow>();
+//                while (rs.next()) {
+//                    out.add(new AppointmentRow(
+//                            rs.getLong("id"),
+//                            ,
+//                            rs.getObject("appointment_date", OffsetDateTime.class),
+//                            rs.getString("doctor_name"),
+//                            rs.getString("patient_name"),
+//                            rs.getString("specialty"), rs.getString("status")));
+//                }
+//                return out;
+//            }
+//        }
+//    }
+
+public List<AppointmentRow> searchScheduledAppointments(String query) throws SQLException {
+    boolean hasQ = query != null && !query.isBlank();
+    String base = """
+        SELECT a.id,
+               a.doctor_id,
+               a.patient_id,
+               a.appointment_date AT TIME ZONE 'UTC' AS start_at,
+               udoc.full_name  AS doctor_name,
+               up.full_name    AS patient_name,
+               a.status::text  AS status,
+               d.specialty     AS specialty
         FROM appointments a
         JOIN doctors d  ON d.id = a.doctor_id
-        JOIN users du   ON du.id = d.user_id
+        JOIN users udoc ON udoc.id = d.user_id
         JOIN patients p ON p.id = a.patient_id
-        JOIN users pu   ON pu.id = p.user_id
+        JOIN users up   ON up.id = p.user_id
         WHERE a.status = 'SCHEDULED'
-        ORDER BY a.appointment_date
     """;
-        try (var c = Database.get(); var ps = c.prepareStatement(sql); var rs = ps.executeQuery()) {
+    String where = hasQ
+            ? " AND (udoc.full_name ILIKE ? OR up.full_name ILIKE ? OR d.specialty ILIKE ?)"
+            : "";
+    String sql = base + where + " ORDER BY a.appointment_date";
+
+    try (var c = Database.get(); var ps = c.prepareStatement(sql)) {
+        if (hasQ) {
+            String q = "%" + query.trim() + "%";
+            ps.setString(1, q);
+            ps.setString(2, q);
+            ps.setString(3, q);
+        }
+        try (var rs = ps.executeQuery()) {
             var out = new ArrayList<AppointmentRow>();
             while (rs.next()) {
                 out.add(new AppointmentRow(
                         rs.getLong("id"),
-                        rs.getObject("appointment_date", java.time.OffsetDateTime.class),
+                        rs.getLong("doctor_id"),
+                        rs.getLong("patient_id"),
+                        rs.getObject("start_at", OffsetDateTime.class),
                         rs.getString("doctor_name"),
                         rs.getString("patient_name"),
                         rs.getString("specialty"),
@@ -682,48 +837,5 @@ public class DoctorDAO {
             return out;
         }
     }
-
-    public List<AppointmentRow> searchScheduledAppointments(String query) throws SQLException {
-        final String base = """
-        SELECT
-            a.id,
-            a.appointment_date,
-            du.full_name AS doctor_name,
-            pu.full_name AS patient_name,
-            d.specialty,
-            a.status::text AS status
-        FROM appointments a
-        JOIN doctors d  ON d.id = a.doctor_id
-        JOIN users du   ON du.id = d.user_id
-        JOIN patients p ON p.id = a.patient_id
-        JOIN users pu   ON pu.id = p.user_id
-        WHERE a.status = 'SCHEDULED'
-    """;
-        boolean hasQ = query != null && !query.isBlank();
-        String sql = hasQ ? base + """
-            AND (du.full_name ILIKE ? OR pu.full_name ILIKE ? OR d.specialty ILIKE ?)
-        """ : base;
-        sql += " ORDER BY a.appointment_date";
-
-        try (var c = Database.get(); var ps = c.prepareStatement(sql)) {
-            if (hasQ) {
-                String q = "%" + query.trim() + "%";
-                ps.setString(1, q); ps.setString(2, q); ps.setString(3, q);
-            }
-            try (var rs = ps.executeQuery()) {
-                var out = new ArrayList<AppointmentRow>();
-                while (rs.next()) {
-                    out.add(new AppointmentRow(
-                            rs.getLong("id"),
-                            rs.getObject("appointment_date", java.time.OffsetDateTime.class),
-                            rs.getString("doctor_name"),
-                            rs.getString("patient_name"),
-                            rs.getString("specialty"),
-                            rs.getString("status")
-                    ));
-                }
-                return out;
-            }
-        }
-    }
+}
 }

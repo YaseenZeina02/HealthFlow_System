@@ -103,105 +103,15 @@
 
 
 
-.table-view:focused .table-row-cell:filled:selected {
-    -fx-background-color: -fx-selection-bar;
-}
-
-.table-view:focused .table-row-cell:filled:selected,
-.table-view .table-row-cell:filled:selected {
-    -fx-background-color: #254E70;   /* <-- اختار أي واحد من اللي فوق */
-    -fx-text-fill: #9f2a2a !important;
-}
-
-.table-view .table-row-cell:filled:selected {
-    -fx-background-color: -fx-selection-bar-non-focused;
-}
-
-/* خلي نص الخلايا أبيض وقت التحديد */
-.table-view .table-row-cell:filled:selected .table-cell {
-    -fx-text-fill: #3A9BDC !important;
-}
-.table-view .table-row-cell:filled:selected .text {
-    -fx-fill: #ffffff !important;
-}
-
-.nav-btn {
-    -fx-background-color: transparent;
-    -fx-text-fill: #e6f2f6;
-    -fx-alignment: CENTER_LEFT;
-    -fx-padding: 8 14 8 14;
-    -fx-background-radius: 3;
-}
-
-/*.nav-btn:hover {*/
-/*    -fx-background-color: rgba(255,255,255,0.08);*/
-/*}*/
-
-/* الزر النشط */
-.nav-btn.current {
-    -fx-background-color: linear-gradient(to right, #1e88e5, #28b6f6);
-    -fx-text-fill: white;
-    -fx-font-weight: bold;
-    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.25), 8, 0, 0, 2);
-}
-
-/* ======= Action buttons ======= */
-.button.btn {
-    -fx-background-radius: 8;
-    -fx-padding: 6 12;
-    -fx-font-weight: 700;
-    -fx-cursor: hand;
-    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.12), 8, 0.2, 0, 1);
-}
-.button.btn:focused {
-    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.25), 10, 0.25, 0, 1);
-}
-
-/* Primary (أزرق) */
-.button.btn--primary {
-    -fx-text-fill: white;
-    -fx-background-color: linear-gradient(to right, #0ea5e9, #2563eb);
-}
-.button.btn--primary:hover {
-    -fx-background-color: linear-gradient(to right, #22b6f5, #2f6ef0);
-}
-
-/* Info (تركوازي) */
-.button.btn--info {
-    -fx-text-fill: white;
-    -fx-background-color: linear-gradient(to right, #10b981, #0ea5e9);
-}
-.button.btn--info:hover {
-    -fx-background-color: linear-gradient(to right, #27c491, #19b2f0);
-}
-
-/* Ghost (شفاف بحد خفيف) */
-.button.btn--ghost {
-    -fx-background-color: transparent;
-    -fx-text-fill: #334155;          /* slate-700 */
-    -fx-border-color: rgba(51,65,85,0.35);
-    -fx-border-radius: 8;
-    -fx-border-width: 1;
-}
-.button.btn--ghost:hover {
-    -fx-background-color: rgba(2,132,199,0.08);
-    -fx-border-color: rgba(2,132,199,0.45);
-    -fx-text-fill: #0f172a;          /* slate-900 */
-}
-
-/* مسافات الحاوية */
-.table-actions {
-    -fx-alignment: center-left;
-}
-
 /* ======= Row selection colors ======= */
 .table-view .table-row-cell:filled:selected,
 .table-view .table-row-cell:filled:selected:hover {
-    -fx-background-color: linear-gradient(to right, #0ea5e9, #2563eb);
+    -fx-background-color: #0ea5e9;
 }
 .table-view .table-row-cell:filled:selected .text {
     -fx-fill: white;
 }
+.table-view .table-row-cell:filled:selected .table-cell { -fx-text-fill: white; }
 
 /* خلي الأزرار تبان كويس فوق الصف المحدد */
 .table-view .table-row-cell:filled:selected .button.btn--ghost {
@@ -215,9 +125,9 @@
 }
 
 /* Hover بدون اختيار */
-.table-view .table-row-cell:filled:hover {
-    -fx-background-color: rgba(2,132,199,0.08);
-}
+/*.table-view .table-row-cell:filled:hover {*/
+/*    -fx-background-color: rgba(178, 232, 70, 0.08);*/
+/*}*/
 
 
 /* ========== Base ========== */
@@ -227,26 +137,107 @@
 }
 
 /* صندوق عام: استعمله على TextField / ComboBox / DatePicker */
+/*.box {*/
+/*    -fx-background-color: white;*/
+/*    -fx-background-insets: 0;*/
+/*    -fx-background-radius: 0.2;*/
+/*    -fx-border-color: #84ddcb !important;*/
+/*    !*-fx-border-width: 1;*!*/
+/*    -fx-border-radius: 4;*/
+/*    !*-fx-padding: 10 14;*!*/
+/*    -fx-effect: dropshadow(gaussian, rgba(16,24,40,0.06), 10, 0.2, 0, 1);*/
+/*    -fx-prompt-text-fill: rgba(17,24,39,0.45);*/
+/*    -fx-pref-height: 20px;*/
+/*}*/
+
+/*.box:hover {*/
+/*    -fx-border-color: rgba(0,0,0,0.18);*/
+/*}*/
+
+/*.box:focused {*/
+/*    -fx-border-color: #3b82f6; !* blue-500 *!*/
+/*    -fx-effect: dropshadow(gaussian, rgba(59,130,246,0.35), 14, 0.35, 0, 1);*/
+/*}*/
+
+/* عنصر عام */
 .box {
     -fx-background-color: white;
-    -fx-background-insets: 0;
-    -fx-background-radius: 0.2;
-    -fx-border-color: #84ddcb !important;
-    /*-fx-border-width: 1;*/
-    -fx-border-radius: 4;
-    /*-fx-padding: 10 14;*/
-    -fx-effect: dropshadow(gaussian, rgba(16,24,40,0.06), 10, 0.2, 0, 1);
-    -fx-prompt-text-fill: rgba(17,24,39,0.45);
-    -fx-pref-height: 20px;
+    -fx-background-radius: 10;
+    -fx-border-color: #1aa3a8;
+    -fx-border-width: 1;
+    -fx-border-radius: 10;
+    -fx-padding: 6 10;
+    -fx-font-size: 14px;
+    -fx-text-fill: #222;
 }
 
-.box:hover {
-    -fx-border-color: rgba(0,0,0,0.18);
-}
-
+/* فوكس/هوفر أنيق */
 .box:focused {
-    -fx-border-color: #3b82f6; /* blue-500 */
-    -fx-effect: dropshadow(gaussian, rgba(59,130,246,0.35), 14, 0.35, 0, 1);
+    -fx-border-color: #0e7c80;
+    -fx-effect: dropshadow(gaussian, rgba(14,124,128,0.25), 8, 0.25, 0, 0);
+}
+/*.box:hover {*/
+/*    -fx-border-color: #159399;*/
+/*}*/
+
+/* ComboBox */
+.combo-box.box > .arrow-button {
+    -fx-background-color: transparent;
+    -fx-padding: 0 8 0 6;
+}
+
+/* Popup list cells */
+.combo-box-popup .list-view {
+    -fx-background-insets: 0 ;
+    -fx-padding: 4 0 4 0;
+    -fx-text-fill: black;
+}
+.combo-box-popup .list-cell {
+    -fx-padding: 8 12;
+    -fx-font-size: 14px;
+    /*-fx-background-color: #1976d2;*/
+    -fx-text-fill: black;
+}
+/*.combo-box-popup .list-cell:hover {*/
+/*    -fx-background-color: #b9ff72;*/
+/*    -fx-text-fill: white;*/
+/*}*/
+.combo-box-popup .list-cell:selected {
+    -fx-background-color: #63a7ec;
+    -fx-text-fill: white;
+    -fx-border-color: #1976d2;
+}
+.combo-box-popup:selected .list-cell {
+    /*-fx-background-color: #1976d2;*/
+    -fx-text-fill: white;
+    -fx-border-color: #b4b836;
+
+}
+
+/* ==== Controls inside a selected TableView row ==== */
+
+/* اجعل خلفية الكمبوبوكس/الدات بيكر داكنة خفيفة داخل الصف المحدد */
+/*.table-view .table-row-cell:filled:selected .combo-box-base,*/
+/*.table-view .table-row-cell:filled:selected .date-picker {*/
+/*    -fx-background-color: rgba(255,255,255,0.10); !* شفافية بسيطة فوق الأزرق *!*/
+/*    -fx-border-color: rgba(255,255,255,0.65);*/
+/*}*/
+
+/* نص القيمة داخل الكمبوبوكس والدات بيكر يكون أبيض */
+.table-view .table-row-cell:filled:selected .combo-box-base .text,
+.table-view .table-row-cell:filled:selected .date-picker .text {
+    -fx-fill:black;
+    -fx-background-color: green;
+}
+
+
+    /* DatePicker */
+.date-picker.box > .arrow-button {
+    -fx-background-color: transparent;
+}
+.date-picker.box > .text-field {
+    -fx-background-color: transparent;
+    -fx-prompt-text-fill: rgba(0,0,0,0.45);
 }
 
 /* تعطيل */
@@ -288,6 +279,7 @@
     -fx-background-color: white;
     /*-fx-max-height:3 ;*/
 }
+
 .date-picker.box > .arrow-button {
     -fx-background-color: transparent !important;
     -fx-padding: 0 8 0 8;
@@ -348,3 +340,59 @@
     -fx-border-color: rgba(0,0,0,0.12);
     -fx-border-radius: 10;
 }
+
+/* ====== Complete button (Reception Dashboard) ====== */
+.button.btn-complete {
+    -fx-background-color: linear-gradient(to right, #22c55e, #16a34a);
+    -fx-text-fill: white !important;
+    -fx-font-weight: bold;
+    -fx-background-radius: 8;
+    -fx-padding: 6 14;
+    -fx-cursor: hand;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.25), 8, 0.3, 0, 1);
+    -fx-font-size: 12.5px;
+}
+
+/* ثبّت لون النص أبيض سواء الصف محدد أو لا */
+.button.btn-complete .text {
+    -fx-fill: white !important;
+}
+/*.table-view .table-row-cell:filled .button.btn-complete .text,*/
+/*.table-view .table-row-cell:filled:selected .button.btn-complete .text {*/
+/*    -fx-fill: #302323;*/
+/*}*/
+
+.table-row-cell { -fx-cell-size: 38; }
+.button.btn-complete:hover {
+    -fx-background-color: linear-gradient(to right, #16a34a, #15803d);
+}
+.button.btn-complete:disabled {
+    -fx-opacity: 0.6;
+}
+
+.chart-bar {
+    -fx-bar-fill: #F2742B;
+}
+.table-view .box {
+    -fx-padding: 0 10;     /* حواف أفقية أقل */
+    -fx-pref-height: 34;   /* ارتفاع مناسب للصف */
+}
+.table-row-cell {
+    -fx-cell-size: 38;     /* ثبّت ارتفاع الصف */
+}
+
+
+
+
+
+
+
+/* Hover feedback on inputs inside a selected row */
+.table-view .table-row-cell:filled:selected .combo-box-base:hover,
+.table-view .table-row-cell:filled:selected .date-picker:hover {
+    /*-fx-background-color: #f0f9ff;               !* very light blue *!*/
+    -fx-border-color: #38bdf8;
+    /* sky-400 */
+}
+
+
