@@ -28,6 +28,7 @@ import org.mindrot.jbcrypt.BCrypt;
 
 import java.sql.Connection;
 import java.util.Objects;
+import com.example.healthflow.controllers.ReceptionController;
 
 public class LoginController {
 
@@ -181,29 +182,42 @@ public class LoginController {
 
                 // أغلق نافذة الدخول وافتح الوجهة حسب الدور
                 Stage currentStage = (Stage) rootPane.getScene().getWindow();
-                currentStage.close();
 
                 Role r = user.getRole();
                 if (r == Role.RECEPTIONIST) {
                     Stage stage = new Stage();
-                    navigation.navigateTo(stage, navigation.Reception_Fxml);
+                    FXMLLoader loader = new FXMLLoader(getClass().getResource(navigation.Reception_Fxml));
+                    Parent root = loader.load();
+                    stage.setScene(new Scene(root));
                     stage.setTitle("Reception Dashboard");
                     stage.show();
+
+                    ReceptionController rc = loader.getController();
+                    stage.setOnCloseRequest(e -> rc.shutdown());
+
+                    currentStage.close(); // close after successful show
+
                 } else if (r == Role.DOCTOR) {
                     Stage stage = new Stage();
                     navigation.navigateTo(stage, navigation.Doctor_Fxml);
                     stage.setTitle("Doctor Dashboard");
                     stage.show();
+                    currentStage.close();
+
                 } else if (r == Role.PHARMACIST) {
                     Stage stage = new Stage();
                     navigation.navigateTo(stage, navigation.Pharmacy_Fxml);
                     stage.setTitle("Pharmacy Dashboard");
                     stage.show();
+                    currentStage.close();
+
                 } else if (r == Role.ADMIN) {
                     Stage stage = new Stage();
                     navigation.navigateTo(stage, navigation.Admin_Fxml);
                     stage.setTitle("Admin Panel");
                     stage.show();
+                    currentStage.close();
+
                 } else if (r == Role.PATIENT) {
                     showAlert("Access Restricted", "Patient portal is not available in this version.");
                 }

@@ -63,7 +63,7 @@ public class Navigation {
     }
 
     /* ===================== نافذة جديدة ===================== */
-    public void navigateTo(Stage stage, String fxmlPath, ConnectivityMonitor monitor) {
+    public FXMLLoader navigateTo(Stage stage, String fxmlPath, ConnectivityMonitor monitor) {
         try {
             FXMLLoader loader = new FXMLLoader(getClass().getResource(fxmlPath));
             loader.setControllerFactory(type -> createController(type, monitor));
@@ -74,10 +74,12 @@ public class Navigation {
             stage.setTitle("New Window");
             stage.setResizable(true);
             stage.show();
+            return loader;
         } catch (IOException e) {
             System.err.println("Error loading view: " + fxmlPath);
             e.printStackTrace();
         }
+        return null;
     }
 
     // Backward compat
