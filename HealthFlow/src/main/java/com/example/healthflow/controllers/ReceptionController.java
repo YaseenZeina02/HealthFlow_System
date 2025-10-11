@@ -2,12 +2,22 @@ package com.example.healthflow.controllers;
 
 import com.example.healthflow.db.Database;
 import com.example.healthflow.dao.DoctorDAO;
+import com.example.healthflow.model.Appointment;
+import com.example.healthflow.model.DoctorRow;
+import com.example.healthflow.model.PatientRow;
 import com.example.healthflow.net.ConnectivityMonitor;
 import com.example.healthflow.service.AuthService.Session;
-import com.example.healthflow.model.dto.PatientView;
+import com.example.healthflow.model.Appointment.ApptRow;
 import com.example.healthflow.service.PatientService;
 import com.example.healthflow.ui.ConnectivityBanner;
 import com.example.healthflow.ui.OnlineBindings;
+
+import com.example.healthflow.db.notify.DbNotifications;
+import com.example.healthflow.ui.fx.RefreshScheduler;
+import com.example.healthflow.ui.fx.TableUtils;
+import static com.example.healthflow.ui.base.Dialogs.error;
+//import static jdk.internal.org.commonmark.text.Characters.isBlank;
+
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
 import javafx.application.Platform;
@@ -23,34 +33,28 @@ import javafx.scene.Scene;
 import javafx.scene.chart.BarChart;
 import javafx.scene.chart.XYChart;
 import javafx.scene.control.*;
+import javafx.scene.control.cell.ComboBoxTableCell;
 import javafx.scene.control.cell.TextFieldTableCell;
 import javafx.scene.layout.AnchorPane;
 import javafx.scene.layout.StackPane;
 import javafx.scene.shape.Circle;
 import javafx.stage.Stage;
 import javafx.util.Duration;
-import org.controlsfx.control.textfield.AutoCompletionBinding;
-import org.controlsfx.control.textfield.TextFields;
-import javafx.beans.property.ReadOnlyObjectWrapper;
-
-import javafx.scene.control.cell.ComboBoxTableCell;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.Map;
-import javafx.util.StringConverter;
 
 import java.io.IOException;
 import java.sql.*;
+import java.sql.Date;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
-import java.util.Objects;
-import java.util.Set;
-import java.util.TreeSet;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.TimeUnit;
+
 
 public class ReceptionController {
 
@@ -104,6 +108,12 @@ public class ReceptionController {
     private TextArea medicalHistory;
 
     @FXML
+    private Button deleteRowApptTable;
+
+    @FXML
+    private Button addNewRow;
+
+    @FXML
     private Button InsertButton;
     @FXML
     private Button UpdateButton;
@@ -140,7 +150,11 @@ public class ReceptionController {
     private Label patientCompleteNum;
     @FXML
     private Label RemainingNum;
+
     private final ObservableList<DoctorDAO.AppointmentRow> apptData = FXCollections.observableArrayList();
+
+    // Editable list for the appointments table in the Appointment pane
+    private final ObservableList<ApptRow> apptEditable = FXCollections.observableArrayList();
 
     // Caches/edit choices for in-row editors
     private final ObservableList<String> specialtyChoices = FXCollections.observableArrayList();
@@ -165,14 +179,22 @@ public class ReceptionController {
     @FXML
     private Label TotalDoctors;
 
-    @FXML private TableView<DoctorDAO.AppointmentRow> TableAppInDashboard;
+    @FXML
+    private TableView<DoctorDAO.AppointmentRow> TableAppInDashboard;
 
-    @FXML private TableColumn<DoctorDAO.AppointmentRow, Number>      colAppointmentID;
-    @FXML private TableColumn<DoctorDAO.AppointmentRow, Void>      colActionDash;
-    @FXML private TableColumn<DoctorDAO.AppointmentRow, LocalDate>  colAppintementDateDash;
-    @FXML private TableColumn<DoctorDAO.AppointmentRow, String>     colAppintementTimeDash;
-    @FXML private TableColumn<DoctorDAO.AppointmentRow, String>     colDoctorNameDash;
-    @FXML private TableColumn<DoctorDAO.AppointmentRow, String>     colPatientNameDash;
+    @FXML
+    private TableColumn<DoctorDAO.AppointmentRow, Number> colAppointmentID;
+    @FXML
+    private TableColumn<DoctorDAO.AppointmentRow, Void> colActionDash;
+    @FXML
+    private TableColumn<DoctorDAO.AppointmentRow, LocalDate> colAppintementDateDash;
+    @FXML
+    private TableColumn<DoctorDAO.AppointmentRow, String> colAppintementTimeDash;
+    @FXML
+    private TableColumn<DoctorDAO.AppointmentRow, String> colDoctorNameDash;
+    @FXML
+    private TableColumn<DoctorDAO.AppointmentRow, String> colPatientNameDash;
+
     @FXML
     private BarChart<String, Number> appointmentStatusChart;
     @FXML
@@ -185,16 +207,16 @@ public class ReceptionController {
 
     @FXML
     private Button insertAppointments;
-    @FXML
-    private Button addNewRow;
+
     @FXML
     private Label TotalPatients;
     @FXML
     private Button BookAppointmentFromPateint;
     @FXML
     private Button updateAppointments;
+
     @FXML
-    private ComboBox<String> DoctorspecialtyApp;           // list of specialties
+    private ComboBox<String> DoctorspecialtyApp;             // list of specialties
     @FXML
     private ComboBox<DoctorDAO.DoctorOption> avilabelDoctorApp; // available doctors for selected specialty
     @FXML
@@ -202,32 +224,30 @@ public class ReceptionController {
     @FXML
     private Button deleteAppointments;
 
-    // In Appointment Anchorpane
-//    @FXML
-//    private TableView<?> TableINAppointment;
-//    @FXML
-//    private TableColumn<?, ?> colAppointmentIDAppointment;
-//    @FXML
-//    private TableColumn<?, ?> colDateAppointment;
-//    @FXML
-//    private TableColumn<?, ?> colDoctorNameAppointment;
-//    @FXML
-//    private TableColumn<?, ?> colPatientNameAppointment;
-//    @FXML
-//    private TableColumn<?, ?> colSpecialty;
-//    @FXML
-//    private TableColumn<?, ?> colStatusAppointment;
-//    @FXML
-//    private TableColumn<?, ?> colTimeAppointment;
+    @FXML
+    private TableView<ApptRow> TableINAppointment;
+    @FXML
+    private TableColumn<ApptRow, Number> colAppointmentIDAppointment;
+    @FXML
+    private TableColumn<ApptRow, LocalDate> colDateAppointment;
+    @FXML
+    private TableColumn<ApptRow, String> colDoctorNameAppointment;
+    @FXML
+    private TableColumn<ApptRow, String> colPatientNameAppointment;
+    @FXML
+    private TableColumn<ApptRow, String> colSpecialty;
+    @FXML
+    private TableColumn<ApptRow, String> colStatusAppointment;
+    @FXML
+    private TableColumn<ApptRow, String> colStartTime;
+    @FXML
+    private TableColumn<ApptRow, Number> colSessionTime;
+    @FXML
+    private TableColumn<ApptRow, String> colRoomNumber;
 
-    @FXML private TableView<ApptRow> TableINAppointment;
-    @FXML private TableColumn<ApptRow, Number> colAppointmentIDAppointment;
-    @FXML private TableColumn<ApptRow, LocalDate> colDateAppointment;
-    @FXML private TableColumn<ApptRow, String> colDoctorNameAppointment;
-    @FXML private TableColumn<ApptRow, String> colPatientNameAppointment;
-    @FXML private TableColumn<ApptRow, String> colSpecialty;
-    @FXML private TableColumn<ApptRow, String> colStatusAppointment;
-    @FXML private TableColumn<ApptRow, String> colTimeAppointment;
+    @FXML
+    private Label LabelToAlert;
+
 
     @FXML
     private Button deleteButtonAppointment;
@@ -236,7 +256,7 @@ public class ReceptionController {
     @FXML
     private Label getPatientID;
 
-    // ===== Doctors table (تأكّد من fx:id في FXML) =====
+    // ===== Doctors table =====
     @FXML
     private TableView<DoctorRow> DocTable_Recption;
     @FXML
@@ -254,28 +274,47 @@ public class ReceptionController {
     @FXML
     private TableColumn<DoctorRow, Boolean> colDoctor_available;
 
-
     @FXML
     private DatePicker AppointmentDate;
-//    -----
-
-
     @FXML
     private TextField appointmentSetTime;
-
     @FXML
     private TextField PatientNameForAppointment;
-
     @FXML
     private TextField PatientIDForAppointment;
-
-
-    //    @FXML
-    //    private DatePicker setAppointmentDate;
     @FXML
     private ComboBox<DoctorDAO.Slot> cmbSlots;
 
-    // --- Auto refresh infrastructure ---
+    @FXML
+    private Label DoctorAvilable;
+
+
+    private static final java.time.ZoneId APP_ZONE = java.time.ZoneId.of("Asia/Gaza");
+
+    // helpers:
+    private static java.time.OffsetDateTime toAppOffset(java.time.LocalDate d, java.time.LocalTime t) {
+        return java.time.ZonedDateTime.of(d, t, APP_ZONE).toOffsetDateTime();
+    }
+    private static java.time.LocalDateTime toLocal(java.time.OffsetDateTime odt) {
+        return odt == null ? null : odt.atZoneSameInstant(APP_ZONE).toLocalDateTime();
+    }
+
+    private void updateDirtyAlert() {
+        int n = (int) apptEditable.stream().filter(Appointment.ApptRow::isDirty).count();
+        if (LabelToAlert != null) {
+            if (n > 0) {
+                LabelToAlert.setText(n + (n == 1 ? " unsaved change" : " unsaved changes"));
+                LabelToAlert.setStyle("-fx-text-fill: red; -fx-font-weight: bold;");
+                LabelToAlert.setVisible(true);
+            } else {
+                LabelToAlert.setText("");
+                LabelToAlert.setVisible(false);
+            }
+        }
+    }
+
+
+    // --- Auto refresh infra ---
     private final ScheduledExecutorService autoRefreshExec =
             Executors.newSingleThreadScheduledExecutor(r -> {
                 Thread t = new Thread(r, "ui-auto-refresh");
@@ -284,11 +323,14 @@ public class ReceptionController {
             });
     private final AtomicBoolean refreshBusy = new AtomicBoolean(false);
 
+    public static final int DEFAULT_SESSION_MIN = 20;
+    // --- Coalesced UI refresh + DB NOTIFY ---
+    private final RefreshScheduler uiRefresh = new RefreshScheduler(600);
+    private DbNotifications apptDbListener;
 
     // To color current nav button
     private static final String ACTIVE_CLASS = "current";
-    private static final java.time.format.DateTimeFormatter SLOT_FMT_12H =
-            java.time.format.DateTimeFormatter.ofPattern("hh:mm a");
+    private static final DateTimeFormatter SLOT_FMT_12H = DateTimeFormatter.ofPattern("hh:mm a");
 
     private void markNavActive(Button active) {
         Button[] all = {DachboardButton, DoctorsButton, PatientsButton, AppointmentsButton};
@@ -300,6 +342,82 @@ public class ReceptionController {
             active.getStyleClass().add(ACTIVE_CLASS);
         }
     }
+
+
+
+    private static final String[] ROOMS = {"Room 1", "Room 2", "Room 3", "Room 4", "Room 5", "Room 6", "Room 7", "Room 8", "Room 9"};
+
+    // Cache for free slots per doctor/day to make row selection instant
+    private final Map<Long, Map<LocalDate, ObservableList<DoctorDAO.Slot>>> slotCache = new ConcurrentHashMap<>();
+
+    // Cache rooms per (doctor|date|time) to avoid re-querying on each paint
+    private final Map<String, ObservableList<String>> roomsCache = new ConcurrentHashMap<>();
+
+//    private static String roomKey(String doctorName, LocalDate date, LocalTime time) {
+//        String d = (doctorName == null) ? "-" : doctorName;
+//        String day = (date == null) ? "-" : date.toString();
+//        String t = (time == null) ? "-" : time.toString();
+//        return d + "|" + day + "|" + t;
+//    }
+    private String roomKey(long doctorId, LocalDate date, LocalTime time) {
+        return doctorId + "|" + (date == null ? "" : date) + "|" + (time == null ? "" : time);
+    }
+
+    // Best-effort: cancel pending debounced refresh if the implementation exposes such method
+    private void cancelPendingUiRefresh() {
+        if (uiRefresh == null) return;
+        try {
+            var m = uiRefresh.getClass().getMethod("cancelPending");
+            m.invoke(uiRefresh);
+        } catch (Exception ignore) {
+            // no-op if not supported
+        }
+    }
+
+    /* ============ slot load ============ */
+
+    // إرجاع الغرف المتاحة (Room 1..Room 9) مع استبعاد المحجوزة
+    private List<String> listAvailableRooms(long doctorId, LocalDate date, LocalTime time) throws SQLException {
+        final int TOTAL_ROOMS = 9;
+        // كل الغرف الافتراضية
+        List<String> all = new ArrayList<>();
+        for (int i = 1; i <= TOTAL_ROOMS; i++) all.add("Room " + i);
+
+        if (doctorId <= 0 || date == null || time == null) return all;
+
+//        long doctorId = doctorDAO.findIdByName(doctorName);
+
+        // الغرف المحجوزة لهذه اللحظة لهذا الطبيب
+        final String sql = """
+            SELECT COALESCE(location,'') AS loc
+            FROM appointments
+            WHERE doctor_id = ?
+              AND appointment_date::date = ?
+              AND appointment_date::time = ?
+        """;
+
+        try (Connection c = Database.get();
+             PreparedStatement ps = c.prepareStatement(sql)) {
+
+            ps.setLong(1, doctorId);   // لا تستخدم الاسم هنا
+            ps.setDate(2, Date.valueOf(date));
+            ps.setTime(3, Time.valueOf(time));
+
+            try (ResultSet rs = ps.executeQuery()) {
+                Set<String> taken = new HashSet<>();
+                while (rs.next()) {
+                    String loc = rs.getString("loc");
+                    if (loc != null && !loc.isBlank()) taken.add(loc);
+                }
+                all.removeAll(taken);
+                return all;
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return all; // fallback لو صار خطأ
+        }
+    }
+
 
     /* ============ Types ============ */
     public enum Gender {MALE, FEMALE}
@@ -317,7 +435,6 @@ public class ReceptionController {
 
     /* ============ Connectivity ============ */
     private final ConnectivityMonitor monitor;
-
     private static volatile boolean listenerRegistered = false;
     private static volatile Boolean lastNotifiedOnline = null;
 
@@ -332,45 +449,35 @@ public class ReceptionController {
     /* ============ Init ============ */
     @FXML
     private void initialize() {
-        // Attach CSS when the Scene becomes available (avoid NPE if scene is null during initialize)
+        // CSS attach (safe if scene null at init)
         if (rootPane != null) {
-            String receptionCss;
-            var cssUrl = getClass().getResource("/com/example/healthflow/Design/ReceptionDesign.css"); // absolute path
+            var cssUrl = getClass().getResource("/com/example/healthflow/Design/ReceptionDesign.css");
             if (cssUrl != null) {
-                receptionCss = cssUrl.toExternalForm();
-            } else {
-                receptionCss = null;
-                System.err.println("Reception CSS not found at /com/example/healthflow/Design/ReceptionDesign.css");
-            }
-
-            if (receptionCss != null) {
+                String css = cssUrl.toExternalForm();
                 if (rootPane.getScene() != null) {
-                    if (!rootPane.getScene().getStylesheets().contains(receptionCss)) {
-                        rootPane.getScene().getStylesheets().add(receptionCss);
-                    }
+                    if (!rootPane.getScene().getStylesheets().contains(css))
+                        rootPane.getScene().getStylesheets().add(css);
                 } else {
                     rootPane.sceneProperty().addListener((obs, oldScene, newScene) -> {
-                        if (newScene != null && !newScene.getStylesheets().contains(receptionCss)) {
-                            newScene.getStylesheets().add(receptionCss);
+                        if (newScene != null && !newScene.getStylesheets().contains(css)) {
+                            newScene.getStylesheets().add(css);
                         }
                     });
                 }
+            } else {
+                System.err.println("Reception CSS not found at /com/example/healthflow/Design/ReceptionDesign.css");
             }
         }
 
         monitor.start();
-
         if (rootPane != null) {
             ConnectivityBanner banner = new ConnectivityBanner(monitor);
             rootPane.getChildren().add(0, banner);
             banner.prefWidthProperty().bind(rootPane.widthProperty());
         }
-
-        OnlineBindings.disableWhenOffline(
-                monitor,
+        OnlineBindings.disableWhenOffline(monitor,
                 InsertButton, UpdateButton, deleteButton, clearBtn,
-                DachboardButton, PatientsButton, AppointmentsButton, DoctorsButton
-        );
+                DachboardButton, PatientsButton, AppointmentsButton, DoctorsButton);
 
         if (!listenerRegistered) {
             listenerRegistered = true;
@@ -381,10 +488,8 @@ public class ReceptionController {
                     lastNotifiedOnline = isOnline;
                     return;
                 }
-                // Skip duplicate notifications; UI reacts via bindings and banner.
                 if (lastNotifiedOnline != null && lastNotifiedOnline == isOnline) return;
                 lastNotifiedOnline = isOnline;
-                // No alerts here — the ConnectivityBanner and OnlineBindings handle UX.
             });
         }
 
@@ -400,13 +505,9 @@ public class ReceptionController {
         GenderComboBox.setValue(Gender.MALE);
         DateOfBirthPicker.setValue(null);
 
-        // Default appointment date pickers to today (can still be changed by the user)
         if (AppointmentDate != null && AppointmentDate.getValue() == null) {
-            AppointmentDate.setValue(java.time.LocalDate.now());
+            AppointmentDate.setValue(LocalDate.now());
         }
-//        if (setAppointmentDate != null && setAppointmentDate.getValue() == null) {
-//            setAppointmentDate.setValue(java.time.LocalDate.now());
-//        }
 
         wirePatientTable();
         wireDoctorTable();
@@ -434,13 +535,10 @@ public class ReceptionController {
                 a.showAndWait();
                 return;
             }
-            // Pre-fill appointment panel labels (if present)
             if (getPatientName != null) getPatientName.setText(row.getFullName());
             if (getPatientID != null) getPatientID.setText(row.getNationalId());
-            // Navigate to the appointment pane
             showAppointmentPane();
             if (DoctorspecialtyApp != null && DoctorspecialtyApp.getItems().isEmpty()) loadSpecialtiesAsync();
-            // جرّب تركيز/إضافة سطر مسودة للمريض المختار
             addOrFocusDraftForPatient(row);
         });
 
@@ -455,44 +553,45 @@ public class ReceptionController {
             new Thread(this::loadDoctorsBG, "doctors-load").start();
         });
 
-//        ------------------------
-        cmbSlots.setCellFactory(cb -> new ListCell<DoctorDAO.Slot>() {
-            @Override
-            protected void updateItem(DoctorDAO.Slot s, boolean empty) {
-                super.updateItem(s, empty);
-                setText(empty || s == null ? null :
-                        s.from().toLocalTime().format(SLOT_FMT_12H) + " \u2192 " +
-                                s.to().toLocalTime().format(SLOT_FMT_12H));
-            }
-        });
-        cmbSlots.setButtonCell(new ListCell<DoctorDAO.Slot>() {
-            @Override
-            protected void updateItem(DoctorDAO.Slot s, boolean empty) {
-                super.updateItem(s, empty);
-                setText(empty || s == null ? "Select a slot"
-                        : s.from().toLocalTime().format(SLOT_FMT_12H) + " \u2192 " +
-                        s.to().toLocalTime().format(SLOT_FMT_12H));
-            }
-        });
+        // Slots combobox rendering
+        // داخل initialize أو أينما تهيّئ cmbSlots
+        if (cmbSlots != null) {
+            cmbSlots.setCellFactory(cb -> new ListCell<DoctorDAO.Slot>() {
+                @Override
+                protected void updateItem(DoctorDAO.Slot s, boolean empty) {
+                    super.updateItem(s, empty);
+                    setText(empty || s == null ? null :
+                            s.from().toLocalTime().format(SLOT_FMT_12H) + " \u2192 " +
+                                    s.to().toLocalTime().format(SLOT_FMT_12H));
+                }
+            });
+            cmbSlots.setButtonCell(new ListCell<DoctorDAO.Slot>() {
+                @Override
+                protected void updateItem(DoctorDAO.Slot s, boolean empty) {
+                    super.updateItem(s, empty);
+                    setText(empty || s == null ? "Select time"
+                            : s.from().toLocalTime().format(SLOT_FMT_12H) + " \u2192 " +
+                            s.to().toLocalTime().format(SLOT_FMT_12H));
+                }
+            });
+            cmbSlots.setOnShown(e -> refreshSlots());
+        } else {
+            System.out.println("cmbSlots is null: Reception.fxml likely doesn't have fx:id=\"cmbSlots\" on a ComboBox");
+        }
 
-        if (AppointmentDate != null) {
-            AppointmentDate.valueProperty().addListener((o, a, b) -> refreshSlots());
-        }
-        if (avilabelDoctorApp != null) {
-            avilabelDoctorApp.valueProperty().addListener((o, a, b) -> refreshSlots());
-        }
+        if (AppointmentDate != null) AppointmentDate.valueProperty().addListener((o, a, b) -> refreshSlots());
+        if (avilabelDoctorApp != null) avilabelDoctorApp.valueProperty().addListener((o, a, b) -> refreshSlots());
+
         showDashboardPane();
 
         // appointments wiring + load
         wireAppointmentsTables();
+        setupAppointmentSlotsListener();
         wireDashboardAppointmentsSearch();
         if (clearSelectionDach != null) clearSelectionDach.setOnAction(e -> {
-            if (TableAppInDashboard != null)
-                TableAppInDashboard.getSelectionModel().clearSelection();
-            if (appointmentStatusChart != null)
-                appointmentStatusChart.getData().clear(); // يمسح البار-تشارت
-            if (searchAppointmentDach != null)
-                searchAppointmentDach.clear();    // يمسح البحث
+            if (TableAppInDashboard != null) TableAppInDashboard.getSelectionModel().clearSelection();
+            if (appointmentStatusChart != null) appointmentStatusChart.getData().clear();
+            if (searchAppointmentDach != null) searchAppointmentDach.clear();
         });
 
         // CRUD buttons
@@ -501,84 +600,600 @@ public class ReceptionController {
         if (deleteAppointments != null) deleteAppointments.setOnAction(e -> doDeleteAppointment());
         if (clear_Appointments != null) clear_Appointments.setOnAction(e -> doClearAppointmentForm());
         if (addNewRow != null) addNewRow.setOnAction(e -> addBlankDraftRow());
+        // زر حذف صف من جدول المواعيد (لا يحذف من قاعدة البيانات)
+        if (deleteRowApptTable != null) {
+            deleteRowApptTable.setOnAction(e -> {
+                if (TableINAppointment == null) return;
+                ApptRow selected = TableINAppointment.getSelectionModel().getSelectedItem();
+                if (selected == null) {
+                    showWarn("Delete Row", "Please select a row to delete.");
+                    return;
+                }
+                TableINAppointment.getItems().remove(selected);
+            });
+        }
 
         // initial data loads
         new Thread(this::loadAppointmentsTable, "appt-load").start();
         new Thread(this::updateAppointmentCounters, "appt-counts").start();
-        startAutoRefresh();
+
+        // === التحديث اللحظي + تهيئة أولية ===
+        startDbNotifications();      // يبدأ LISTEN
+        scheduleCoalescedRefresh();  // تعبئة أولية
+//        startAutoRefresh();          // Poll احتياطي كل 10 ثواني
+//        autoRefreshExec.scheduleAtFixedRate(this::scheduleCoalescedRefresh, 10, 20, TimeUnit.SECONDS);
+    }
+    private void setupAppointmentSlotsListener() {
+        // listeners already wired in initialize():
+        // AppointmentDate.valueProperty() -> refreshSlots()
+        // avilabelDoctorApp.valueProperty() -> refreshSlots()
+        // cmbSlots.setOnShown(...) -> refreshSlots()
     }
 
+    /**
+     * TableCell تعرض DatePicker لتعديل تاريخ الموعد داخل الجدول
+     */
 
+    // داخل ReceptionController (أو المكان اللي مخصص لتهيئة الأعمدة)
+    private TableCell<Appointment.ApptRow, LocalDate> datePickerCell() {
+        return new TableCell<Appointment.ApptRow, LocalDate>() {
+            private final DatePicker picker = new DatePicker();
 
-//    private void refreshSlots() {
-//        if (cmbSlots == null) return;
+            {
+                // شكليّات + إصلاحات
+                picker.setEditable(true);
+                picker.setPromptText("yyyy-MM-dd");
+
+                // فور اختيار تاريخ جديد
+                picker.setOnAction(e -> {
+                    var rowItem = getTableRow() != null ? getTableRow().getItem() : null;
+                    LocalDate d = picker.getValue();
+                    if (rowItem == null || d == null) return;
+
+                    // حدّث الموديل
+                    rowItem.setDate(d);
+
+                    // لو فيه وقت محدد، حدّث الـ start في الداتابيز
+                    if (rowItem.getTime() != null && rowItem.getId() > 0) {
+                        try {
+                            updateAppointmentStartAt(rowItem.getId(), d, rowItem.getTime());
+                        } catch (Exception ex) {
+                            showError("Update date/time", ex);
+                        }
+                    }
+
+                    // ريفرش جدول/أوقات
+                    commitEdit(d);
+                    if (TableINAppointment != null) TableINAppointment.refresh();
+                    updateDirtyAlert();
+                });
+
+                // افتح الـ DatePicker عند بداية التحرير
+                this.setOnMouseClicked(me -> {
+                    if (!isEmpty() && me.getClickCount() == 1) {
+                        startEdit();
+                        picker.show();
+                    }
+                });
+            }
+
+            @Override
+            public void startEdit() {
+                super.startEdit();
+                picker.setValue(getItem());
+                setGraphic(picker);
+                setText(null);
+            }
+
+            @Override
+            public void cancelEdit() {
+                super.cancelEdit();
+                setGraphic(null);
+                setText(format(getItem()));
+            }
+
+            @Override
+            protected void updateItem(LocalDate item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty) {
+                    setGraphic(null);
+                    setText(null);
+                } else if (isEditing()) {
+                    picker.setValue(item);
+                    setGraphic(picker);
+                    setText(null);
+                } else {
+                    setGraphic(null);
+                    setText(format(item));
+                }
+            }
+
+            private String format(LocalDate d) {
+                return (d == null) ? "" : d.toString(); // بدك فورمات معيّن؟ استعمل DateTimeFormatter
+            }
+        };
+    }
+//    private TableCell<ApptRow, LocalDate> DatePickerCell() {
+//        return new TableCell<ApptRow, LocalDate>() {
+//            private final DatePicker picker = new DatePicker();
 //
-//        var doc = (avilabelDoctorApp == null) ? null : avilabelDoctorApp.getValue();
-//        var day = (AppointmentDate == null) ? null : AppointmentDate.getValue();
+//            {
+//                // لمسات شكل اختيارية
+//                picker.setEditable(ture);
+//                picker.setPromptText("yyyy-MM-dd");
 //
-//        if (doc == null || day == null) {
-//            cmbSlots.setItems(FXCollections.observableArrayList());
-//            return;
-//        }
+//                // لما يختار تاريخ جديد
+//                picker.valueProperty().addListener((obs, old, d) -> {
+//                    if (!isEditing()) return;
+//                    ApptRow row = getTableView().getItems().get(getIndex());
+//                    if (row == null) return;
 //
-//        final LocalTime open  = LocalTime.of(9, 0);   // دوام العيادة
-//        final LocalTime close = LocalTime.of(15, 0);  // انتهاء الدواء الدوام الساعة 3
-//        final int slotMinutes = 20;
+//                    row.setDate(d);
+//                    // لو عنده وقت مختار، حدّث start_at في الداتابيز
+//                    if (row.getTime() != null) {
+//                        updateAppointmentStartAt(row.getId(), d, row.getTime());
+//                    }
+//                    // التاريخ تغيّر → لازم ننعش قائمة الأوقات في عمود الـ Time
+//                    if (TableINAppointment != null) TableINAppointment.refresh();
+//                    commitEdit(d);
+//                });
 //
-//        new Thread(() -> {
-//            try {
-//                var slots = doctorDAO.listFreeSlots(doc.doctorId, day, open, close, slotMinutes);
-//
-//                // فلترة أوقات الماضي لو اليوم = اليوم الحالي
-//                if (day.equals(LocalDate.now())) {
-//                    LocalDateTime now = LocalDateTime.now().withSecond(0).withNano(0);
-//                    int mod = now.getMinute() % slotMinutes;
-//                    // قرب للسلوت القادم
-//                    LocalDateTime cutoff = (mod == 0) ? now : now.plusMinutes(slotMinutes - mod);
-//
-//                    final LocalDateTime cutoffFinal = cutoff; // لازم يكون effectively final للامبدا
-//                    slots.removeIf(s -> s.from().isBefore(cutoffFinal));
-//                }
-//
-//                var data = FXCollections.observableArrayList(slots);
-//                Platform.runLater(() -> cmbSlots.setItems(data));
-//            } catch (Exception e) {
-//                e.printStackTrace();
-//                Platform.runLater(() -> showWarn("Slots", "Failed to load free slots: " + e.getMessage()));
+//                // منع فتح الـDatePicker لو ما في صف صالح
+//                setOnMouseClicked(e -> {
+//                    if (isEmpty()) e.consume();
+//                });
 //            }
-//        }, "load-slots").start();
+//
+//            @Override public void startEdit() {
+//                super.startEdit();
+//                picker.setValue(getItem());
+//                setGraphic(picker);
+//                setText(null);
+//            }
+//
+//            @Override public void cancelEdit() {
+//                super.cancelEdit();
+//                setGraphic(null);
+//                setText(getItem() == null ? "" : getItem().toString());
+//            }
+//
+//            @Override protected void updateItem(LocalDate item, boolean empty) {
+//                super.updateItem(item, empty);
+//                if (empty) {
+//                    setText(null);
+//                    setGraphic(null);
+//                } else if (isEditing()) {
+//                    picker.setValue(item);
+//                    setGraphic(picker);
+//                    setText(null);
+//                } else {
+//                    setText(item == null ? "" : item.toString());
+//                    setGraphic(null);
+//                }
+//            }
+//        };
 //    }
 
-    private void refreshSlots() {
-        if (cmbSlots == null) return;
+    /**
+     * Doctor column: show ComboBox only when row is selected/editing
+     */
+    private TableCell<Appointment.ApptRow, String> doctorComboCell() {
+        return new TableCell<Appointment.ApptRow, String>() {
+            private final ComboBox<String> combo = new ComboBox<>();
+            private Map<String, Long> nameToId = Collections.emptyMap();
 
+            {
+                combo.setPromptText("Select doctor");
+                combo.setVisibleRowCount(8);
+
+                // إذا فقد الصف التحديد اغلق المحرر فوراً
+                final javafx.beans.value.ChangeListener<Boolean> selListener = (obs, wasSel, isSel) -> {
+                    if (!isSel && isEditing()) cancelEdit();
+                };
+                tableRowProperty().addListener((o, oldRow, newRow) -> {
+                    if (oldRow != null) oldRow.selectedProperty().removeListener(selListener);
+                    if (newRow != null) newRow.selectedProperty().addListener(selListener);
+                });
+
+                // افتح المحرر فور لمسة واحدة على الصف المحدد
+                setOnMouseClicked(e -> {
+                    if (!isEmpty() && getTableRow() != null && getTableRow().isSelected()) {
+                        startEdit();
+                        combo.show();
+                    }
+                });
+
+                combo.setOnAction(e -> {
+                    var rowItem = getTableRow() != null ? getTableRow().getItem() : null;
+                    if (rowItem == null) return;
+                    String sel = combo.getValue();
+                    if (sel == null || sel.isBlank()) return;
+
+                    Long did = nameToId.get(sel);
+                    if (did != null) {
+                        rowItem.setDoctorId(did);
+                        rowItem.setDoctorName(sel);
+                        rowItem.setDirty(true);
+                        // تغيّر الدكتور → حدّث الأعمدة المعتمدة عليه (الأوقات/الغرف)
+                        if (TableINAppointment != null) TableINAppointment.refresh();
+                    }
+                    commitEdit(sel);
+                });
+            }
+
+            @Override
+            public void startEdit() {
+                super.startEdit();
+                var rowItem = (getTableRow() == null) ? null : getTableRow().getItem();
+                if (rowItem != null) {
+                    var spec = rowItem.getSpecialty();
+                    List<DoctorDAO.DoctorOption> opts;
+                    try {
+                        opts = doctorDAO.listAvailableBySpecialty(spec);
+                    } catch (Exception ex) {
+                        opts = Collections.emptyList();
+                    }
+                    Map<String, Long> m = new LinkedHashMap<>();
+                    for (var o : opts) m.put(o.fullName, o.doctorId);
+                    nameToId = m;
+
+                    combo.setItems(FXCollections.observableArrayList(m.keySet()));
+                    combo.setValue(rowItem.getDoctorName());
+                }
+                setGraphic(combo);
+                setText(null);
+            }
+
+            @Override
+            public void cancelEdit() {
+                super.cancelEdit();
+                setGraphic(null);
+                setText(getItem());
+            }
+
+            @Override
+            protected void updateItem(String item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty) {
+                    setGraphic(null);
+                    setText(null);
+                    return;
+                }
+
+                // أغلق المحرر لو فقد الصف التحديد
+                if (getTableRow() != null && !getTableRow().isSelected() && isEditing()) {
+                    cancelEdit();
+                }
+                boolean showEditor = isEditing() && getTableRow() != null && getTableRow().isSelected();
+                if (showEditor) {
+                    setGraphic(combo);
+                    setText(null);
+                } else {
+                    setGraphic(null);
+                    setText(item);
+                }
+            }
+        };
+    }
+
+    /**
+     * Room column: show ComboBox only when row is selected/editing
+     */
+//    private TableCell<Appointment.ApptRow, String> roomComboInlineCell() {
+//        return new TableCell<Appointment.ApptRow, String>() {
+//            private final ComboBox<String> combo = new ComboBox<>();
+//
+//            {
+//                combo.setPromptText("Select room");
+//                combo.setVisibleRowCount(9);
+//
+//                // إذا فقد الصف التحديد اغلق المحرر فوراً
+//                final javafx.beans.value.ChangeListener<Boolean> selListener = (obs, wasSel, isSel) -> {
+//                    if (!isSel && isEditing()) cancelEdit();
+//                };
+//                tableRowProperty().addListener((o, oldRow, newRow) -> {
+//                    if (oldRow != null) oldRow.selectedProperty().removeListener(selListener);
+//                    if (newRow != null) newRow.selectedProperty().addListener(selListener);
+//                });
+//
+//                setOnMouseClicked(e -> {
+//                    if (!isEmpty() && getTableRow() != null && getTableRow().isSelected()) {
+//                        startEdit();
+//                        combo.show();
+//                    }
+//                });
+//
+//                combo.setOnShown(e -> {
+////                    var r = (getTableRow() == null) ? null : getTableRow().getItem();
+////                    if (r == null) return;
+////                    String key = roomKey(r.getDoctorName(), r.getDate(), r.getTime());
+////
+////                    // أولاً عبّي من الكاش مباشرة لو موجود لتجربة سريعة
+////                    var cached = roomsCache.get(key);
+////                    if (cached != null) {
+////                        combo.setItems(cached);
+////                    }
+////
+////                    // ثم حدّث بالقيم الأحدث في الخلفية
+////                    new Thread(() -> {
+////                        ObservableList<String> rooms = null;
+////                        try {
+////                            rooms = FXCollections.observableArrayList(listAvailableRooms(r.getDoctorName(), r.getDate(), r.getTime()));
+////                        } catch (SQLException ex) {
+////                            throw new RuntimeException(ex);
+////                        }
+////                        roomsCache.put(key, rooms);
+////                        ObservableList<String> finalRooms = rooms;
+////                        Platform.runLater(() -> {
+////                            // لا تكتب فوق اختيار المستخدم إذا كان غيّره
+////                            if (getTableRow() == null || getTableRow().getItem() != r) return;
+////                            combo.setItems(finalRooms);
+////                            combo.setValue(r.getRoomNumber());
+////                        });
+////                    }, "load-rooms-cell").start();
+//
+//                    // عند الفتح
+//                    var r = (getTableRow() == null) ? null : getTableRow().getItem();
+//                    if (r == null) return;
+//                    String key = roomKey(r.getDoctorId(), r.getDate(), r.getTime());   // <-- بدل الاسم بالـ id
+//
+//                    var cached = roomsCache.get(key);
+//                    if (cached != null) combo.setItems(cached);
+//
+//                    new Thread(() -> {
+//                        ObservableList<String> rooms;
+//                        try {
+//                            rooms = FXCollections.observableArrayList(
+//                                    listAvailableRooms(r.getDoctorId(), r.getDate(), r.getTime()) // <-- مرر الـ id
+//                            );
+//                        } catch (SQLException ex) {
+//                            ex.printStackTrace();  // أو showWarn(...)
+//                            return;
+//                        }
+//                        roomsCache.put(key, rooms);
+//                        Platform.runLater(() -> {
+//                            if (getTableRow() == null || getTableRow().getItem() != r) return;
+//                            combo.setItems(rooms);
+//                            combo.setValue(r.getRoomNumber());
+//                        });
+//                    }, "load-rooms-cell").start();
+//                });
+//
+//                combo.setOnAction(e -> {
+//                    var r = (getTableRow() == null) ? null : getTableRow().getItem();
+//                    if (r == null) return;
+//                    String sel = combo.getValue();
+//                    if (sel == null || sel.isBlank()) return;
+//                    r.setRoomNumber(sel);
+//                    r.setDirty(true);
+//                    commitEdit(sel);
+//                });
+//            }
+//
+//            @Override
+//            public void startEdit() {
+//                super.startEdit();
+//                var r = (getTableRow() == null) ? null : getTableRow().getItem();
+//                if (r != null) {
+//                    String key = roomKey(r.getDoctorId(), r.getDate(), r.getTime());
+//                    var cached = roomsCache.get(key);
+//                    if (cached != null) {
+//                        combo.setItems(cached);
+//                        combo.setValue(r.getRoomNumber());
+//                    } else {
+//                        combo.setItems(FXCollections.observableArrayList());
+//                        // حمّل الغرف بالخلفية ثم حدّث
+//                        new Thread(() -> {
+//                            ObservableList<String> rooms = null;
+//                            try {
+//                                rooms = FXCollections.observableArrayList(listAvailableRooms(r.getDoctorId(), r.getDate(), r.getTime()));
+//                            } catch (SQLException e) {
+//                                throw new RuntimeException(e);
+//                            }
+//                            roomsCache.put(key, rooms);
+//                            ObservableList<String> finalRooms = rooms;
+//                            Platform.runLater(() -> {
+//                                if (getTableRow() == null || getTableRow().getItem() != r) return;
+//                                combo.setItems(finalRooms);
+//                                combo.setValue(r.getRoomNumber());
+//                            });
+//                        }, "load-rooms-startEdit").start();
+//                    }
+//                }
+//                setGraphic(combo);
+//                setText(null);
+//            }
+//
+//            @Override
+//            public void cancelEdit() {
+//                super.cancelEdit();
+//                setGraphic(null);
+//                setText(getItem());
+//            }
+//
+//            @Override
+//            protected void updateItem(String item, boolean empty) {
+//                super.updateItem(item, empty);
+//                if (empty) {
+//                    setGraphic(null);
+//                    setText(null);
+//                    return;
+//                }
+//
+//                // أغلق المحرر لو فقد الصف التحديد
+//                if (getTableRow() != null && !getTableRow().isSelected() && isEditing()) {
+//                    cancelEdit();
+//                }
+//
+//                boolean showEditor = isEditing() && getTableRow() != null && getTableRow().isSelected();
+//                if (showEditor) {
+//                    setGraphic(combo);
+//                    setText(null);
+//                } else {
+//                    setGraphic(null);
+//                    setText(item);
+//                }
+//            }
+//        };
+//    }
+     // Room column: show ComboBox only when row is selected/editing (using doctor ID)
+     private TableCell<Appointment.ApptRow, String> roomComboInlineCell() {
+        return new TableCell<Appointment.ApptRow, String>() {
+            private final ComboBox<String> combo = new ComboBox<>();
+
+            {
+                combo.setPromptText("Select room");
+                combo.setVisibleRowCount(9);
+
+                // أغلق المحرر إذا فقد الصف التحديد
+                final javafx.beans.value.ChangeListener<Boolean> selListener = (obs, wasSel, isSel) -> {
+                    if (!isSel && isEditing()) cancelEdit();
+                };
+                tableRowProperty().addListener((o, oldRow, newRow) -> {
+                    if (oldRow != null) oldRow.selectedProperty().removeListener(selListener);
+                    if (newRow != null) newRow.selectedProperty().addListener(selListener);
+                });
+
+                // افتح المحرر بلمسة واحدة عندما يكون الصف محدد
+                setOnMouseClicked(e -> {
+                    if (!isEmpty() && getTableRow() != null && getTableRow().isSelected()) {
+                        startEdit();
+                        combo.show();
+                    }
+                });
+
+                // عند فتح القائمة: عبّي من الكاش ثم حدّث بالخلفية
+                combo.setOnShown(e -> {
+                    ApptRow r = (getTableRow() == null) ? null : getTableRow().getItem();
+                    if (r == null) return;
+                    final String key = roomKey(r.getDoctorId(), r.getDate(), r.getTime()); // <-- doctorId
+
+                    // من الكاش أولاً (سريع)
+                    ObservableList<String> cached = roomsCache.get(key);
+                    if (cached != null) combo.setItems(cached);
+
+                    // حمّل أحدث بيانات بالخلفية
+                    new Thread(() -> {
+                        ObservableList<String> rooms;
+                        try {
+                            rooms = FXCollections.observableArrayList(
+                                    listAvailableRooms(r.getDoctorId(), r.getDate(), r.getTime())
+                            );
+                        } catch (SQLException ex) {
+                            ex.printStackTrace();
+                            return;
+                        }
+                        roomsCache.put(key, rooms);
+                        Platform.runLater(() -> {
+                            // تأكد إن نفس الصف لسه هنا
+                            if (getTableRow() == null || getTableRow().getItem() != r) return;
+                            combo.setItems(rooms);
+                            combo.setValue(r.getRoomNumber());
+                        });
+                    }, "load-rooms-cell").start();
+                });
+
+                // لما يختار غرفة
+                combo.setOnAction(e -> {
+                    ApptRow r = (getTableRow() == null) ? null : getTableRow().getItem();
+                    if (r == null) return;
+                    String sel = combo.getValue();
+                    if (sel == null || sel.isBlank()) return;
+                    r.setRoomNumber(sel);
+                    r.setDirty(true);
+                    updateDirtyAlert();
+                    commitEdit(sel);
+                });
+            }
+
+            @Override
+            public void startEdit() {
+                super.startEdit();
+                ApptRow r = (getTableRow() == null) ? null : getTableRow().getItem();
+                if (r != null) {
+                    final String key = roomKey(r.getDoctorId(), r.getDate(), r.getTime());
+                    ObservableList<String> cached = roomsCache.get(key);
+                    if (cached != null) {
+                        combo.setItems(cached);
+                        combo.setValue(r.getRoomNumber());
+                    } else {
+                        combo.setItems(FXCollections.observableArrayList());
+                        new Thread(() -> {
+                            ObservableList<String> rooms;
+                            try {
+                                rooms = FXCollections.observableArrayList(
+                                        listAvailableRooms(r.getDoctorId(), r.getDate(), r.getTime())
+                                );
+                            } catch (SQLException ex) {
+                                ex.printStackTrace();
+                                return;
+                            }
+                            roomsCache.put(key, rooms);
+                            Platform.runLater(() -> {
+                                if (getTableRow() == null || getTableRow().getItem() != r) return;
+                                combo.setItems(rooms);
+                                combo.setValue(r.getRoomNumber());
+                            });
+                        }, "load-rooms-startEdit").start();
+                    }
+                }
+                setGraphic(combo);
+                setText(null);
+            }
+
+            @Override
+            public void cancelEdit() {
+                super.cancelEdit();
+                setGraphic(null);
+                setText(getItem());
+            }
+
+            @Override
+            protected void updateItem(String item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty) {
+                    setGraphic(null);
+                    setText(null);
+                    return;
+                }
+                // أغلق المحرر لو فقد الصف التحديد
+                if (getTableRow() != null && !getTableRow().isSelected() && isEditing()) {
+                    cancelEdit();
+                }
+                boolean showEditor = isEditing() && getTableRow() != null && getTableRow().isSelected();
+                if (showEditor) {
+                    setGraphic(combo);
+                    setText(null);
+                } else {
+                    setGraphic(null);
+                    setText(item);
+                }
+            }
+        };
+    }
+
+     private void refreshSlots() {
+
+        if (cmbSlots == null) return;
         var doc = (avilabelDoctorApp == null) ? null : avilabelDoctorApp.getValue();
         var day = (AppointmentDate == null) ? null : AppointmentDate.getValue();
-
         if (doc == null || day == null) {
             cmbSlots.setItems(FXCollections.observableArrayList());
             return;
         }
 
-        final LocalTime open = LocalTime.of(9, 0);   // بداية الدوام
-        final LocalTime close = LocalTime.of(15, 0);  // نهاية الدوام
-        final int slotMinutes = 20;
+        final LocalTime open = LocalTime.of(9, 0);
+        final LocalTime close = LocalTime.of(15, 0);
+        final int slotMinutes = DEFAULT_SESSION_MIN; //20 in this time
 
         new Thread(() -> {
             try {
                 var slots = doctorDAO.listFreeSlots(doc.doctorId, day, open, close, slotMinutes);
-
-                // فلترة أوقات الماضي لو اليوم = اليوم الحالي
                 if (day.equals(LocalDate.now())) {
                     LocalDateTime now = LocalDateTime.now().withSecond(0).withNano(0);
                     int mod = now.getMinute() % slotMinutes;
-                    // نقرب للسلوت القادم
                     LocalDateTime cutoff = (mod == 0) ? now : now.plusMinutes(slotMinutes - mod);
-
-                    final LocalDateTime cutoffFinal = cutoff;
-                    slots.removeIf(s -> s.from().isBefore(cutoffFinal));
-
-                    // إذا انتهى الدوام (الآن بعد آخر وقت)
+                    slots.removeIf(s -> s.from().isBefore(cutoff));
                     if (now.toLocalTime().isAfter(close)) {
                         Platform.runLater(() -> {
                             cmbSlots.getItems().clear();
@@ -587,7 +1202,6 @@ public class ReceptionController {
                         return;
                     }
                 }
-
                 var data = FXCollections.observableArrayList(slots);
                 Platform.runLater(() -> cmbSlots.setItems(data));
             } catch (Exception e) {
@@ -597,32 +1211,6 @@ public class ReceptionController {
         }, "load-slots").start();
     }
 
-//    private void refreshSlots() {
-//        if (cmbSlots == null) return;
-//
-//        var doc = (avilabelDoctorApp == null) ? null : avilabelDoctorApp.getValue();
-//        var day = (AppointmentDate == null) ? null : AppointmentDate.getValue();
-//
-//        if (doc == null || day == null) {
-//            cmbSlots.setItems(FXCollections.observableArrayList());
-//            return;
-//        }
-//
-//        var open  = LocalTime.of(9, 0);
-//        var close = LocalTime.of(15, 0);
-//        var slotMinutes = 20;
-//
-//        new Thread(() -> {
-//            try {
-//                var slots = doctorDAO.listFreeSlots(doc.doctorId, day, open, close, slotMinutes);
-//                Platform.runLater(() -> cmbSlots.setItems(FXCollections.observableArrayList(slots)));
-//            } catch (Exception e) {
-//                e.printStackTrace();
-//                Platform.runLater(() -> showWarn("Slots", "Failed to load free slots: " + e.getMessage()));
-//            }
-//        }, "load-slots").start();
-//    }
-
     private static String fmt12(LocalTime t) {
         return t == null ? "" : t.format(SLOT_FMT_12H);
     }
@@ -630,13 +1218,10 @@ public class ReceptionController {
     /* ============ Clock (12h) ============ */
     private void startClock() {
         DateTimeFormatter tf = DateTimeFormatter.ofPattern("hh:mm:ss a");
-        Timeline tl = new Timeline(
-                new KeyFrame(Duration.ZERO, e -> time.setText(LocalTime.now().format(tf))),
-                new KeyFrame(Duration.seconds(1))
-        );
+        Timeline tl = new Timeline(new KeyFrame(Duration.ZERO, e -> time.setText(LocalTime.now().format(tf))),
+                new KeyFrame(Duration.seconds(1)));
         tl.setCycleCount(Timeline.INDEFINITE);
         tl.play();
-
         DateTimeFormatter df = DateTimeFormatter.ofPattern("MM/dd/yyyy");
         DateOfDay.setText(LocalDate.now().format(df));
     }
@@ -675,40 +1260,26 @@ public class ReceptionController {
     }
 
     /* ============ Navigation ============ */
-//    @FXML
-//    private void BackAction() {
-//        Stage stage = (Stage) BackButton.getScene().getWindow();
-//        try {
-//            FXMLLoader loader = new FXMLLoader(getClass().getResource(new Navigation().Login_Fxml));
-//            loader.setControllerFactory(type ->
-//                    type == LoginController.class ? new LoginController(monitor) : null
-//            );
-//            Parent root = loader.load();
-//            stage.setScene(new Scene(root));
-//            stage.setResizable(false);
-//            stage.show();
-//        } catch (IOException e) { showError("Navigation", e); }
-//    }
     @FXML
     private void BackAction() {
         Stage stage = (Stage) BackButton.getScene().getWindow();
         try {
             FXMLLoader loader = new FXMLLoader(getClass().getResource(new Navigation().Login_Fxml));
-            loader.setControllerFactory(type ->
-                    type == LoginController.class ? new LoginController(monitor) : null
-            );
+            loader.setControllerFactory(type -> type == LoginController.class ? new LoginController(monitor) : null);
             Parent loginRoot = loader.load();
 
-            // لفّ loginRoot ببوردر بان ومعاه البانر
-            var banner = new com.example.healthflow.ui.ConnectivityBanner(monitor);
+            var banner = new ConnectivityBanner(monitor);
             javafx.scene.layout.BorderPane root = new javafx.scene.layout.BorderPane();
             root.setTop(banner);
             root.setCenter(loginRoot);
 
             stage.setScene(new Scene(root));
-            stage.setTitle("HealthFlow");   // ← غيّر العنوان
+            stage.setTitle("HealthFlow");
             stage.setResizable(false);
             stage.show();
+
+            // أوقف المستمعين والـ executors عند الخروج
+            shutdown();
         } catch (IOException e) {
             showError("Navigation", e);
         }
@@ -755,8 +1326,9 @@ public class ReceptionController {
         colDob.setCellValueFactory(cd -> cd.getValue().dateOfBirthProperty());
         colPhoneNumber.setCellValueFactory(cd -> cd.getValue().phoneProperty());
         colMedicalHistory.setCellValueFactory(cd -> cd.getValue().medicalHistoryProperty());
-
         patientTable.setItems(patientData);
+        patientTable.setEditable(true);
+        setupPatientInlineEditing();
 
         patientTable.getSelectionModel().selectedItemProperty().addListener((obs, old, row) -> {
             if (row == null) return;
@@ -775,34 +1347,179 @@ public class ReceptionController {
             String s = (q == null) ? "" : q.trim().toLowerCase();
             if (s.isEmpty()) filtered.setPredicate(p -> true);
             else filtered.setPredicate(p ->
-                    contains(p.getFullName(), s) ||
-                            contains(p.getGender(), s) ||
-                            contains(p.getPhone(), s) ||
-                            contains(p.getNationalId(), s) ||
+                    contains(p.getFullName(), s) || contains(p.getGender(), s) ||
+                            contains(p.getPhone(), s) || contains(p.getNationalId(), s) ||
                             contains(p.getMedicalHistory(), s) ||
-                            (p.getDateOfBirth() != null && p.getDateOfBirth().toString().toLowerCase().contains(s))
-            );
+                            (p.getDateOfBirth() != null && p.getDateOfBirth().toString().toLowerCase().contains(s)));
         });
         SortedList<PatientRow> sorted = new SortedList<>(filtered);
         sorted.comparatorProperty().bind(patientTable.comparatorProperty());
         patientTable.setItems(sorted);
     }
 
+    /**
+     * تفعيل التحرير داخل patientTable والكتابة مباشرة إلى قاعدة البيانات
+     */
+    private void setupPatientInlineEditing() {
+        // Full Name -> users.full_name
+        colName.setCellFactory(TextFieldTableCell.forTableColumn());
+        colName.setOnEditCommit(ev -> {
+            PatientRow row = ev.getRowValue();
+            String v = safe(ev.getNewValue());
+            if (v == null) return;
+            row.setFullName(v);
+            updateUserText(row.getUserId(), "full_name", v);
+            notifyPatientsChanged();
+        });
+
+        // Phone -> users.phone
+        colPhoneNumber.setCellFactory(TextFieldTableCell.forTableColumn());
+        colPhoneNumber.setOnEditCommit(ev -> {
+            PatientRow row = ev.getRowValue();
+            String v = safe(ev.getNewValue());
+            if (v == null) return;
+            row.setPhone(v);
+            updateUserText(row.getUserId(), "phone", v);
+            notifyPatientsChanged();
+        });
+
+        // Gender -> users.gender (ComboBox MALE/FEMALE)
+        colGender.setCellFactory(ComboBoxTableCell.forTableColumn(
+                FXCollections.observableArrayList("MALE", "FEMALE")
+        ));
+        colGender.setOnEditCommit(ev -> {
+            PatientRow row = ev.getRowValue();
+            String v = safe(ev.getNewValue());
+            if (v == null) return;
+            row.setGender(v);
+            updateUserText(row.getUserId(), "gender", v);
+            notifyPatientsChanged();
+        });
+
+        // National ID -> patients.national_id
+        colNationalId.setCellFactory(TextFieldTableCell.forTableColumn());
+        colNationalId.setOnEditCommit(ev -> {
+            PatientRow row = ev.getRowValue();
+            String v = safe(ev.getNewValue());
+            if (v == null) return;
+            row.setNationalId(v);
+            updatePatientText(row.getPatientId(), "national_id", v);
+            notifyPatientsChanged();
+        });
+
+        // Date of Birth -> patients.date_of_birth (نستخدم TextFieldTableCell مع محوّل بسيط yyyy-MM-dd)
+        colDob.setCellFactory(TextFieldTableCell.forTableColumn(new javafx.util.StringConverter<LocalDate>() {
+            @Override
+            public String toString(LocalDate d) {
+                return d == null ? "" : d.toString();
+            }
+
+            @Override
+            public LocalDate fromString(String s) {
+                if (s == null || s.isBlank()) return null;
+                return LocalDate.parse(s.trim()); // صيغة: 2025-10-10
+            }
+        }));
+        colDob.setOnEditCommit(ev -> {
+            PatientRow row = ev.getRowValue();
+            LocalDate d = ev.getNewValue();
+            if (d == null) return;
+            row.setDateOfBirth(d);
+            updatePatientDate(row.getPatientId(), "date_of_birth", d);
+            notifyPatientsChanged();
+        });
+
+        // Medical History -> patients.medical_history
+        colMedicalHistory.setCellFactory(TextFieldTableCell.forTableColumn());
+        colMedicalHistory.setOnEditCommit(ev -> {
+            PatientRow row = ev.getRowValue();
+            String v = safe(ev.getNewValue());
+            if (v == null) v = ""; // نسمح بقيمة فارغة
+            row.setMedicalHistory(v);
+            updatePatientText(row.getPatientId(), "medical_history", v);
+            notifyPatientsChanged();
+        });
+    }
+
+    private void updateUserText(long userId, String column, String value) {
+        final String sql = "UPDATE users SET " + column + " = ? WHERE id = ?";
+        try (Connection c = Database.get(); PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setString(1, value);
+            ps.setLong(2, userId);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            showError("Update user." + column, e);
+        }
+    }
+
+    private void updatePatientText(long patientId, String column, String value) {
+        final String sql = "UPDATE patients SET " + column + " = ? WHERE id = ?";
+        try (Connection c = Database.get(); PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setString(1, value);
+            ps.setLong(2, patientId);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            showError("Update patient." + column, e);
+        }
+    }
+
+    private void updatePatientDate(long patientId, String column, LocalDate d) {
+        final String sql = "UPDATE patients SET " + column + " = ? WHERE id = ?";
+        try (Connection c = Database.get(); PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setDate(1, java.sql.Date.valueOf(d));
+            ps.setLong(2, patientId);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            showError("Update patient." + column, e);
+        }
+    }
+
+    private void notifyPatientsChanged() {
+        try (Connection c = Database.get();
+             PreparedStatement nps = c.prepareStatement("SELECT pg_notify('patients_changed','update')")) {
+            nps.execute();
+        } catch (SQLException e) {
+            // مش حرجة لو فشلت النوتيفاي، بس نطبع للتشخيص
+            e.printStackTrace();
+        }
+    }
+
+    private String safe(String s) {
+        if (s == null) return null;
+        String t = s.trim();
+        return t.isEmpty() ? null : t;
+    }
+
     private boolean contains(String v, String q) {
         return v != null && v.toLowerCase().contains(q);
     }
 
+    //    private void loadPatientsBG() {
+    //        try {
+    //            var list = patientService.listPatients(); // List<PatientRow>
+    //            Platform.runLater(() -> {
+    //                patientData.clear();
+    //                // بدل الحلقة التي كانت تستخدم pv.patientId()… إلخ
+    //                var pv = patientService.createPatient(fullName, nid, phone, dob, gender.name(), history);
+    //
+    //                // استبدل الاستدعاءات style record بالـ getters
+    //                patientData.add(new PatientRow(
+    //                        pv.getPatientId(), pv.getUserId(), pv.getFullName(), pv.getNationalId(),
+    //                        pv.getPhone(), pv.getDateOfBirth(), pv.getGender(), pv.getMedicalHistory()
+    //                ));
+    //                patientData.addAll(list);
+    //            });
+    //        } catch (Exception ex) {
+    //            Platform.runLater(() -> showError("Load Patients", ex));
+    //        }
+    //    }
+
     private void loadPatientsBG() {
         try {
-            var list = patientService.listPatients();
+            var list = patientService.listPatients(); // List<PatientRow>
             Platform.runLater(() -> {
                 patientData.clear();
-                for (PatientView pv : list) {
-                    patientData.add(new PatientRow(
-                            pv.patientId(), pv.userId(), pv.fullName(), pv.nationalId(),
-                            pv.phone(), pv.dateOfBirth(), pv.gender(), pv.medicalHistory()
-                    ));
-                }
+                patientData.addAll(list);
             });
         } catch (Exception ex) {
             Platform.runLater(() -> showError("Load Patients", ex));
@@ -811,7 +1528,6 @@ public class ReceptionController {
 
     /* ============ Doctors: table, search, load ============ */
     private void wireDoctorTable() {
-        // ربط الأعمدة
         if (colDoctor_name != null) colDoctor_name.setCellValueFactory(cd -> cd.getValue().fullNameProperty());
         if (colDoctor_Gender != null) colDoctor_Gender.setCellValueFactory(cd -> cd.getValue().genderProperty());
         if (colDoctor_Phone != null) colDoctor_Phone.setCellValueFactory(cd -> cd.getValue().phoneProperty());
@@ -821,7 +1537,6 @@ public class ReceptionController {
         if (colDoctor_Status != null) colDoctor_Status.setCellValueFactory(cd -> cd.getValue().statusTextProperty());
         if (colDoctor_available != null)
             colDoctor_available.setCellValueFactory(cd -> cd.getValue().availableProperty());
-
         if (DocTable_Recption != null) DocTable_Recption.setItems(doctorData);
     }
 
@@ -832,13 +1547,9 @@ public class ReceptionController {
                 String s = (q == null) ? "" : q.trim().toLowerCase();
                 if (s.isEmpty()) doctorFiltered.setPredicate(d -> true);
                 else doctorFiltered.setPredicate(d ->
-                        contains(d.getFullName(), s) ||
-                                contains(d.getGender(), s) ||
-                                contains(d.getPhone(), s) ||
-                                contains(d.getSpecialty(), s) ||
-                                contains(d.getBio(), s) ||
-                                contains(d.getStatusText(), s)
-                );
+                        contains(d.getFullName(), s) || contains(d.getGender(), s) ||
+                                contains(d.getPhone(), s) || contains(d.getSpecialty(), s) ||
+                                contains(d.getBio(), s) || contains(d.getStatusText(), s));
             });
         }
         if (DocTable_Recption != null) {
@@ -848,22 +1559,14 @@ public class ReceptionController {
         }
     }
 
-    /**
-     * Load specialties into DoctorspecialtyApp and react to changes to fill avilabelDoctorApp.
-     */
     private void setupDoctorFilters() {
-        // Guard if FXML nodes are absent in this view
         if (DoctorspecialtyApp != null) {
             DoctorspecialtyApp.setPromptText("Select specialty");
             loadSpecialtiesAsync();
-            DoctorspecialtyApp.valueProperty().addListener((obs, old, sp) -> {
-                loadAvailableDoctorsForSpecialty(sp);
-            });
+            DoctorspecialtyApp.valueProperty().addListener((obs, old, sp) -> loadAvailableDoctorsForSpecialty(sp));
         }
-
         if (avilabelDoctorApp != null) {
             avilabelDoctorApp.setPromptText("Available doctor");
-            // Render doctor nicely in drop-down
             avilabelDoctorApp.setCellFactory(list -> new ListCell<>() {
                 @Override
                 protected void updateItem(DoctorDAO.DoctorOption item, boolean empty) {
@@ -881,21 +1584,13 @@ public class ReceptionController {
         }
     }
 
-    /**
-     * Async: fetch distinct specialties (with available doctors only) and populate DoctorspecialtyApp.
-     */
     private void loadSpecialtiesAsync() {
         if (DoctorspecialtyApp == null) return;
         new Thread(() -> {
             try {
-                // احصل على كل الأطباء المتاحين (بدون فلترة تخصص) ثم استخرج تخصصاتهم المميّزة
                 var available = doctorDAO.listAvailableBySpecialty((String) null);
-                Set<String> specs = new TreeSet<>(); // مرتّبة أبجديًا بدون تكرار
-                for (var opt : available) {
-                    if (opt != null && opt.specialty != null) {
-                        specs.add(opt.specialty);
-                    }
-                }
+                Set<String> specs = new TreeSet<>();
+                for (var opt : available) if (opt != null && opt.specialty != null) specs.add(opt.specialty);
                 Platform.runLater(() -> DoctorspecialtyApp.setItems(FXCollections.observableArrayList(specs)));
             } catch (Exception e) {
                 Platform.runLater(() -> showWarn("Doctors", "Failed to load specialties (available only)."));
@@ -903,12 +1598,8 @@ public class ReceptionController {
         }, "recp-specialties").start();
     }
 
-    /**
-     * Async: fetch available doctors for a given specialty (null = all).
-     */
     private void loadAvailableDoctorsForSpecialty(String specialty) {
         if (avilabelDoctorApp == null) return;
-        // If no specialty selected, clear list (or you can load all available doctors)
         if (specialty == null || specialty.isBlank()) {
             avilabelDoctorApp.getItems().clear();
             avilabelDoctorApp.setValue(null);
@@ -919,7 +1610,6 @@ public class ReceptionController {
                 var list = doctorDAO.listAvailableBySpecialty(specialty);
                 Platform.runLater(() -> {
                     avilabelDoctorApp.setItems(FXCollections.observableArrayList(list));
-                    // select first by default (optional)
                     if (!list.isEmpty()) avilabelDoctorApp.getSelectionModel().select(0);
                 });
             } catch (Exception e) {
@@ -928,7 +1618,6 @@ public class ReceptionController {
         }, "recp-avail-docs").start();
     }
 
-    /** Ensure specialties cache is filled (available only). */
     private void ensureSpecialtiesLoadedAsync() {
         if (!specialtyChoices.isEmpty()) return;
         new Thread(() -> {
@@ -937,11 +1626,11 @@ public class ReceptionController {
                 Set<String> sp = new TreeSet<>();
                 for (var d : all) if (d != null && d.specialty != null) sp.add(d.specialty);
                 Platform.runLater(() -> specialtyChoices.setAll(sp));
-            } catch (Exception ignored) {}
+            } catch (Exception ignored) {
+            }
         }, "load-spec-cache").start();
     }
 
-    /** Load doctors for a specialty into cache if missing. */
     private void ensureDoctorsForSpecAsync(String spec) {
         if (spec == null || spec.isBlank()) return;
         if (doctorsBySpec.containsKey(spec)) return;
@@ -950,276 +1639,143 @@ public class ReceptionController {
             try {
                 var list = doctorDAO.listAvailableBySpecialty(spec);
                 Platform.runLater(() -> doctorsBySpec.get(spec).setAll(list));
-            } catch (Exception ignored) {}
+            } catch (Exception ignored) {
+            }
         }, "load-docs-" + spec).start();
     }
 
     /**
-     * يسحب جديد الداتا ويحدث الواجهة دورياً:
-     * - المواعيد والعدادات والتشارت كل 1ث
-     * - المرضى/الأطباء كل 10ث
-     * - السلوطات حسب الطبيب/التاريخ المختارَين
+     * تحديث لحظي مجمّع (coalesced)
      */
-    private void startAutoRefresh() {
-        // تحديث سريع كل ثانية
-        autoRefreshExec.scheduleAtFixedRate(() -> {
-            if (!refreshBusy.compareAndSet(false, true)) return;
-            try {
-                // 1) جدول المواعيد الرئيسي (TableINAppointment) — مجدولة فقط
-                var apptRows = doctorDAO.listScheduledAppointments();
-                var mapped = javafx.collections.FXCollections.<ApptRow>observableArrayList();
-                for (var r : apptRows) {
-                    ApptRow ar = new ApptRow();
-                    ar.setId(r.id);
-                    ar.setDoctorId(r.id);      // ← انتبه: doctorId الصحيح
-                    ar.setDoctorName(r.doctorName);
-                    ar.setPatientName(r.patientName);
-                    ar.setSpecialty(r.specialty);
-                    ar.setStatus(r.status);
-                    ar.setDate(r.startAt.toLocalDate());
-                    ar.setTime(r.startAt.toLocalTime());
-                    ar.setNew(false);
-                    ar.setDirty(false);
-                    mapped.add(ar);
-                }
-                javafx.application.Platform.runLater(() -> apptEditable.setAll(mapped));
+    private void scheduleCoalescedRefresh() {
+        uiRefresh.request(() -> {
+            new Thread(() -> {
+                try {
+                    var apptRows = doctorDAO.listScheduledAppointments();
+                    var mapped = FXCollections.<ApptRow>observableArrayList();
+                    for (var r : apptRows) {
+                        ApptRow ar = new ApptRow();
+                        ar.setId(r.id);
+                        ar.setDoctorId(r.doctorId);
+                        ar.setDoctorName(r.doctorName);
+                        ar.setPatientName(r.patientName);
+                        ar.setSpecialty(r.specialty);
+                        ar.setStatus(r.status);
+                        java.time.LocalDateTime ldt1 = toLocal(r.startAt);
+                        if (ldt1 != null) {
+                            ar.setDate(ldt1.toLocalDate());
+                            ar.setTime(ldt1.toLocalTime());
+                        }
+                        ar.setRoomNumber(r.location);   // <-- أضِف هذا
+                        ar.setNew(false);
+                        ar.setDirty(false);
+                        mapped.add(ar);
+                    }
 
-                // 2) جدول الداشبورد (يحترم البحث إن وُجد)
-                if (TableAppInDashboard != null) {
-                    String q = (searchAppointmentDach != null) ? searchAppointmentDach.getText() : null;
-                    var dashRows = (q == null || q.isBlank())
-                            ? apptRows
-                            : doctorDAO.searchScheduledAppointments(q);
-                    javafx.application.Platform.runLater(() -> apptData.setAll(dashRows));
-                }
+                    var dashRows = apptRows;
+                    if (TableAppInDashboard != null && searchAppointmentDach != null) {
+                        String q = searchAppointmentDach.getText();
+                        if (q != null && !q.isBlank()) dashRows = doctorDAO.searchScheduledAppointments(q);
+                    }
+                    final var dashRowsFinal = dashRows;
 
-                // 3) العدادّات + تشارت الحالة
-                int doctors   = doctorDAO.countAvailableDoctors();
-                int appts     = doctorDAO.countAppointments();
-                int patients  = doctorDAO.countPatients();
-                int completed = doctorDAO.countCompletedAppointments();
-                int scheduled = doctorDAO.countScheduledAppointments();
-                javafx.application.Platform.runLater(() -> {
-                    if (NumberOfTotalDoctors != null)      NumberOfTotalDoctors.setText(String.valueOf(doctors));
-                    if (NumberOfTotalAppointments != null) NumberOfTotalAppointments.setText(String.valueOf(appts));
-                    if (NumberOfTotalPatients != null)     NumberOfTotalPatients.setText(String.valueOf(patients));
-                    if (patientCompleteNum != null)        patientCompleteNum.setText(String.valueOf(completed));
-                    if (RemainingNum != null)              RemainingNum.setText(String.valueOf(scheduled));
-                    updatePatientDetailsChart();
-                });
+                    int doctors = doctorDAO.countAvailableDoctors();
+                    int appts = doctorDAO.countAppointments();
+                    int patients = doctorDAO.countPatients();
+                    int completed = doctorDAO.countCompletedAppointments();
+                    int scheduled = doctorDAO.countScheduledAppointments();
 
-                // 4) السلوطات (لو الطبيب/التاريخ محددين)
-                if (cmbSlots != null && avilabelDoctorApp != null && AppointmentDate != null
-                        && avilabelDoctorApp.getValue() != null && AppointmentDate.getValue() != null) {
-                    try {
-                        final java.time.LocalTime open  = java.time.LocalTime.of(9, 0);
-                        final java.time.LocalTime close = java.time.LocalTime.of(15, 0);
+                    Platform.runLater(() -> {
+                        TableUtils.applyDelta(apptEditable, mapped, ApptRow::getId);
+                        if (TableAppInDashboard != null) apptData.setAll(dashRowsFinal);
+                        if (NumberOfTotalDoctors != null) NumberOfTotalDoctors.setText(String.valueOf(doctors));
+                        if (NumberOfTotalAppointments != null) NumberOfTotalAppointments.setText(String.valueOf(appts));
+                        if (NumberOfTotalPatients != null) NumberOfTotalPatients.setText(String.valueOf(patients));
+                        if (patientCompleteNum != null) patientCompleteNum.setText(String.valueOf(completed));
+                        if (RemainingNum != null) RemainingNum.setText(String.valueOf(scheduled));
+                        updatePatientDetailsChart();
+                    });
+                    TableUtils.applyDelta(apptEditable, mapped, ApptRow::getId);
+
+                    if (cmbSlots != null && avilabelDoctorApp != null && AppointmentDate != null
+                            && avilabelDoctorApp.getValue() != null && AppointmentDate.getValue() != null) {
+                        final LocalTime open = LocalTime.of(9, 0);
+                        final LocalTime close = LocalTime.of(15, 0);
                         final int slotMin = 20;
                         var doc = avilabelDoctorApp.getValue();
                         var day = AppointmentDate.getValue();
                         var slots = doctorDAO.listFreeSlots(doc.doctorId, day, open, close, slotMin);
-
-                        // قص الماضي لليوم الحالي + إنتهاء الدوام
-                        if (day.equals(java.time.LocalDate.now())) {
-                            var now = java.time.LocalDateTime.now().withSecond(0).withNano(0);
+                        if (day.equals(LocalDate.now())) {
+                            var now = LocalDateTime.now().withSecond(0).withNano(0);
                             int mod = now.getMinute() % slotMin;
                             var cutoff = (mod == 0) ? now : now.plusMinutes(slotMin - mod);
                             slots.removeIf(s -> s.from().isBefore(cutoff));
                             if (now.toLocalTime().isAfter(close)) slots.clear();
                         }
-
-                        javafx.application.Platform.runLater(() -> {
+                        Platform.runLater(() -> {
                             var selected = cmbSlots.getValue();
-                            cmbSlots.setItems(javafx.collections.FXCollections.observableArrayList(slots));
-                            // حافظ على الاختيار السابق إن بقي متاحًا
+                            cmbSlots.setItems(FXCollections.observableArrayList(slots));
                             if (selected != null && slots.stream().anyMatch(s ->
                                     s.from().equals(selected.from()) && s.to().equals(selected.to()))) {
                                 cmbSlots.getSelectionModel().select(selected);
                             }
                         });
-                    } catch (Exception ignore) {}
+                        TableUtils.applyDelta(apptEditable, mapped, ApptRow::getId);
+                    }
+                } catch (Exception e) {
+                    Platform.runLater(() -> error("Auto refresh", e));
                 }
-            } catch (SQLException e) {
-                throw new RuntimeException(e);
-            } finally {
-                refreshBusy.set(false);
-            }
-        }, 0, 5, java.util.concurrent.TimeUnit.SECONDS);
+            }, "ui-coalesced-refresh").start();
+        });
+    }
 
-        // تحديث أبطأ كل 10 ثوانٍ لقوائم المرضى والأطباء
+    /**
+     * استماع لقناة DB NOTIFY
+     */
+
+    private void startDbNotifications() {
+        apptDbListener = new DbNotifications();
+
+        // appointments_changed -> فلش كاش الساعات وجدّد الشاشة
+        apptDbListener.listen("appointments_changed", payload -> {
+            slotCache.clear();
+            scheduleCoalescedRefresh();
+        });
+
+        // patients_changed -> مستمع واحد مع debounce
+        apptDbListener.listen("patients_changed", payload -> {
+            System.out.println("NOTIFY patients_changed: " + payload);
+            uiRefresh.request(this::loadPatientsBG);
+        });
+
+        System.out.println("DbNotifications: starting listeners...");
+    }
+
+
+    /**
+     * Poll احتياطي خفيف فقط (تعطيل التحديث كل 1 دقيقة)
+     */
+    private void startAutoRefresh() {
+        autoRefreshExec.scheduleAtFixedRate(this::scheduleCoalescedRefresh, 10, 10, TimeUnit.SECONDS);
         autoRefreshExec.scheduleAtFixedRate(() -> {
             try {
-                loadPatientsBG(); // هذه أصلاً تحدث على FX thread داخليًا
+                loadPatientsBG();
                 loadDoctorsBG();
-            } catch (Exception ignore) {}
-        }, 0, 10, java.util.concurrent.TimeUnit.SECONDS);
-    }
-    /**
-     * تحميل كل الدكاترة مع حالتهم
-     */
-    private void loadDoctorsBG() {
-        final String sql = """
-            SELECT d.id AS doctor_id,
-                   u.full_name,
-                   u.gender::text AS gender,
-                   u.phone,
-                   d.specialty,
-                   COALESCE(d.bio, '') AS bio,
-                   d.availability_status::text AS status
-            FROM doctors d
-            JOIN users u ON u.id = d.user_id
-            ORDER BY u.full_name
-        """;
-        try (Connection c = Database.get();
-             PreparedStatement ps = c.prepareStatement(sql);
-             ResultSet rs = ps.executeQuery()) {
-
-            ObservableList<DoctorRow> list = FXCollections.observableArrayList();
-            while (rs.next()) {
-                list.add(new DoctorRow(
-                        rs.getLong("doctor_id"),
-                        rs.getString("full_name"),
-                        rs.getString("gender"),
-                        rs.getString("phone"),
-                        rs.getString("specialty"),
-                        rs.getString("bio"),
-                        rs.getString("status")
-                ));
+            } catch (Exception ignore) {
             }
-            Platform.runLater(() -> {
-                doctorData.setAll(list);
-                // أرقام أعلى الداشبورد (اختياري)
-                if (NumberOfTotalDoctors != null) NumberOfTotalDoctors.setText(String.valueOf(list.size()));
-            });
-        } catch (Exception ex) {
-            Platform.runLater(() -> showError("Load Doctors", ex));
-        }
+        }, 0, 60, TimeUnit.SECONDS);
+        // داخل startAutoRefresh()
     }
 
-    /* ============ CRUD via Service (patients) ============ */
-    private void doInsertPatient() {
-        String fullName = trimOrNull(FullNameTextField.getText());
-        String nid = trimOrNull(PatientIdTextField.getText());
-        Gender gender = GenderComboBox.getValue();
-        LocalDate dob = DateOfBirthPicker.getValue();
-        String phone = trimOrNull(PhoneTextField.getText());
-        String history = trimOrNull(medicalHistory.getText());
+    // ==== بقية الدوال كما كانت (loadDoctorsBG, CRUD, إلخ) ====
 
-        if (fullName == null || dob == null || gender == null) {
-            showWarn("Validation", "Full name, gender and date of birth are required.");
-            return;
-        }
-        if (phone == null) {
-            showWarn("Validation", "Patient must have a phone number.");
-            return;
-        }
-
-        try {
-            var pv = patientService.createPatient(fullName, nid, phone, dob, gender.name(), history);
-            patientData.add(new PatientRow(
-                    pv.patientId(), pv.userId(), pv.fullName(), pv.nationalId(),
-                    pv.phone(), pv.dateOfBirth(), pv.gender(), pv.medicalHistory()
-            ));
-            clearForm();
-            showInfo("Insert", "Patient inserted successfully.");
-        } catch (Exception ex) {
-            showError("Insert Patient", ex);
-        }
-    }
-
-    private void doUpdatePatient() {
-        PatientRow row = patientTable.getSelectionModel().getSelectedItem();
-        if (row == null) {
-            showWarn("Update", "Select a patient row first.");
-            return;
-        }
-
-        String fullName = trimOrNull(FullNameTextField.getText());
-        String nid = trimOrNull(PatientIdTextField.getText());
-        String phone = trimOrNull(PhoneTextField.getText());
-        String history = trimOrNull(medicalHistory.getText());
-        Gender gender = GenderComboBox.getValue();
-        LocalDate dob = DateOfBirthPicker.getValue();
-
-        if (fullName == null || dob == null || gender == null) {
-            showWarn("Validation", "Full name, gender and date of birth are required.");
-            return;
-        }
-
-        try {
-            patientService.updatePatient(row.getUserId(), row.getPatientId(),
-                    fullName, nid, phone, dob, gender.name(), history);
-
-            row.setFullName(fullName);
-            row.setNationalId(nid);
-            row.setPhone(phone);
-            row.setDateOfBirth(dob);
-            row.setGender(gender.name());
-            row.setMedicalHistory(history);
-            patientTable.refresh();
-
-            showInfo("Update", "Patient updated successfully.");
-        } catch (Exception ex) {
-            showError("Update Patient", ex);
-        }
-    }
-
-    private void doDeletePatient() {
-        PatientRow row = patientTable.getSelectionModel().getSelectedItem();
-        if (row == null) {
-            showWarn("Delete", "Select a patient row first.");
-            return;
-        }
-        if (!confirm("Delete", "Are you sure you want to delete this patient?")) return;
-
-        try {
-            patientService.deletePatientByUserId(row.getUserId());
-            patientData.remove(row);
-            clearForm();
-            showInfo("Delete", "Patient deleted.");
-        } catch (Exception e) {
-            showError("Delete Patient", e);
-        }
-    }
-
-    private void clearForm() {
-        FullNameTextField.clear();
-        PatientIdTextField.clear();
-        PhoneTextField.clear();
-        medicalHistory.clear();
-        GenderComboBox.setValue(Gender.MALE);
-        DateOfBirthPicker.setValue(null);
-        patientTable.getSelectionModel().clearSelection();
-    }
-
-    /* ============ Helpers ============ */
+    /* ===== Helpers (alerts & online guard wrapper) ===== */
     private boolean ensureOnlineOrAlert() {
         if (monitor != null && !monitor.isOnline()) {
             showWarn("Offline", "You're offline. Please reconnect and try again.");
             return false;
         }
         return true;
-    }
-
-    private String trimOrNull(String s) {
-        if (s == null) return null;
-        String t = s.trim();
-        return t.isEmpty() ? null : t;
-    }
-
-    private String showError(String title, Exception ex) {
-        if (ex instanceof SQLException sqlEx && "23514".equals(sqlEx.getSQLState())) {
-            // 23514 = check_violation
-            // مثال على رسالة مخصّصة
-        } else {
-            ex.printStackTrace();
-        }
-        Alert a = new Alert(Alert.AlertType.ERROR);
-        a.setTitle(title);
-        a.setHeaderText(null);
-        a.setContentText(ex.getMessage());
-        a.showAndWait();
-        return ex.getMessage();
     }
 
     private void showWarn(String title, String msg) {
@@ -1238,6 +1794,16 @@ public class ReceptionController {
         a.showAndWait();
     }
 
+    private String showError(String title, Exception ex) {
+        if (ex != null) ex.printStackTrace();
+        Alert a = new Alert(Alert.AlertType.ERROR);
+        a.setTitle(title);
+        a.setHeaderText(null);
+        a.setContentText(ex == null ? title : ex.getMessage());
+        a.showAndWait();
+        return ex == null ? title : ex.getMessage();
+    }
+
     private boolean confirm(String title, String msg) {
         Alert a = new Alert(Alert.AlertType.CONFIRMATION);
         a.setTitle(title);
@@ -1246,899 +1812,393 @@ public class ReceptionController {
         return a.showAndWait().filter(b -> b == ButtonType.OK).isPresent();
     }
 
-    /* ============ Row models ============ */
-    public static class PatientRow {
-        private final LongProperty patientId = new SimpleLongProperty();
-        private final LongProperty userId = new SimpleLongProperty();
-        private final StringProperty fullName = new SimpleStringProperty();
-        private final StringProperty nationalId = new SimpleStringProperty();
-        private final StringProperty phone = new SimpleStringProperty();
-        private final ObjectProperty<LocalDate> dateOfBirth = new SimpleObjectProperty<>();
-        private final StringProperty gender = new SimpleStringProperty();
-        private final StringProperty medicalHistory = new SimpleStringProperty();
+    /* ===== Patients CRUD (restored) ===== */
+    private void doInsertPatient() {
+        String fullName = trimOrNull(FullNameTextField.getText());
+        String nid = trimOrNull(PatientIdTextField.getText());
+        Gender gender = GenderComboBox.getValue();
+        LocalDate dob = DateOfBirthPicker.getValue();
+        String phone = trimOrNull(PhoneTextField.getText());
+        String history = trimOrNull(medicalHistory.getText());
 
-        public PatientRow(Long patientId, Long userId, String fullName, String nationalId,
-                          String phone, LocalDate dob, String gender, String medicalHistory) {
-            setPatientId(patientId);
-            setUserId(userId);
-            setFullName(fullName);
-            setNationalId(nationalId);
-            setPhone(phone);
-            setDateOfBirth(dob);
-            setGender(gender);
-            setMedicalHistory(medicalHistory);
+        if (fullName == null || dob == null || gender == null) {
+            showWarn("Validation", "Full name, gender and date of birth are required.");
+            return;
+        }
+        if (phone == null) {
+            showWarn("Validation", "Patient must have a phone number.");
+            return;
         }
 
-        public long getPatientId() {
-            return patientId.get();
+        try {
+            // ننشئ المريض – ما بنعتمد على PatientView
+            patientService.createPatient(fullName, nid, phone, dob, gender.name(), history);
+
+            // نحدّث الجدول من المصدر الرسمي (PatientRow)
+            loadPatientsBG();
+
+            clearForm();
+            showInfo("Insert", "Patient inserted successfully.");
+        } catch (Exception ex) {
+            showError("Insert Patient", ex);
+            return;
         }
 
-        public void setPatientId(long v) {
-            patientId.set(v);
-        }
-
-        public LongProperty patientIdProperty() {
-            return patientId;
-        }
-
-        public long getUserId() {
-            return userId.get();
-        }
-
-        public void setUserId(long v) {
-            userId.set(v);
-        }
-
-        public LongProperty userIdProperty() {
-            return userId;
-        }
-
-        public String getFullName() {
-            return fullName.get();
-        }
-
-        public void setFullName(String v) {
-            fullName.set(v);
-        }
-
-        public StringProperty fullNameProperty() {
-            return fullName;
-        }
-
-        public String getNationalId() {
-            return nationalId.get();
-        }
-
-        public void setNationalId(String v) {
-            nationalId.set(v);
-        }
-
-        public StringProperty nationalIdProperty() {
-            return nationalId;
-        }
-
-        public String getPhone() {
-            return phone.get();
-        }
-
-        public void setPhone(String v) {
-            phone.set(v);
-        }
-
-        public StringProperty phoneProperty() {
-            return phone;
-        }
-
-        public LocalDate getDateOfBirth() {
-            return dateOfBirth.get();
-        }
-
-        public void setDateOfBirth(LocalDate v) {
-            dateOfBirth.set(v);
-        }
-
-        public ObjectProperty<LocalDate> dateOfBirthProperty() {
-            return dateOfBirth;
-        }
-
-        public String getGender() {
-            return gender.get();
-        }
-
-        public void setGender(String v) {
-            gender.set(v);
-        }
-
-        public StringProperty genderProperty() {
-            return gender;
-        }
-
-        public String getMedicalHistory() {
-            return medicalHistory.get();
-        }
-
-        public void setMedicalHistory(String v) {
-            medicalHistory.set(v);
-        }
-
-        public StringProperty medicalHistoryProperty() {
-            return medicalHistory;
+        // إشعار قنوات الـ DB NOTIFY (غير حرِج لو فشل)
+        try (Connection c = Database.get();
+             PreparedStatement nps = c.prepareStatement("SELECT pg_notify('patients_changed','insert')")) {
+            nps.execute();
+        } catch (SQLException e) {
+            e.printStackTrace();
         }
     }
 
-    /**
-     * صفّ عرض للدكتور
-     */
-    public static class DoctorRow {
-        private final LongProperty doctorId = new SimpleLongProperty();
-        private final StringProperty fullName = new SimpleStringProperty();
-        private final StringProperty gender = new SimpleStringProperty();
-        private final StringProperty phone = new SimpleStringProperty();
-        private final StringProperty specialty = new SimpleStringProperty();
-        private final StringProperty bio = new SimpleStringProperty();
-        private final StringProperty statusText = new SimpleStringProperty();
-        private final BooleanProperty available = new SimpleBooleanProperty(false);
-
-        public DoctorRow(long doctorId, String fullName, String gender, String phone,
-                         String specialty, String bio, String statusText) {
-            setDoctorId(doctorId);
-            setFullName(fullName);
-            setGender(gender);
-            setPhone(phone);
-            setSpecialty(specialty);
-            setBio(bio);
-            setStatusText(statusText);
-            setAvailable("AVAILABLE".equalsIgnoreCase(statusText));
+    private void doUpdatePatient() {
+        PatientRow row = (patientTable == null) ? null : patientTable.getSelectionModel().getSelectedItem();
+        if (row == null) {
+            showWarn("Update", "Select a patient row first.");
+            return;
         }
 
-        public long getDoctorId() {
-            return doctorId.get();
+        String fullName = trimOrNull(FullNameTextField.getText());
+        String nid = trimOrNull(PatientIdTextField.getText());
+        String phone = trimOrNull(PhoneTextField.getText());
+        String history = trimOrNull(medicalHistory.getText());
+        Gender gender = GenderComboBox.getValue();
+        LocalDate dob = DateOfBirthPicker.getValue();
+
+
+        if (fullName == null || dob == null || gender == null) {
+            showWarn("Validation", "Full name, gender and date of birth are required.");
+            return;
+        }
+        try {
+            patientService.updatePatient(row.getUserId(), row.getPatientId(),
+                    fullName, nid, phone, dob, gender.name(), history);
+            row.setFullName(fullName);
+            row.setNationalId(nid);
+            row.setPhone(phone);
+            row.setDateOfBirth(dob);
+            row.setGender(gender.name());
+            row.setMedicalHistory(history);
+            if (patientTable != null) patientTable.refresh();
+            showInfo("Update", "Patient updated successfully.");
+        } catch (Exception ex) {
+            showError("Update Patient", ex);
         }
 
-        public void setDoctorId(long v) {
-            doctorId.set(v);
-        }
-
-        public LongProperty doctorIdProperty() {
-            return doctorId;
-        }
-
-        public String getFullName() {
-            return fullName.get();
-        }
-
-        public void setFullName(String v) {
-            fullName.set(v);
-        }
-
-        public StringProperty fullNameProperty() {
-            return fullName;
-        }
-
-        public String getGender() {
-            return gender.get();
-        }
-
-        public void setGender(String v) {
-            gender.set(v);
-        }
-
-        public StringProperty genderProperty() {
-            return gender;
-        }
-
-        public String getPhone() {
-            return phone.get();
-        }
-
-        public void setPhone(String v) {
-            phone.set(v);
-        }
-
-        public StringProperty phoneProperty() {
-            return phone;
-        }
-
-        public String getSpecialty() {
-            return specialty.get();
-        }
-
-        public void setSpecialty(String v) {
-            specialty.set(v);
-        }
-
-        public StringProperty specialtyProperty() {
-            return specialty;
-        }
-
-        public String getBio() {
-            return bio.get();
-        }
-
-        public void setBio(String v) {
-            bio.set(v);
-        }
-
-        public StringProperty bioProperty() {
-            return bio;
-        }
-
-        public String getStatusText() {
-            return statusText.get();
-        }
-
-        public void setStatusText(String v) {
-            statusText.set(v);
-        }
-
-        public StringProperty statusTextProperty() {
-            return statusText;
-        }
-
-        public boolean isAvailable() {
-            return available.get();
-        }
-
-        public void setAvailable(boolean v) {
-            available.set(v);
-        }
-
-        public BooleanProperty availableProperty() {
-            return available;
+        try (Connection c = Database.get();
+             PreparedStatement nps = c.prepareStatement("SELECT pg_notify('patients_changed','update')")) {
+            nps.execute();
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
         }
     }
 
-    // ===== Editable appointment row used by TableINAppointment =====
-    public static class ApptRow {
-        private final LongProperty id = new SimpleLongProperty(0);       // 0 = not yet persisted
-        private final LongProperty doctorId = new SimpleLongProperty();
-        private final LongProperty patientId = new SimpleLongProperty();
-        private final StringProperty doctorName = new SimpleStringProperty();
-        private final StringProperty patientName = new SimpleStringProperty();
-        private final StringProperty specialty = new SimpleStringProperty();
-        private final StringProperty status = new SimpleStringProperty("PENDING");
-        private final ObjectProperty<LocalDate> date = new SimpleObjectProperty<>(LocalDate.now());
-        private final ObjectProperty<LocalTime> time = new SimpleObjectProperty<>(LocalTime.of(9,0));
-        private final BooleanProperty isNew = new SimpleBooleanProperty(true);
-        private final BooleanProperty dirty = new SimpleBooleanProperty(false);
+    private void doDeletePatient() {
+        PatientRow row = (patientTable == null) ? null : patientTable.getSelectionModel().getSelectedItem();
+        if (row == null) {
+            showWarn("Delete", "Select a patient row first.");
+            return;
+        }
+        if (!confirm("Delete", "Are you sure you want to delete this patient?")) return;
+        try {
+            patientService.deletePatientByUserId(row.getUserId());
+            patientData.remove(row);
+            clearForm();
+            showInfo("Delete", "Patient deleted.");
+        } catch (Exception e) {
+            showError("Delete Patient", e);
+        }
 
-        public long getId() { return id.get(); }
-        public void setId(long v) { id.set(v); }
-        public LongProperty idProperty() { return id; }
-
-        public long getDoctorId() { return doctorId.get(); }
-        public void setDoctorId(long v) { doctorId.set(v); dirty.set(true); }
-        public LongProperty doctorIdProperty() { return doctorId; }
-
-        public long getPatientId() { return patientId.get(); }
-        public void setPatientId(long v) { patientId.set(v); dirty.set(true); }
-        public LongProperty patientIdProperty() { return patientId; }
-
-        public String getDoctorName() { return doctorName.get(); }
-        public void setDoctorName(String v) { doctorName.set(v); }
-        public StringProperty doctorNameProperty() { return doctorName; }
-
-        public String getPatientName() { return patientName.get(); }
-        public void setPatientName(String v) { patientName.set(v); }
-        public StringProperty patientNameProperty() { return patientName; }
-
-        public String getSpecialty() { return specialty.get(); }
-        public void setSpecialty(String v) { specialty.set(v); }
-        public StringProperty specialtyProperty() { return specialty; }
-
-        public String getStatus() { return status.get(); }
-        public void setStatus(String v) { status.set(v); }
-        public StringProperty statusProperty() { return status; }
-
-        public LocalDate getDate() { return date.get(); }
-        public void setDate(LocalDate v) { date.set(v); dirty.set(true); }
-        public ObjectProperty<LocalDate> dateProperty() { return date; }
-
-        public LocalTime getTime() { return time.get(); }
-        public void setTime(LocalTime v) { time.set(v); dirty.set(true); }
-        public ObjectProperty<LocalTime> timeProperty() { return time; }
-
-        public boolean isNew() { return isNew.get(); }
-        public void setNew(boolean v) { isNew.set(v); }
-        public BooleanProperty isNewProperty() { return isNew; }
-
-        public boolean isDirty() { return dirty.get(); }
-        public void setDirty(boolean v) { dirty.set(v); }
-        public BooleanProperty dirtyProperty() { return dirty; }
+        try (Connection c = Database.get();
+             PreparedStatement nps = c.prepareStatement("SELECT pg_notify('patients_changed','delete')")) {
+            nps.execute();
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
     }
 
-    // backing list for editable table (TableINAppointment)
-    private final ObservableList<ApptRow> apptEditable = FXCollections.observableArrayList();
+    private void clearForm() {
+        if (FullNameTextField != null) FullNameTextField.clear();
+        if (PatientIdTextField != null) PatientIdTextField.clear();
+        if (PhoneTextField != null) PhoneTextField.clear();
+        if (medicalHistory != null) medicalHistory.clear();
+        if (GenderComboBox != null) GenderComboBox.setValue(Gender.MALE);
+        if (DateOfBirthPicker != null) DateOfBirthPicker.setValue(null);
+        if (patientTable != null) patientTable.getSelectionModel().clearSelection();
+    }
 
-    private static final DateTimeFormatter TIME_12 = DateTimeFormatter.ofPattern("hh:mm a");
+    private String trimOrNull(String s) {
+        if (s == null) return null;
+        String t = s.trim();
+        return t.isEmpty() ? null : t;
+    }
 
-
-    /**
-     * Wire both appointments tables (main & dashboard) to display AppointmentRow.
-     */
+    /* ===== Appointments table wiring & search (minimal) ===== */
     private void wireAppointmentsTables() {
-        // Appointments main table
-        if (TableINAppointment != null) {
-            TableINAppointment.setEditable(true);
+        if (TableINAppointment == null) return;
+        TableINAppointment.setItems(apptEditable);
+        // === تفعيل التحرير داخل جدول المواعيد ===
+        TableINAppointment.setEditable(true);
+        colDateAppointment.setEditable(true);
 
-            // Use unconstrained resize policy to allow horizontal scrolling
-            TableINAppointment.setColumnResizePolicy(TableView.UNCONSTRAINED_RESIZE_POLICY);
-
-            // Set fixed preferred widths for columns (horizontal scrollbar enabled if total width exceeds table)
-            colAppointmentIDAppointment.setPrefWidth(90);     // ID
-            colPatientNameAppointment.setPrefWidth(220);      // Patient Name
-            colSpecialty.setPrefWidth(170);                   // Specialty
-            colDoctorNameAppointment.setPrefWidth(200);       // Doctor Name
-            colDateAppointment.setPrefWidth(150);             // Date
-            colTimeAppointment.setPrefWidth(160);             // Time
-            colStatusAppointment.setPrefWidth(130);           // Status
-
-            // Keep minWidth for usability
-            colAppointmentIDAppointment.setMinWidth(60);
-            colPatientNameAppointment.setMinWidth(160);
-            colSpecialty.setMinWidth(140);
-            colDoctorNameAppointment.setMinWidth(160);
-            colDateAppointment.setMinWidth(120);
-            colTimeAppointment.setMinWidth(130);
-            colStatusAppointment.setMinWidth(100);
-
+        setupInlineEditing();
+        if (colAppointmentIDAppointment != null)
             colAppointmentIDAppointment.setCellValueFactory(cd -> cd.getValue().idProperty());
-            colDateAppointment.setCellValueFactory(cd -> cd.getValue().dateProperty());
-            colTimeAppointment.setCellValueFactory(cd -> new SimpleStringProperty(fmt12(cd.getValue().getTime())));
+        if (colDateAppointment != null) colDateAppointment.setCellValueFactory(cd -> cd.getValue().dateProperty());
+        if (colDoctorNameAppointment != null)
             colDoctorNameAppointment.setCellValueFactory(cd -> cd.getValue().doctorNameProperty());
+
+        //        --------------------
+        //        --------------------
+        if (colPatientNameAppointment != null)
             colPatientNameAppointment.setCellValueFactory(cd -> cd.getValue().patientNameProperty());
-            colSpecialty.setCellValueFactory(cd -> cd.getValue().specialtyProperty());
+        if (colSpecialty != null) colSpecialty.setCellValueFactory(cd -> cd.getValue().specialtyProperty());
+        if (colStatusAppointment != null)
             colStatusAppointment.setCellValueFactory(cd -> cd.getValue().statusProperty());
 
-            // --- Specialty editor: ComboBox in-row ---
-            ensureSpecialtiesLoadedAsync();
-            colSpecialty.setCellFactory(col -> new TableCell<>() {
-                private final ComboBox<String> cb = new ComboBox<>(specialtyChoices);
-                {
-                    cb.getStyleClass().add("box");                 // ← مهم
-                    cb.setMaxWidth(Double.MAX_VALUE);
-                    cb.setPromptText("Specialty");
-                    cb.setOnAction(e -> {
-                        ApptRow r = getTableView().getItems().get(getIndex());
-                        if (r == null) return;
-                        String sp = cb.getValue();
-                        r.setSpecialty(sp);
-                        r.setDoctorId(0);
-                        r.setDoctorName(null);
-                        r.setTime(null);
-                        ensureDoctorsForSpecAsync(sp);
-                        getTableView().refresh();
-                    });
-                }
-                @Override protected void updateItem(String item, boolean empty) {
-                    super.updateItem(item, empty);
-                    if (empty) { setGraphic(null); setText(null); }
-                    else { cb.setValue(item); setGraphic(cb); setText(null); }
-                }
-            });
-//            colDoctorNameAppointment.setCellFactory(col -> new TableCell<>() {
-//                private final ComboBox<DoctorDAO.DoctorOption> cb = new ComboBox<>();
-//                {
-//                    cb.getStyleClass().add("box");                 // ← مهم
-//                    cb.setMaxWidth(Double.MAX_VALUE);
-//                    cb.setConverter(new StringConverter<>() {
-//                        @Override public String toString(DoctorDAO.DoctorOption d) { return d == null ? "" : d.fullName; }
-//                        @Override public DoctorDAO.DoctorOption fromString(String s) { return null; }
-//                    });
-//                    cb.setOnShowing(e -> {
-//                        ApptRow r = getTableView().getItems().get(getIndex());
-//                        if (r == null) return;
-//                        ensureDoctorsForSpecAsync(r.getSpecialty());
-//                        var list = doctorsBySpec.getOrDefault(r.getSpecialty(), FXCollections.observableArrayList());
-//                        cb.setItems(list);
-//                    });
-//                    cb.setOnAction(e -> {
-//                        ApptRow r = getTableView().getItems().get(getIndex());
-//                        var d = cb.getValue();
-//                        if (r == null) return;
-//                        if (d != null) { r.setDoctorId(d.doctorId); r.setDoctorName(d.fullName); }
-//                        else { r.setDoctorId(0); r.setDoctorName(null); }
-//                        r.setTime(null);
-//                        getTableView().refresh();
-//                    });
-//                }
-//                @Override protected void updateItem(String item, boolean empty) {
-//                    super.updateItem(item, empty);
-//                    if (empty) { setGraphic(null); setText(null); }
-//                    else {
-//                        ApptRow r = getTableView().getItems().get(getIndex());
-//                        if (r != null && r.getDoctorName() != null) {
-//                            var list = doctorsBySpec.getOrDefault(r.getSpecialty(), FXCollections.observableArrayList());
-//                            cb.setItems(list);
-//                            cb.getSelectionModel().select(
-//                                    list.stream().filter(o -> o.doctorId == r.getDoctorId()).findFirst().orElse(null)
-//                            );
-//                        }
-//                        setGraphic(cb); setText(null);
-//                    }
-//                }
-//            });
+//        if (colStartTime != null)
+//            colStartTime.setCellValueFactory(cd -> new SimpleStringProperty(fmt12(cd.getValue().getTime())));
+//        if (colStartTime != null) colStartTime.setEditable(false);
 
-            colDoctorNameAppointment.setCellFactory(col -> new TableCell<ApptRow, String>() {
-                private final ComboBox<DoctorDAO.DoctorOption> cb = new ComboBox<>();
-                {
-                    cb.getStyleClass().add("box");
-                    cb.setMaxWidth(Double.MAX_VALUE);
-                    cb.setVisibleRowCount(10);
-                    cb.setConverter(new StringConverter<>() {
-                        @Override public String toString(DoctorDAO.DoctorOption d){ return d==null? "" : d.fullName; }
-                        @Override public DoctorDAO.DoctorOption fromString(String s){ return null; }
-                    });
-                    // لو أول كليك والقائمة لسه فاضية: حمّل ثم افتح مباشرة
-                    cb.setOnShowing(e -> {
-                        ApptRow r = getTableView().getItems().get(getIndex());
-                        if (r == null) return;
-                        ensureDoctorsForSpecAsync(r.getSpecialty());
-                        var list = doctorsBySpec.getOrDefault(r.getSpecialty(), FXCollections.observableArrayList());
-                        cb.setItems(list);
-                    });
+        // --- Start Time column (يعرض الوقت بصيغة 12h)
+        if (colStartTime != null) {
+            colStartTime.setCellValueFactory(cd ->
+                    new javafx.beans.property.SimpleStringProperty(fmt12(cd.getValue().getTime()))
+            );
 
-                    cb.setOnMousePressed(e -> {
-                        if (cb.getItems().isEmpty()) {
-                            ApptRow r = getRowSafely();
-                            if (r != null) { preloadDoctors(r); Platform.runLater(cb::show); }
-                        }
-                    });
-                    cb.setOnAction(e -> {
-                        ApptRow r = getRowSafely();
-                        var d = cb.getValue();
-                        if (r == null) return;
-                        if (d != null) { r.setDoctorId(d.doctorId); r.setDoctorName(d.fullName); }
-                        else           { r.setDoctorId(0);          r.setDoctorName(null);      }
-                        r.setTime(null); // إعادة اختيار الوقت
-                        getTableView().refresh();
-                    });
-
-                }
-                private ApptRow getRowSafely() {
-                    int i = getIndex();
-                    return (i < 0 || i >= getTableView().getItems().size()) ? null : getTableView().getItems().get(i);
-                }
-                private void preloadDoctors(ApptRow r) {
-                    String spec = r.getSpecialty();
-                    if (spec == null || spec.isBlank()) { cb.getItems().clear(); return; }
-                    ensureDoctorsForSpecAsync(spec);
-                    cb.setItems(doctorsBySpec.getOrDefault(spec, FXCollections.observableArrayList()));
-                }
-                @Override protected void updateItem(String itm, boolean empty) {
-                    super.updateItem(itm, empty);
-                    if (empty) { setGraphic(null); setText(null); return; }
-                    ApptRow r = getRowSafely();
-                    preloadDoctors(r); // **تجهيز مسبق**
-                    if (r != null && r.getDoctorId() != 0) {
-                        cb.getSelectionModel().select(
-                                cb.getItems().stream().filter(o -> o.doctorId == r.getDoctorId()).findFirst().orElse(null)
-                        );
-                    } else cb.getSelectionModel().clearSelection();
-                    setGraphic(cb); setText(null);
-                }
-            });
-
-//            colTimeAppointment.setCellFactory(col -> new TableCell<>() {
-//                private final ComboBox<DoctorDAO.Slot> cb = new ComboBox<>();
-//                {
-//                    cb.getStyleClass().add("box");
-//                    cb.setMaxWidth(Double.MAX_VALUE);
-//                    cb.setConverter(new StringConverter<>() {
-//                        @Override public String toString(DoctorDAO.Slot s) {
-//                            if (s == null) return "";
-//                            return s.from().toLocalTime().format(SLOT_FMT_12H) + " \u2192 " +
-//                                    s.to().toLocalTime().format(SLOT_FMT_12H);
-//                        }
-//                        @Override public DoctorDAO.Slot fromString(String s) { return null; }
-//                    });
-//                    cb.setOnShowing(e -> {
-//                        ApptRow r = getTableView().getItems().get(getIndex());
-//                        if (r == null || r.getDoctorId() == 0 || r.getDate() == null) {
-//                            cb.getItems().clear();
-//                            return;
-//                        }
-//                        new Thread(() -> {
-//                            try {
-//                                final LocalTime open  = LocalTime.of(9, 0),
-//                                        close = LocalTime.of(15, 0); // ← العيادة تنتهي 3PM
-//                                final int slotMinutes = 20;
-//
-//                                var slots = doctorDAO.listFreeSlots(r.getDoctorId(), r.getDate(), open, close, slotMinutes);
-//
-//                                if (r.getDate().equals(LocalDate.now())) {
-//                                    LocalDateTime now = LocalDateTime.now().withSecond(0).withNano(0);
-//                                    int mod = now.getMinute() % slotMinutes;
-//                                    LocalDateTime cutoff = (mod == 0) ? now : now.plusMinutes(slotMinutes - mod);
-//                                    slots.removeIf(s -> s.from().isBefore(cutoff));
-//                                }
-//
-//                                Platform.runLater(() -> {
-//                                    if (slots.isEmpty()) {
-//                                        cb.getItems().clear();
-//                                        cb.setPromptText("Out of working hours");
-//                                        cb.setDisable(true);
-//                                    } else {
-//                                        cb.setDisable(false);
-//                                        cb.setItems(FXCollections.observableArrayList(slots));
-//                                    }
-//                                });
-//                            } catch (Exception ex) {
-//                                Platform.runLater(() -> {
-//                                    cb.getItems().clear();
-//                                    cb.setPromptText("Out of working hours");
-//                                    cb.setDisable(true);
-//                                });
-//                            }
-//                        }, "row-slots").start();
-//                    });
-//                    cb.setOnAction(e -> {
-//                        ApptRow r = getTableView().getItems().get(getIndex());
-//                        var s = cb.getValue();
-//                        if (r != null && s != null) r.setTime(s.from().toLocalTime());
-//                        getTableView().refresh();
-//                    });
-//                }
-//                @Override protected void updateItem(String item, boolean empty) {
-//                    super.updateItem(item, empty);
-//                    if (empty) { setGraphic(null); setText(null); }
-//                    else {
-//                        ApptRow r = getTableView().getItems().get(getIndex());
-//                        if (cb.isDisable()) {
-//                            cb.setPromptText("Out of working hours");
-//                        } else {
-//                            cb.setPromptText(r != null && r.getTime() != null ? fmt12(r.getTime()) : "Select time");
-//                        }
-//                        setGraphic(cb); setText(null);
-//                    }
-//                }
-//            });
-            colTimeAppointment.setCellFactory(col -> new TableCell<ApptRow, String>() {
-                private final ComboBox<DoctorDAO.Slot> cb = new ComboBox<>();
-                {
-                    cb.getStyleClass().add("box");
-                    cb.setMaxWidth(Double.MAX_VALUE);
-                    cb.setVisibleRowCount(12);
-                    cb.setConverter(new StringConverter<>() {
-                        @Override public String toString(DoctorDAO.Slot s){
-                            if (s==null) return "";
-                            return s.from().toLocalTime().format(SLOT_FMT_12H) + " \u2192 " +
-                                    s.to().toLocalTime().format(SLOT_FMT_12H);
-                        }
-                        @Override public DoctorDAO.Slot fromString(String s){ return null; }
-                    });
-                    cb.setOnMousePressed(e -> {
-                        if (cb.getItems().isEmpty()) {
-                            ApptRow r = getRowSafely();
-                            if (r != null) { loadSlots(r); Platform.runLater(cb::show); }
-                        }
-                    });
-                    cb.setOnAction(e -> {
-                        ApptRow r = getRowSafely();
-                        var s = cb.getValue();
-                        if (r != null && s != null) r.setTime(s.from().toLocalTime());
-                        getTableView().refresh();
-                    });
-                }
-                private ApptRow getRowSafely() {
-                    int i = getIndex();
-                    return (i < 0 || i >= getTableView().getItems().size()) ? null : getTableView().getItems().get(i);
-                }
-                private void loadSlots(ApptRow r) {
-                    cb.setDisable(false); cb.setPromptText("Loading..."); cb.getItems().clear();
-                    if (r.getDoctorId() == 0 || r.getDate() == null) {
-                        cb.setPromptText("Select doctor/date"); cb.setDisable(true); return;
-                    }
-                    new Thread(() -> {
-                        try {
-                            final LocalTime open = LocalTime.of(9,0), close = LocalTime.of(15,0);
-                            final int slotMin = 20;
-                            var slots = doctorDAO.listFreeSlots(r.getDoctorId(), r.getDate(), open, close, slotMin);
-                            if (r.getDate().equals(LocalDate.now())) {
-                                LocalDateTime now = LocalDateTime.now().withSecond(0).withNano(0);
-                                int mod = now.getMinute() % slotMin;
-                                LocalDateTime cutoff = (mod==0) ? now : now.plusMinutes(slotMin - mod);
-                                slots.removeIf(s -> s.from().isBefore(cutoff));
-                                if (now.toLocalTime().isAfter(close)) slots.clear();
+            // تحرير الوقت كنص: يقبل HH:mm أو hh:mm AM/PM
+            colStartTime.setCellFactory(
+                    javafx.scene.control.cell.TextFieldTableCell.forTableColumn(
+                            new javafx.util.StringConverter<String>() {
+                                @Override public String toString(String s) { return s == null ? "" : s; }
+                                @Override public String fromString(String s) { return (s == null) ? null : s.trim(); }
                             }
-                            Platform.runLater(() -> {
-                                if (slots.isEmpty()) {
-                                    cb.getItems().clear();
-                                    cb.setPromptText("Out of working hours");
-                                    cb.setDisable(true);
-                                } else {
-                                    cb.setDisable(false);
-                                    cb.setItems(FXCollections.observableArrayList(slots));
-                                    cb.setPromptText("Select time");
-                                }
-                            });
-                        } catch (Exception ex) {
-                            Platform.runLater(() -> {
-                                cb.getItems().clear();
-                                cb.setPromptText("Out of working hours");
-                                cb.setDisable(true);
-                            });
-                        }
-                    }, "slots-preload").start();
-                }
-                @Override protected void updateItem(String itm, boolean empty) {
-                    super.updateItem(itm, empty);
-                    if (empty) { setGraphic(null); setText(null); return; }
-                    ApptRow r = getRowSafely();
-                    loadSlots(r); // **تجهيز مسبق**
-                    cb.setPromptText(r != null && r.getTime()!=null ? fmt12(r.getTime()) : "Select time");
-                    setGraphic(cb); setText(null);
-                }
-            });
+                    )
+            );
 
-//            colTimeAppointment.setCellFactory(col -> new TableCell<>() {
-//                private final ComboBox<DoctorDAO.Slot> cb = new ComboBox<>();
-//                {
-//                    cb.getStyleClass().add("box");                 // ← مهم
-//                    cb.setMaxWidth(Double.MAX_VALUE);
-//                    cb.setConverter(new StringConverter<>() {
-//                        @Override public String toString(DoctorDAO.Slot s) {
-//                            if (s == null) return "";
-//                            return s.from().toLocalTime().format(SLOT_FMT_12H) + " \u2192 " + s.to().toLocalTime().format(SLOT_FMT_12H);
-//                        }
-//                        @Override public DoctorDAO.Slot fromString(String s) { return null; }
-//                    });
-//                    cb.setOnShowing(e -> {
-//                        ApptRow r = getTableView().getItems().get(getIndex());
-//                        if (r == null || r.getDoctorId() == 0 || r.getDate() == null) { cb.getItems().clear(); return; }
-//                        new Thread(() -> {
-//                            try {
-//                                final LocalTime open = LocalTime.of(9,0),
-//                                               close = LocalTime.of(17,0);
-//                                final int slotMinutes = 20;
-//                                var slots = doctorDAO.listFreeSlots(r.getDoctorId(), r.getDate(), open, close, slotMinutes);
-//                                if (r.getDate().equals(LocalDate.now())) {
-//                                    LocalDateTime now = LocalDateTime.now().withSecond(0).withNano(0);
-//                                    int mod = now.getMinute() % slotMinutes;
-//                                    LocalDateTime cutoff = (mod == 0) ? now : now.plusMinutes(slotMinutes - mod);
-//                                    slots.removeIf(s -> s.from().isBefore(cutoff));
-//                                }
-//                                Platform.runLater(() -> cb.setItems(FXCollections.observableArrayList(slots)));
-//                            } catch (Exception ex) {
-//                                Platform.runLater(cb.getItems()::clear);
-//                            }
-//                        }, "row-slots").start();
-//                    });
-//                    cb.setOnAction(e -> {
-//                        ApptRow r = getTableView().getItems().get(getIndex());
-//                        var s = cb.getValue();
-//                        if (r != null && s != null) r.setTime(s.from().toLocalTime());
-//                        getTableView().refresh();
-//                    });
-//                }
-//                @Override protected void updateItem(String item, boolean empty) {
-//                    super.updateItem(item, empty);
-//                    if (empty) { setGraphic(null); setText(null); }
-//                    else {
-//                        ApptRow r = getTableView().getItems().get(getIndex());
-//                        cb.setPromptText(r != null && r.getTime() != null ? fmt12(r.getTime()) : "Select time");
-//                        setGraphic(cb); setText(null);
-//                    }
-//                }
-//            });
-
-            // --- Date editable via DatePicker ---
-            colDateAppointment.setCellFactory(col -> new TableCell<ApptRow, LocalDate>() {
-                private final DatePicker picker = new DatePicker();
-                {
-                    picker.getStyleClass().add("box");             // ← مهم
-                    picker.setOnAction(e -> {
-                        ApptRow r = getTableView().getItems().get(getIndex());
-                        if (r != null) { r.setDate(picker.getValue()); r.setTime(null); }
-                    });
-                }
-                @Override protected void updateItem(LocalDate item, boolean empty) {
-                    super.updateItem(item, empty);
-                    if (empty) { setGraphic(null); setText(null); }
-                    else { picker.setValue(item); setGraphic(picker); setText(null); }
+            colStartTime.setOnEditCommit(ev -> {
+                var row = ev.getRowValue();
+                String txt = ev.getNewValue();
+                if (row == null || txt == null || txt.isBlank()) return;
+                try {
+                    java.time.LocalTime nt;
+                    try {
+                        nt = java.time.LocalTime.parse(txt.trim()); // HH:mm
+                    } catch (Exception e1) {
+                        nt = java.time.LocalTime.parse(
+                                txt.trim().toUpperCase(),
+                                java.time.format.DateTimeFormatter.ofPattern("hh:mm a")
+                        ); // hh:mm AM/PM
+                    }
+                    row.setTime(nt);
+                    if (row.getId() > 0 && row.getDate() != null) {
+                        updateAppointmentStartAt(row.getId(), row.getDate(), nt);
+                    }
+                    if (TableINAppointment != null) TableINAppointment.refresh();
+                    if (row.getId() <= 0) { row.setDirty(true); }
+                    updateDirtyAlert();
+                } catch (Exception ex) {
+                    showError("Invalid time", new RuntimeException("Use HH:mm or hh:mm AM/PM"));
                 }
             });
-
-            // When date changes, clear chosen time (must re-pick a valid slot)
-            colDateAppointment.setOnEditCommit(ev -> {
-                ApptRow r = ev.getRowValue();
-                if (r != null) { r.setDate(ev.getNewValue()); r.setTime(null); }
-                TableINAppointment.refresh();
-            });
-
-            TableINAppointment.setItems(apptEditable);
         }
 
-        // (Removed duplicate/override block for TableINAppointment columns)
-
-
-        // Dashboard table
-        if (TableAppInDashboard != null) {
-//            if (colAppointmentID != null) {
-                colAppointmentID.setCellValueFactory(cd ->
-                        new ReadOnlyObjectWrapper<>(cd.getValue().id));
-//            }
-            colAppintementDateDash.setCellValueFactory(cd -> new SimpleObjectProperty<>(cd.getValue().startAt.toLocalDate()));
-            colAppintementTimeDash.setCellValueFactory(cd -> new SimpleStringProperty(cd.getValue().startAt.toLocalTime().format(SLOT_FMT_12H)));
-            colDoctorNameDash.setCellValueFactory(cd -> new SimpleStringProperty(cd.getValue().doctorName));
-            colPatientNameDash.setCellValueFactory(cd -> new SimpleStringProperty(cd.getValue().patientName));
-
-            if (colActionDash != null) {
-                colActionDash.setCellFactory(col -> new TableCell<DoctorDAO.AppointmentRow, Void>() {
-                    final Button btn = new Button("Complete");
-                    {
-                        btn.getStyleClass().setAll("button", "btn-complete");                        btn.setFocusTraversable(false);
-                        btn.setOnAction(e -> {
-                            DoctorDAO.AppointmentRow row =
-                                    getTableView().getItems().get(getIndex());
-                            if (row == null) return;
-
-                            if (!ReceptionController.this.confirm("Complete Appointment",
-                                    "Mark this appointment as completed?")) return;
-
-                            new Thread(() -> {
-                                try {
-                                    // 1) حدّث الحالة في الداتابيز
-                                    doctorDAO.markAppointmentCompleted(row.id);
-
-                                    new Thread(ReceptionController.this::updateAppointmentCounters, "appt-counts").start();
-                                    Platform.runLater(ReceptionController.this::updatePatientDetailsChart);
-
-                                    // 2) شيل السطر من الجدول وحدّث العدّادات والرسم
-                                    Platform.runLater(() -> {
-                                        apptData.remove(row);
-                                        ReceptionController.this.updateAppointmentCounters();
-                                        if (appointmentStatusChart != null) appointmentStatusChart.getData().clear();
-                                    });
-                                } catch (Exception ex) {
-                                    Platform.runLater(() -> ReceptionController.this.showError("Complete Appointment", ex));
-                                }
-                            }, "appt-complete").start();
-                        });
-                    }
-
-                    @Override
-                    protected void updateItem(Void item, boolean empty) {
-                        super.updateItem(item, empty);
-                        setGraphic(empty ? null : btn);
-                    }
-                });
-            }
-
-            TableAppInDashboard.setItems(apptData);
-            TableAppInDashboard.getSelectionModel().selectedItemProperty()
-                .addListener((obs, oldSel, newSel) -> ReceptionController.this.updatePatientDetailsChart());
+        // Date as DatePicker
+        if (colDateAppointment != null) {
+            colDateAppointment.setCellFactory(col -> datePickerCell());
         }
-    }
+        // Session time column: ثابت 20 دقيقة، غير قابل للتحرير
+        if (colSessionTime != null) {
+            colSessionTime.setEditable(true);
+            colSessionTime.setCellValueFactory(cd -> new SimpleIntegerProperty(
+                    cd.getValue().getSessionTime() > 0 ? cd.getValue().getSessionTime() : DEFAULT_SESSION_MIN
+            ));
 
-//        if (patientDetails == null) return;
-//        patientDetails.getData().clear();
-//        var series = new javafx.scene.chart.XYChart.Series<String, Number>();
-//        series.setName("Selected");
-//        // Example: show 1 bar for specialty and 1 for status length (purely illustrative)
-//        series.getData().add(new javafx.scene.chart.XYChart.Data<>(row.specialty, 1));
-//        series.getData().add(new javafx.scene.chart.XYChart.Data<>(row.status, 1));
-//        //noinspection unchecked
-//        ((BarChart<String, Number>) (BarChart<?, ?>) patientDetails).getData().add(series);
-//    }
+            // محرر نصي يسمح بإدخال رقم فقط
+            colSessionTime.setCellFactory(TextFieldTableCell.forTableColumn(new javafx.util.StringConverter<Number>() {
+                @Override
+                public String toString(Number n) {
+                    return (n == null) ? "" : n.toString();
+                }
 
-    private void updatePatientDetailsChart() {
-        if (appointmentStatusChart == null) return;
+                @Override
+                public Number fromString(String s) {
+                    try {
+                        int v = Integer.parseInt(s.trim());
+                        return v > 0 ? v : DEFAULT_SESSION_MIN;
+                    } catch (Exception e) {
+                        return DEFAULT_SESSION_MIN; // fallback
+                    }
+                }
+            }));
 
-        Platform.runLater(() -> {
-            appointmentStatusChart.getData().clear();
-            XYChart.Series<String, Number> series = new XYChart.Series<>();
-            series.setName("Appointments");
+            // عند تعديل القيمة
+            colSessionTime.setOnEditCommit(ev -> {
+                ApptRow row = ev.getRowValue();
+                int newVal = ev.getNewValue().intValue();
+                if (newVal <= 0) newVal = DEFAULT_SESSION_MIN; // دائماً على الأقل 20
+                row.setSessionTime(newVal);
+                row.setDirty(true);
+                updateDirtyAlert();
 
-            try {
-                int completed = doctorDAO.countCompletedAppointments();
-                int scheduled = doctorDAO.countScheduledAppointments();
+                if (TableINAppointment != null)
+                    TableINAppointment.refresh();
+            });
+        }
 
-                series.getData().add(new XYChart.Data<>("Completed", completed));
-                series.getData().add(new XYChart.Data<>("Scheduled", scheduled));
+        if (colRoomNumber != null) {
+            colRoomNumber.setCellValueFactory(cd -> cd.getValue().roomNumberProperty());
+            colRoomNumber.setCellFactory(col -> roomComboInlineCell());
+            colRoomNumber.setEditable(true);
+        }
 
-            } catch (SQLException e) {
-                showError("Chart Load", e);
-            }
-
-            appointmentStatusChart.getData().setAll(series);
-        });
+        if (TableINAppointment != null) TableINAppointment.refresh();
     }
 
 
 
     /**
-     * إذا كان للمريض المختار صف مسودة في جدول TableINAppointment فحدده،
-     * وإلا أضِف صفًا جديدًا مع قيم افتراضية قابلة للتعديل.
+     * تهيئة التحرير المباشر على جدول المواعيد
      */
+    private void setupInlineEditing() {
+        if (TableINAppointment == null) return;
+
+        // Patient name inline (kept local only)
+        if (colPatientNameAppointment != null) {
+            colPatientNameAppointment.setEditable(true);
+            colPatientNameAppointment.setCellFactory(TextFieldTableCell.forTableColumn());
+            colPatientNameAppointment.setOnEditCommit(ev -> {
+                ApptRow row = ev.getRowValue();
+                String v = safe(ev.getNewValue());
+                if (row == null || v == null) return;
+                row.setPatientName(v);
+                row.setDirty(true);
+                updateDirtyAlert();
+            });
+        }
+
+        // Specialty as ComboBox
+        if (colSpecialty != null) {
+            ensureSpecialtiesLoadedAsync();
+            colSpecialty.setEditable(true);
+            colSpecialty.setCellFactory(ComboBoxTableCell.forTableColumn(specialtyChoices));
+            colSpecialty.setOnEditCommit(ev -> {
+                ApptRow row = ev.getRowValue();
+                String sp = ev.getNewValue();
+                if (row == null || sp == null) return;
+                // حدّث التخصص
+                row.setSpecialty(sp);
+                // Specialty تغيّر ⇒ لازم نلغي أي اختيار دكتور وغرفة
+                row.setDoctorId(0);
+                row.setDoctorName(null);
+                row.setRoomNumber(null);
+                row.setDirty(true);
+                updateDirtyAlert();
+                ensureDoctorsForSpecAsync(sp);  // حمّل قائمة أطباء التخصص الجديد
+                if (TableINAppointment != null) TableINAppointment.refresh();
+            });
+        }
+
+        // Doctor column uses our custom cell that only shows the ComboBox while editing/selected
+        if (colDoctorNameAppointment != null) {
+            colDoctorNameAppointment.setEditable(true);
+            colDoctorNameAppointment.setCellFactory(col -> doctorComboCell());
+        }
+
+        // Room column (by doctorId/date/time)
+        if (colRoomNumber != null) {
+            colRoomNumber.setEditable(true);
+            colRoomNumber.setCellFactory(col -> roomComboInlineCell());
+        }
+
+        // Status column as ComboBox
+        if (colStatusAppointment != null) {
+            ObservableList<String> statuses = FXCollections.observableArrayList("SCHEDULED", "COMPLETED", "CANCELLED");
+            colStatusAppointment.setEditable(true);
+            colStatusAppointment.setCellFactory(ComboBoxTableCell.forTableColumn(statuses));
+            colStatusAppointment.setOnEditCommit(ev -> {
+                ApptRow row = ev.getRowValue();
+                String st = ev.getNewValue();
+                if (row == null || st == null) return;
+                row.setStatus(st);
+                row.setDirty(true);
+                updateDirtyAlert();
+            });
+        }
+    }
+
+    // Add or focus a draft appointment row for a selected patient
     private void addOrFocusDraftForPatient(PatientRow p) {
         if (p == null || TableINAppointment == null) return;
-
-        // 1) ابحث عن صف مسودة موجود لنفس المريض
         for (ApptRow r : apptEditable) {
-            if (r.getPatientId() == p.getPatientId() && (r.isNew() || r.getId() == 0)) {
+            if (p.getFullName().equals(r.getPatientName()) && r.isNew()) {
                 TableINAppointment.getSelectionModel().select(r);
                 TableINAppointment.scrollTo(r);
                 return;
             }
         }
-
-        // 2) أضِف صف مسودة جديد
-        ApptRow draft = new ApptRow();
-        draft.setNew(true);
-        draft.setPatientId(p.getPatientId());
-        draft.setPatientName(p.getFullName());
-        draft.setStatus("PENDING");
-        // عيّن تاريخ اليوم أو تاريخ الـ DatePicker إن وُجد
-        LocalDate d = (AppointmentDate != null && AppointmentDate.getValue() != null)
-                ? AppointmentDate.getValue() : LocalDate.now();
-        draft.setDate(d);
-        draft.setTime(LocalTime.of(9, 0));
-        // إن كان هناك طبيب محدد في الكمبو، استخدمه كسياق افتراضي
-        if (avilabelDoctorApp != null && avilabelDoctorApp.getValue() != null) {
-            var doc = avilabelDoctorApp.getValue();
-            draft.setDoctorId(doc.doctorId);
-            draft.setDoctorName(doc.fullName);
-            draft.setSpecialty(doc.specialty);
-        }
-        apptEditable.add(0, draft);
-        TableINAppointment.getSelectionModel().select(draft);
-        TableINAppointment.scrollTo(draft);
+        ApptRow r = new ApptRow();
+        r.setId(0);
+        r.setNew(true);
+        r.setDirty(true);
+        r.setPatientName(p.getFullName());
+        r.setStatus("SCHEDULED");
+        r.setDate(AppointmentDate != null && AppointmentDate.getValue() != null ? AppointmentDate.getValue() : LocalDate.now());
+        apptEditable.add(0, r);
+        TableINAppointment.getSelectionModel().select(r);
+        TableINAppointment.scrollTo(r);
     }
 
-    /** أضف صفًا فارغًا (مسودة) يدويًا من زر addNewRow */
+    // Add a blank draft row from the + button
     private void addBlankDraftRow() {
         if (TableINAppointment == null) return;
-        ApptRow draft = new ApptRow();
-        draft.setNew(true);
-        draft.setStatus("PENDING");
-        draft.setDate((AppointmentDate != null && AppointmentDate.getValue() != null)
-                ? AppointmentDate.getValue() : LocalDate.now());
-        draft.setTime(LocalTime.of(9, 0));
-        // حاول تعبئة المريض من الحقول/الليبلز إن كانت موجودة
-        try {
-            String nid = (getPatientID != null) ? getPatientID.getText() : null;
-            if (nid != null && !nid.isBlank()) {
-                Long pid = doctorDAO.findPatientIdByNationalId(nid.trim());
-                if (pid != null) {
-                    draft.setPatientId(pid);
-                    if (getPatientName != null) draft.setPatientName(getPatientName.getText());
-                }
-            }
-        } catch (Exception ignored) { }
-        // الطبيب المختار (إن وُجد)
-        if (avilabelDoctorApp != null && avilabelDoctorApp.getValue() != null) {
-            var doc = avilabelDoctorApp.getValue();
-            draft.setDoctorId(doc.doctorId);
-            draft.setDoctorName(doc.fullName);
-            draft.setSpecialty(doc.specialty);
-        }
-        apptEditable.add(0, draft);
-        TableINAppointment.getSelectionModel().select(draft);
-        TableINAppointment.scrollTo(draft);
+        ApptRow r = new ApptRow();
+//        r.setId(0);
+        r.setNew(true);
+        r.setDirty(true);
+        r.setStatus("PENDING");
+        r.setDate(LocalDate.now());
+        apptEditable.add(0, r);
+        TableINAppointment.getSelectionModel().select(r);
+        TableINAppointment.scrollTo(r);
     }
 
+    // Clear mini booking form on the left (specialty/doctor/slot)
+    private void doClearAppointmentForm() {
+        if (DoctorspecialtyApp != null) DoctorspecialtyApp.getSelectionModel().clearSelection();
+        if (avilabelDoctorApp != null) avilabelDoctorApp.getSelectionModel().clearSelection();
+        if (AppointmentDate != null) AppointmentDate.setValue(LocalDate.now());
+        if (cmbSlots != null) cmbSlots.getItems().clear();
+    }
+
+    // Load appointments table once (used at init)
     private void loadAppointmentsTable() {
         try {
-            var rows = doctorDAO.listScheduledAppointments(); // فقط الـ SCHEDULED
-            ObservableList<ApptRow> mapped = FXCollections.observableArrayList();
-            for (var r : rows) {
+            var apptRows = doctorDAO.listScheduledAppointments();
+            var mapped = FXCollections.<ApptRow>observableArrayList();
+            for (var r : apptRows) {
                 ApptRow ar = new ApptRow();
                 ar.setId(r.id);
-                ar.setDoctorId(r.id);
+                ar.setDoctorId(r.doctorId);
                 ar.setDoctorName(r.doctorName);
                 ar.setPatientName(r.patientName);
                 ar.setSpecialty(r.specialty);
                 ar.setStatus(r.status);
-                ar.setDate(r.startAt.toLocalDate());
-                ar.setTime(r.startAt.toLocalTime());
+                java.time.LocalDateTime ldt2 = toLocal(r.startAt);
+                if (ldt2 != null) {
+                    ar.setDate(ldt2.toLocalDate());
+                    ar.setTime(ldt2.toLocalTime());
+                }
+                ar.setRoomNumber(r.location);
                 ar.setNew(false);
                 ar.setDirty(false);
                 mapped.add(ar);
             }
-            Platform.runLater(() -> apptEditable.setAll(mapped));
-        } catch (Exception e) {
-            showError("Load Appointments", e);
+            Platform.runLater(() -> TableUtils.applyDelta(apptEditable, mapped, ApptRow::getId));
+        } catch (Exception ex) {
+            Platform.runLater(() -> showError("Load Appointments", ex));
         }
     }
 
@@ -2149,169 +2209,281 @@ public class ReceptionController {
             int patients = doctorDAO.countPatients();
             int completed = doctorDAO.countCompletedAppointments();
             int scheduled = doctorDAO.countScheduledAppointments();
-
             Platform.runLater(() -> {
                 if (NumberOfTotalDoctors != null) NumberOfTotalDoctors.setText(String.valueOf(doctors));
                 if (NumberOfTotalAppointments != null) NumberOfTotalAppointments.setText(String.valueOf(appts));
                 if (NumberOfTotalPatients != null) NumberOfTotalPatients.setText(String.valueOf(patients));
                 if (patientCompleteNum != null) patientCompleteNum.setText(String.valueOf(completed));
                 if (RemainingNum != null) RemainingNum.setText(String.valueOf(scheduled));
+                updatePatientDetailsChart();
             });
-        } catch (Exception e) {
-            showError("Counters", e);
+        } catch (Exception ex) {
+            Platform.runLater(() -> showError("Counters", ex));
         }
     }
 
-//    private void wireDashboardAppointmentsSearch() {
-//        if (searchAppointmentDach == null || TableAppInDashboard == null) return;
-//
-//        // filtered/sorted view
-//        FilteredList<DoctorDAO.AppointmentRow> filteredAppts = new FilteredList<>(apptData, a -> true);
-//        searchAppointmentDach.textProperty().addListener((obs, old, q) -> {
-//            String s = (q == null) ? "" : q.trim().toLowerCase();
-//            if (s.isEmpty()) {
-//                filteredAppts.setPredicate(a -> true);
-//            } else {
-//                filteredAppts.setPredicate(a ->
-//                        a.doctorName.toLowerCase().contains(s) ||
-//                                a.patientName.toLowerCase().contains(s) ||
-//                                a.specialty.toLowerCase().contains(s) ||
-//                                a.status.toLowerCase().contains(s) ||
-//                                a.startAt.toLocalDate().toString().contains(s)
-//                );
-//            }
-//        });
-//        SortedList<DoctorDAO.AppointmentRow> sorted = new SortedList<>(filteredAppts);
-//        sorted.comparatorProperty().bind(TableAppInDashboard.comparatorProperty());
-//        TableAppInDashboard.setItems(sorted);
-//    }
-    // هذه بعرض المواعيد المجدولة فقط
-    private void wireDashboardAppointmentsSearch() {
-        if (searchAppointmentDach == null || TableAppInDashboard == null) return;
+    // Update start_at field for an appointment
+    private void updateAppointmentStartAt(long id, LocalDate d, LocalTime t) {
+        if (id <= 0 || d == null || t == null) return;
+        final String sql = "UPDATE appointments SET appointment_date = ?, updated_at = now() WHERE id = ?";
+        try (Connection c = Database.get(); PreparedStatement ps = c.prepareStatement(sql)) {
+            java.time.OffsetDateTime startAt = toAppOffset(d, t); // Asia/Gaza
+            ps.setObject(1, startAt); // write timestamptz correctly
+            ps.setLong(2, id);
+            ps.executeUpdate();
+            try (PreparedStatement n = c.prepareStatement("SELECT pg_notify('appointments_changed','update')")) {
+                n.execute();
+            }
+        } catch (SQLException e) {
+            Platform.runLater(() -> showError("Update appointment_date", e));
+        }
+    }
 
-        searchAppointmentDach.textProperty().addListener((obs, old, q) -> {
-            new Thread(() -> {
-                try {
-                    var rows = (q == null || q.isBlank())
-                            ? doctorDAO.listScheduledAppointments()
-                            : doctorDAO.searchScheduledAppointments(q);
-                    Platform.runLater(() -> apptData.setAll(rows));
-                } catch (Exception e) {
-                    Platform.runLater(() -> showError("Search Appointments", e));
-                }
-            }, "search-appts").start();
-        });
+    // Delete currently selected appointment
+    private void doDeleteAppointment() {
+        var row = (TableINAppointment == null) ? null : TableINAppointment.getSelectionModel().getSelectedItem();
+        if (row == null) { showWarn("Delete", "Select an appointment row first."); return; }
+        if (!confirm("Delete", "Delete appointment #" + row.getId() + "?")) return;
+
+        try (Connection c = Database.get()) {
+            try (PreparedStatement ps = c.prepareStatement("DELETE FROM appointments WHERE id = ?")) {
+                ps.setLong(1, row.getId());
+                ps.executeUpdate();
+            }
+            try (PreparedStatement n = c.prepareStatement("SELECT pg_notify('appointments_changed','delete')")) {
+                n.execute();
+            }
+            showInfo("Delete", "Appointment deleted.");
+            scheduleCoalescedRefresh();
+        } catch (Exception e) {
+            showError("Delete Appointment", e);
+        }
     }
 
     private void doInsertAppointment() {
         try {
-            var doc = (avilabelDoctorApp != null) ? avilabelDoctorApp.getValue() : null;
-            if (doc == null) {
-                showWarn("Validation", "Select a doctor.");
-                return;
+            Long doctorId = null;
+            LocalDate day = null;
+            LocalTime time = null;
+            Integer duration = null;
+            String location = null;
+
+            // ===== Path A: from mini booking form (preferred) =====
+            var formDoc = (avilabelDoctorApp == null) ? null : avilabelDoctorApp.getValue();
+            var formDay = (AppointmentDate == null) ? null : AppointmentDate.getValue();
+            var formSlot = (cmbSlots == null) ? null : cmbSlots.getValue();
+            if (formDoc != null && formDay != null && formSlot != null) {
+                doctorId = formDoc.doctorId;
+                day = formDay;
+                time = formSlot.from().toLocalTime();
+                duration = (int) java.time.Duration.between(formSlot.from(), formSlot.to()).toMinutes();
             }
 
-            String nid = (getPatientID != null) ? getPatientID.getText() : null;
-            if (nid == null || nid.isBlank()) {
-                showWarn("Validation", "Select a patient first.");
-                return;
-            }
-
-            var patientId = doctorDAO.findPatientIdByNationalId(nid);
-            if (patientId == null) {
-                showWarn("Validation", "Patient not found.");
-                return;
-            }
-
-            var day = (AppointmentDate != null) ? AppointmentDate.getValue() : null;
-            var slot = (cmbSlots != null) ? cmbSlots.getValue() : null;
-            if (day == null || slot == null) {
-                showWarn("Validation", "Select date and slot.");
-                return;
-            }
-
-            var startAt = slot.from().atOffset(java.time.ZoneOffset.UTC);
-            Long createdBy = null;
-            if (UserIdLabel != null && !UserIdLabel.getText().isBlank()) {
-                try {
-                    createdBy = Long.parseLong(UserIdLabel.getText().trim());
-                } catch (Exception ignored) {
+            // ===== Path B: from selected table row (draft row) =====
+            if (doctorId == null || day == null || time == null) {
+                ApptRow row = (TableINAppointment == null) ? null : TableINAppointment.getSelectionModel().getSelectedItem();
+                if (row != null) {
+                    if (row.getDoctorId() > 0) doctorId = row.getDoctorId();
+                    if (row.getDate() != null) day = row.getDate();
+                    if (row.getTime() != null) time = row.getTime();
+                    if (row.getRoomNumber() != null && !row.getRoomNumber().isBlank()) location = row.getRoomNumber();
+                    // استخدم مدة الجدولة إن وُجدت وإلا القيمة الافتراضية
+                    duration = (row.getSessionTime() > 0) ? row.getSessionTime() : DEFAULT_SESSION_MIN;
                 }
             }
 
-            doctorDAO.insertAppointment(doc.doctorId, patientId, startAt, 20, createdBy);
-            showInfo("Insert", "Appointment inserted successfully!");
-            loadAppointmentsTable();
-            updateAppointmentCounters();
-            refreshSlots(); // حتى يختفي الوقت الذي حُجز للتو
+            // ===== Validation =====
+            if (doctorId == null || day == null || time == null) {
+                showWarn("Insert Appointment", "Select specialty, doctor and time slot.");
+                return;
+            }
+
+            Long patientId = resolvePatientId();
+            if (patientId == null) {
+                showWarn("Insert Appointment", "Invalid Patient. Select a patient from the table or enter a valid Patient ID / National ID.");
+                return;
+            }
+
+            if (duration == null || duration <= 0) duration = DEFAULT_SESSION_MIN;
+            java.time.OffsetDateTime startAt = toAppOffset(day, time);
+
+            final String sql = """
+                INSERT INTO appointments
+                  (doctor_id, patient_id, appointment_date, duration_minutes, status, location, created_by, created_at, updated_at)
+                VALUES
+                  (?, ?, ?, ?, 'SCHEDULED', ?, ?, now(), now())
+                RETURNING id, doctor_id, patient_id, appointment_date, duration_minutes, status, location
+            """;
+
+            ApptRow draft = (TableINAppointment == null) ? null : TableINAppointment.getSelectionModel().getSelectedItem();
+            try (Connection c = Database.get(); PreparedStatement ps = c.prepareStatement(sql)) {
+                ps.setLong(1, doctorId);
+                ps.setLong(2, patientId);
+                ps.setObject(3, startAt);
+                ps.setInt(4, duration);
+                if (location != null) ps.setString(5, location); else ps.setNull(5, Types.VARCHAR);
+                ps.setLong(6, Session.get().getId());
+
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) {
+                        // ابني صفًا جديدًا من قيم الداتابيز
+                        ApptRow ar = new ApptRow();
+                        ar.setId(rs.getLong("id"));
+                        ar.setDoctorId(rs.getLong("doctor_id"));
+                        ar.setDoctorName((formDoc != null) ? formDoc.fullName : (draft != null ? draft.getDoctorName() : null));
+                        ar.setPatientName((draft != null) ? draft.getPatientName() : null); // للعرض فقط
+                        ar.setSpecialty((draft != null) ? draft.getSpecialty() : null);
+                        ar.setStatus(rs.getString("status"));
+                        java.time.OffsetDateTime odt = rs.getObject("appointment_date", java.time.OffsetDateTime.class);
+                        java.time.LocalDateTime ldt = toLocal(odt);
+                        if (ldt != null) {
+                            ar.setDate(ldt.toLocalDate());
+                            ar.setTime(ldt.toLocalTime());
+                        }
+                        String loc = rs.getString("location");
+                        ar.setRoomNumber(loc != null ? loc : (draft != null ? draft.getRoomNumber() : null));
+                        ar.setNew(false);
+                        ar.setDirty(false);
+
+                        // أزل صف المسودة أو استبدله مباشرة بالمدخل الجديد
+                        if (draft != null && apptEditable.contains(draft)) {
+                            int idx = apptEditable.indexOf(draft);
+                            apptEditable.set(idx, ar);
+                        } else {
+                            apptEditable.add(0, ar);
+                        }
+
+                        // اختَر الصف الجديد ومرّره للفوكس
+                        if (TableINAppointment != null) {
+                            TableINAppointment.getSelectionModel().select(ar);
+                            TableINAppointment.scrollTo(ar);
+                        }
+                    }
+                }
+
+                try (PreparedStatement n = c.prepareStatement("SELECT pg_notify('appointments_changed','insert')")) { n.execute(); }
+            }
+
+            showInfo("Insert", "Appointment created.");
+            scheduleCoalescedRefresh();
         } catch (Exception e) {
             showError("Insert Appointment", e);
         }
     }
 
     private void doUpdateAppointment() {
-        if (TableINAppointment == null) {
-            showWarn("Update", "Appointments table not available.");
-            return;
-        }
-        //noinspection unchecked
-        var row = (DoctorDAO.AppointmentRow) ((TableView<?>) TableINAppointment).getSelectionModel().getSelectedItem();
-        if (row == null) {
-            showWarn("Update", "Select an appointment.");
-            return;
-        }
-        var slot = (cmbSlots != null) ? cmbSlots.getValue() : null;
-        if (slot == null) {
-            showWarn("Update", "Select new slot.");
-            return;
-        }
+        var row = (TableINAppointment == null) ? null : TableINAppointment.getSelectionModel().getSelectedItem();
+        if (row == null) { showWarn("Update", "Select an appointment row first."); return; }
 
-        try {
-            doctorDAO.updateAppointmentTime(row.id, slot.from().atOffset(java.time.ZoneOffset.UTC), 20);
+        try (Connection c = Database.get()) {
+            String sql = "UPDATE appointments SET doctor_id=?, appointment_date=?, duration_minutes=?, location=?, status=?::appt_status, updated_at=now() WHERE id=?";
+            try (PreparedStatement ps = c.prepareStatement(sql)) {
+                java.time.OffsetDateTime startAt = (row.getDate() != null && row.getTime() != null)
+                        ? toAppOffset(row.getDate(), row.getTime())
+                        : null;
+                int duration = (row.getSessionTime() > 0) ? row.getSessionTime() : DEFAULT_SESSION_MIN;
+
+                ps.setLong(1, row.getDoctorId());
+                if (startAt != null) ps.setObject(2, startAt);
+                else ps.setNull(2, java.sql.Types.TIMESTAMP_WITH_TIMEZONE);
+                ps.setInt(3, duration);
+                if (row.getRoomNumber() != null) ps.setString(4, row.getRoomNumber()); else ps.setNull(4, Types.VARCHAR);
+
+                if (row.getStatus() != null && !row.getStatus().isBlank()) {
+                    ps.setString(5, row.getStatus());
+                } else {
+                    ps.setNull(5, Types.OTHER); // ENUM
+                }
+
+                ps.setLong(6, row.getId());
+                ps.executeUpdate();
+            }
+            try (PreparedStatement n = c.prepareStatement("SELECT pg_notify('appointments_changed','update')")) {
+                n.execute();
+            }
             showInfo("Update", "Appointment updated.");
-            loadAppointmentsTable();
-            refreshSlots();
+            scheduleCoalescedRefresh();
         } catch (Exception e) {
             showError("Update Appointment", e);
         }
     }
 
-    private void doDeleteAppointment() {
-        if (TableINAppointment == null) {
-            showWarn("Delete", "Appointments table not available.");
-            return;
-        }
-        //noinspection unchecked
-        var row = (DoctorDAO.AppointmentRow) ((TableView<?>) TableINAppointment).getSelectionModel().getSelectedItem();
-        if (row == null) {
-            showWarn("Delete", "Select an appointment.");
-            return;
-        }
 
+    private void wireDashboardAppointmentsSearch() { /* optional: implement filtering for dashboard table */ }
+
+    private void loadDoctorsBG() { /* optional: load doctors into doctorData if needed */ }
+
+    private void updatePatientDetailsChart() {
+        if (appointmentStatusChart == null) return;
+        appointmentStatusChart.getData().clear();
+        XYChart.Series<String, Number> s = new XYChart.Series<>();
+        s.setName("Appointments");
+        s.getData().add(new XYChart.Data<>("Scheduled", apptEditable.stream().filter(r -> "SCHEDULED".equalsIgnoreCase(r.getStatus())).count()));
+        s.getData().add(new XYChart.Data<>("Completed", apptEditable.stream().filter(r -> "COMPLETED".equalsIgnoreCase(r.getStatus())).count()));
+        s.getData().add(new XYChart.Data<>("Cancelled", apptEditable.stream().filter(r -> "CANCELLED".equalsIgnoreCase(r.getStatus())).count()));
+        appointmentStatusChart.getData().add(s);
+    }
+
+
+    // Graceful shutdown for listeners/executors
+    void shutdown() {
+        try { if (apptDbListener != null) apptDbListener.close(); } catch (Exception ignore) {}
+        try { autoRefreshExec.shutdownNow(); } catch (Exception ignore) {}
+        try { if (monitor != null) monitor.stop(); } catch (Exception ignore) {}
+    }
+//}
+    /** Resolve patient_id from UI: try selected patient row; then try numeric id; then fallback to national_id (9-digit). */
+    private Long resolvePatientId() {
+        // 1) From selected patient row in patients table (most reliable)
         try {
-            doctorDAO.deleteAppointment(row.id);
-            showInfo("Delete", "Appointment deleted.");
-            loadAppointmentsTable();
-            updateAppointmentCounters();
-            refreshSlots();
-        } catch (Exception e) {
-            showError("Delete Appointment", e);
+            PatientRow sel = (patientTable == null) ? null : patientTable.getSelectionModel().getSelectedItem();
+            if (sel != null && sel.getPatientId() > 0) return sel.getPatientId();
+        } catch (Exception ignore) {}
+
+        // 2) From text field (could be internal id or national id)
+        String raw = (getPatientID == null) ? null : getPatientID.getText();
+        if (raw == null) raw = (PatientIdTextField == null) ? null : PatientIdTextField.getText();
+        if (raw == null) return null;
+        String s = raw.trim();
+        if (s.isEmpty()) return null;
+
+        // 2a) If numeric and not 9 digits, treat as internal patients.id
+        if (s.matches("\\d+") && s.length() != 9) {
+            long id = Long.parseLong(s);
+            if (patientExistsById(id)) return id;
         }
+
+        // 2b) If 9-digit, treat as national_id and lookup patients.id via users
+        if (s.matches("\\d{9}")) {
+            Long pid = findPatientIdByNationalId(s);
+            if (pid != null) return pid;
+        }
+
+        // 2c) Last chance: numeric direct id (even if 9 digits) – verify existence
+        if (s.matches("\\d+")) {
+            long id = Long.parseLong(s);
+            if (patientExistsById(id)) return id;
+        }
+
+        return null;
     }
 
-    private void doClearAppointmentForm() {
-        if (PatientNameForAppointment != null) PatientNameForAppointment.clear();
-        if (PatientIDForAppointment != null) PatientIDForAppointment.clear();
-        if (AppointmentDate != null) AppointmentDate.setValue(LocalDate.now());
-        if (cmbSlots != null) cmbSlots.getItems().clear();
-        if (DoctorspecialtyApp != null) DoctorspecialtyApp.getSelectionModel().clearSelection();
-        if (avilabelDoctorApp != null) avilabelDoctorApp.getItems().clear();
+    private boolean patientExistsById(long id) {
+        final String sql = "SELECT 1 FROM patients WHERE id = ?";
+        try (Connection c = Database.get(); PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setLong(1, id);
+            try (ResultSet rs = ps.executeQuery()) { return rs.next(); }
+        } catch (SQLException e) { return false; }
     }
 
-    // استدعِ هذه مثلاً في onCloseRequest أو أثناء خروج المستخدم
-    public void shutdown() {
-        if (autoRefreshExec != null && !autoRefreshExec.isShutdown()) {
-            autoRefreshExec.shutdownNow();
-        }
+    private Long findPatientIdByNationalId(String nid) {
+        final String sql = "SELECT p.id FROM patients p JOIN users u ON u.id = p.user_id WHERE u.national_id = ?";
+        try (Connection c = Database.get(); PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setString(1, nid);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) return rs.getLong(1);
+            }
+        } catch (SQLException ignore) {}
+        return null;
     }
 }

@@ -4,6 +4,7 @@ import com.example.healthflow.db.Database;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -429,6 +430,7 @@ public class DoctorDAO {
         public final String patientName;
         public final String specialty;
         public final String status;
+        public String location;
 
         public AppointmentRow(long id, long doctorId, long patientId,
                               java.time.OffsetDateTime startAt,
@@ -450,39 +452,7 @@ public class DoctorDAO {
     /**
      * يعيد كل المواعيد مع اسم الدكتور/المريض والتخصص والحالة.
      */
-//    public java.util.List<AppointmentRow> listAppointments() throws SQLException {
-//        final String sql = """
-//            SELECT
-//                a.id,
-//                a.appointment_date,
-//                du.full_name AS doctor_name,
-//                pu.full_name AS patient_name,
-//                d.specialty,
-//                a.status::text AS status
-//            FROM appointments a
-//            JOIN doctors d      ON d.id = a.doctor_id
-//            JOIN users  du      ON du.id = d.user_id
-//            JOIN patients p     ON p.id = a.patient_id
-//            JOIN users  pu      ON pu.id = p.user_id
-//            ORDER BY a.appointment_date DESC
-//        """;
-//        try (var c = Database.get();
-//             var ps = c.prepareStatement(sql);
-//             var rs = ps.executeQuery()) {
-//            var out = new java.util.ArrayList<AppointmentRow>();
-//            while (rs.next()) {
-//                out.add(new AppointmentRow(
-//                        rs.getLong("id"),
-//                        rs.getLong("doctor_id"),
-//                        rs.getLong("patient_id"),
-//                        rs.getObject("appointment_date", OffsetDateTime.class),
-//                        rs.getString("doctor_name"),
-//                        rs.getString("patient_name"),
-//                        rs.getString("specialty"), rs.getString("status")));
-//            }
-//            return out;
-//        }
-//    }
+
 
     public java.util.List<AppointmentRow> listAppointments() throws SQLException {
         final String sql = """
@@ -490,7 +460,7 @@ public class DoctorDAO {
             a.id,
             a.doctor_id,
             a.patient_id,
-            a.appointment_date AT TIME ZONE 'UTC' AS start_at,
+            a.appointment_date  AS start_at,
             du.full_name AS doctor_name,
             pu.full_name AS patient_name,
             d.specialty,
@@ -692,6 +662,18 @@ public class DoctorDAO {
         }
     }
 
+    public long findIdByName(String fullName) throws SQLException {
+        String sql = "SELECT id FROM doctors WHERE full_name = ?";
+        try (Connection c = Database.get();
+             PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setString(1, fullName);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) return rs.getLong("id");
+            }
+        }
+        throw new SQLException("Doctor not found: " + fullName);
+    }
+
     public void markAppointmentCompleted(long apptId) throws SQLException {
         String sql = "UPDATE appointments SET status = 'COMPLETED', updated_at = NOW() WHERE id = ?";
         try (Connection c = Database.get();
@@ -701,45 +683,48 @@ public class DoctorDAO {
         }
     }
 
-    public List<AppointmentRow> listScheduledAppointments() throws SQLException {
-        final String sql = """
-            SELECT a.id,
-                   a.doctor_id,
-                   a.patient_id,
-                   a.appointment_date AT TIME ZONE 'UTC' AS start_at,
-                   udoc.full_name  AS doctor_name,
-                   up.full_name    AS patient_name,
-                   a.status::text  AS status,
-                   d.specialty     AS specialty
-            FROM appointments a
-            JOIN doctors d  ON d.id = a.doctor_id
-            JOIN users udoc ON udoc.id = d.user_id
-            JOIN patients p ON p.id = a.patient_id
-            JOIN users up   ON up.id = p.user_id
-            WHERE a.status = 'SCHEDULED'
-            ORDER BY a.appointment_date
-            """;
+public List<AppointmentRow> listScheduledAppointments() throws SQLException {
+    final String sql = """
+        SELECT a.id,
+               a.doctor_id,
+               a.patient_id,
+               a.appointment_date AT TIME ZONE 'UTC' AS start_at,
+               udoc.full_name  AS doctor_name,
+               up.full_name    AS patient_name,
+               a.status::text  AS status,
+               d.specialty     AS specialty,
+               a.location      AS location
+        FROM appointments a
+        JOIN doctors d  ON d.id = a.doctor_id
+        JOIN users udoc ON udoc.id = d.user_id
+        JOIN patients p ON p.id = a.patient_id
+        JOIN users up   ON up.id = p.user_id
+        WHERE a.status = 'SCHEDULED'
+        ORDER BY a.appointment_date
+        """;
 
-        try (var c = Database.get();
-             var ps = c.prepareStatement(sql);
-             var rs = ps.executeQuery()) {
+    try (var c = Database.get();
+         var ps = c.prepareStatement(sql);
+         var rs = ps.executeQuery()) {
 
-            var rows = new ArrayList<AppointmentRow>();
-            while (rs.next()) {
-                rows.add(new AppointmentRow(
-                        rs.getLong("id"),
-                        rs.getLong("doctor_id"),
-                        rs.getLong("patient_id"),
-                        rs.getObject("start_at", java.time.OffsetDateTime.class),
-                        rs.getString("doctor_name"),
-                        rs.getString("patient_name"),
-                        rs.getString("specialty"),
-                        rs.getString("status")
-                ));
-            }
-            return rows;
+        var rows = new ArrayList<AppointmentRow>();
+        while (rs.next()) {
+            AppointmentRow r = new AppointmentRow(
+                    rs.getLong("id"),
+                    rs.getLong("doctor_id"),
+                    rs.getLong("patient_id"),
+                    rs.getObject("start_at", java.time.OffsetDateTime.class),
+                    rs.getString("doctor_name"),
+                    rs.getString("patient_name"),
+                    rs.getString("specialty"),
+                    rs.getString("status")
+            );
+            r.location = rs.getString("location");
+            rows.add(r);
         }
+        return rows;
     }
+}
 
 //    public List<AppointmentRow> searchScheduledAppointments(String query) throws SQLException {
 //        final String sql = """
@@ -796,7 +781,7 @@ public List<AppointmentRow> searchScheduledAppointments(String query) throws SQL
         SELECT a.id,
                a.doctor_id,
                a.patient_id,
-               a.appointment_date AT TIME ZONE 'UTC' AS start_at,
+               a.appointment_date AS start_at,
                udoc.full_name  AS doctor_name,
                up.full_name    AS patient_name,
                a.status::text  AS status,

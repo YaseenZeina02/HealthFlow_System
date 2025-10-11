@@ -3,8 +3,9 @@ package com.example.healthflow.service;
 import com.example.healthflow.dao.AppointmentJdbcDAO;
 import com.example.healthflow.dao.PatientDAO;
 import com.example.healthflow.dao.PatientJdbcDAO;
+import com.example.healthflow.model.PatientRow;
 import com.example.healthflow.model.dto.DoctorApptRow;
-import com.example.healthflow.model.dto.PatientView;
+//import com.example.healthflow.model.dto.PatientView;
 
 import java.sql.SQLException;
 import java.time.LocalDate;
@@ -46,7 +47,7 @@ public class DoctorDashboardService {
         return apptDAO.markCompleted(appointmentId) == 1;
     }
 
-    public List<PatientView> listDoctorPatients() throws SQLException {
+    public List<PatientRow> listDoctorPatients() throws SQLException {
         return patientDAO.findAll(); // simple version for now
     }
 

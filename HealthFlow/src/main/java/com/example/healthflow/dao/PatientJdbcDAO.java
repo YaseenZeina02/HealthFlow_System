@@ -1,7 +1,8 @@
 package com.example.healthflow.dao;
 
 import com.example.healthflow.db.Database;
-import com.example.healthflow.model.dto.PatientView;
+import com.example.healthflow.model.PatientRow;
+//import com.example.healthflow.model.dto.PatientView;
 
 import java.sql.*;
 import java.time.LocalDate;
@@ -40,7 +41,7 @@ public class PatientJdbcDAO implements PatientDAO {
     }
 
     @Override
-    public List<PatientView> findAll() throws SQLException {
+    public List<PatientRow> findAll() throws SQLException {
         String sql = """
             SELECT p.id AS patient_id,
                    u.id AS user_id,
@@ -58,9 +59,9 @@ public class PatientJdbcDAO implements PatientDAO {
              PreparedStatement ps = c.prepareStatement(sql);
              ResultSet rs = ps.executeQuery()) {
 
-            List<PatientView> list = new ArrayList<>();
+            List<PatientRow> list = new ArrayList<>();
             while (rs.next()) {
-                list.add(new PatientView(
+                list.add(new PatientRow(
                         rs.getLong("patient_id"),
                         rs.getLong("user_id"),
                         rs.getString("full_name"),

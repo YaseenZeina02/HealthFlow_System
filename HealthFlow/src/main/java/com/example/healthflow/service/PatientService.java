@@ -5,8 +5,9 @@ import com.example.healthflow.dao.UserDAO;
 import com.example.healthflow.dao.PatientJdbcDAO;
 import com.example.healthflow.dao.UserJdbcDAO;
 import com.example.healthflow.db.Database;
+import com.example.healthflow.model.PatientRow;
 import com.example.healthflow.model.Role;
-import com.example.healthflow.model.dto.PatientView;
+//import com.example.healthflow.model.dto.PatientView;
 
 import java.sql.Connection;
 import java.sql.SQLException;
@@ -21,7 +22,7 @@ public class PatientService {
     private static final String DEFAULT_PATIENT_PASSWORD = "patient@123";
 
     /** إضافة مريض جديد */
-    public PatientView createPatient(String fullName, String nid, String phone,
+    public PatientRow createPatient(String fullName, String nid, String phone,
                                      LocalDate dob, String gender, String history) throws SQLException {
 
         String hash = org.mindrot.jbcrypt.BCrypt.hashpw(
@@ -40,7 +41,7 @@ public class PatientService {
 
                 c.commit();
 
-                return new PatientView(
+                return new PatientRow(
                         patientId, userId, fullName, nid, phone, dob, gender, history
                 );
             } catch (Exception e) {
@@ -82,7 +83,7 @@ public class PatientService {
     }
 
     /** قراءة كل المرضى */
-    public List<PatientView> listPatients() throws SQLException {
+    public List<PatientRow> listPatients() throws SQLException {
         // مهم: DAO لازم يعمل JOIN على users ويرجع u.gender AS gender
         return patientDAO.findAll();
     }

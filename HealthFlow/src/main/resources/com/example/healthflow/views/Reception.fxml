@@ -457,61 +457,52 @@
                                             <!-- ===== Appointments Pane ===== -->
                                 <AnchorPane fx:id="AppointmentsAnchorPane" layoutY="1.0" prefHeight="558.0" prefWidth="890.0" style="-fx-background-color: #ededed;" stylesheets="@../Design/ReceptionDesign.css" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="1.0">
                                     <children>
-                              <AnchorPane layoutX="16.0" layoutY="14.0" prefHeight="232.0" prefWidth="850.0" style="-fx-background-color: #ffffff; -fx-background-radius: 5;" styleClass="shadow" AnchorPane.leftAnchor="19.0" AnchorPane.rightAnchor="21.0">
+                              <AnchorPane layoutX="16.0" layoutY="14.0" prefHeight="110.0" prefWidth="850.0" style="-fx-background-color: #ffffff; -fx-background-radius: 5;" styleClass="shadow" AnchorPane.leftAnchor="19.0" AnchorPane.rightAnchor="21.0">
                                  <children>
                                     <Label layoutX="9.0" layoutY="4.0" prefHeight="20.0" prefWidth="200.0" styleClass="header-top" stylesheets="@../Design/ReceptionDesign.css" text="Create Appointements" AnchorPane.leftAnchor="11.0" AnchorPane.topAnchor="8.0">
                                        <font>
                                           <Font size="14.0" />
                                        </font>
                                     </Label>
-                                    <Label layoutX="20.0" layoutY="107.0" prefHeight="24.0" prefWidth="95.0" text="Doctor specialty" />
-                                    <ComboBox fx:id="DoctorspecialtyApp" layoutX="118.0" layoutY="106.0" prefHeight="28.0" prefWidth="129.0" styleClass="box" />
                                     <Label layoutX="20.0" layoutY="38.0" prefHeight="24.0" prefWidth="83.0" text="Patient Name :" />
                                     <Label fx:id="getPatientName" layoutX="109.0" layoutY="38.0" prefHeight="24.0" prefWidth="112.0" text="i" />
-                                    <Label layoutX="20.0" layoutY="145.0" prefHeight="24.0" prefWidth="95.0" text="Avilabel Doctor" />
-                                    <ComboBox fx:id="avilabelDoctorApp" layoutX="118.0" layoutY="144.0" prefHeight="28.0" prefWidth="129.0" styleClass="box" />
                                     <Label layoutX="20.0" layoutY="62.0" prefHeight="24.0" prefWidth="70.0" text="Patient ID:" />
                                     <Label fx:id="getPatientID" layoutX="109.0" layoutY="62.0" prefHeight="24.0" prefWidth="132.0" text="77" />
-                                    <Button fx:id="insertAppointments" layoutX="669.0" layoutY="72.0" mnemonicParsing="false" prefHeight="30.0" prefWidth="70.0" styleClass="btn-2" stylesheets="@../Design/ReceptionDesign.css" text="Insert" />
-                                    <Button fx:id="updateAppointments" layoutX="669.0" layoutY="107.0" mnemonicParsing="false" prefHeight="30.0" prefWidth="70.0" styleClass="btn-2" stylesheets="@../Design/ReceptionDesign.css" text="Update" />
-                                    <Button fx:id="clear_Appointments" layoutX="744.0" layoutY="72.0" mnemonicParsing="false" prefHeight="30.0" prefWidth="70.0" styleClass="btn-2" stylesheets="@../Design/ReceptionDesign.css" text="Clear" />
-                                    <Button fx:id="deleteAppointments" layoutX="744.0" layoutY="107.0" mnemonicParsing="false" prefHeight="30.0" prefWidth="70.0" styleClass="btn-2" stylesheets="@../Design/ReceptionDesign.css" text="Delete" />
-                                    <DatePicker fx:id="AppointmentDate" layoutX="352.0" layoutY="77.0" prefHeight="26.0" prefWidth="153.0" styleClass="box" stylesheets="@../Design/ReceptionDesign.css" />
-                                    <Label alignment="CENTER" layoutX="292.0" layoutY="84.0" prefHeight="35.0" prefWidth="55.0" text="Date" textAlignment="CENTER" />
-                                    <Label alignment="CENTER" layoutX="303.0" layoutY="105.0" prefHeight="35.0" prefWidth="55.0" text="Time :" textAlignment="CENTER" />
-                                    <TextField layoutX="368.0" layoutY="139.0" prefHeight="28.0" prefWidth="60.0" styleClass="box" />
-                                    <Label alignment="CENTER" layoutX="311.0" layoutY="135.0" prefHeight="36.0" prefWidth="39.0" text="From" textAlignment="CENTER" />
-                                    <Label alignment="CENTER" layoutX="427.0" layoutY="135.0" prefHeight="36.0" prefWidth="22.0" text="To" textAlignment="CENTER" />
-                                    <TextField layoutX="549.0" layoutY="139.0" prefHeight="26.0" prefWidth="51.0" styleClass="box" />
-                                    <Label alignment="CENTER" layoutX="529.0" layoutY="103.0" prefHeight="36.0" prefWidth="90.0" text="sessioin time" textAlignment="CENTER" />
-                                    <Label layoutX="334.0" layoutY="34.0" prefHeight="24.0" prefWidth="95.0" text="Time Avilabel" />
-                                    <ComboBox fx:id="cmbSlots" layoutX="418.0" layoutY="31.0" prefHeight="28.0" prefWidth="129.0" styleClass="box" AnchorPane.leftAnchor="418.0" />
-                                    <TextField fx:id="PatientIDForAppointment" layoutX="176.0" layoutY="74.0" prefHeight="28.0" prefWidth="91.0" styleClass="box" />
-                                    <TextField fx:id="PatientNameForAppointment" layoutX="176.0" layoutY="36.0" prefHeight="28.0" prefWidth="92.0" styleClass="box" />
+                                    <Label fx:id="LabelToAlert" layoutX="421.0" layoutY="61.0" prefHeight="44.0" prefWidth="339.0" text="." AnchorPane.bottomAnchor="2.0" AnchorPane.rightAnchor="21.0" />
+                                    <ComboBox fx:id="cmbSlots" layoutX="287.0" layoutY="56.0" prefHeight="7.0" prefWidth="172.0" styleClass="box" />
+                                    <Label fx:id="getPatientID1" layoutX="202.0" layoutY="60.0" prefHeight="28.0" prefWidth="90.0" text="Time Avilable" />
+                                    <Label fx:id="DoctorAvilable" layoutX="203.0" layoutY="7.0" prefHeight="44.0" prefWidth="367.0" text="." />
                                  </children>
                               </AnchorPane>
-                              <AnchorPane layoutX="18.0" layoutY="259.0" prefHeight="287.0" prefWidth="850.0" style="-fx-background-color: #ffffff; -fx-background-radius: 5;" styleClass="shadow" AnchorPane.bottomAnchor="12.0" AnchorPane.leftAnchor="18.0" AnchorPane.rightAnchor="20.0" AnchorPane.topAnchor="259.0">
+                              <AnchorPane layoutX="18.0" layoutY="134.0" prefHeight="412.0" prefWidth="852.0" style="-fx-background-color: #ffffff; -fx-background-radius: 5;" styleClass="shadow" AnchorPane.bottomAnchor="12.0" AnchorPane.leftAnchor="18.0" AnchorPane.rightAnchor="20.0" AnchorPane.topAnchor="134.0">
                                  <children>
                                     <Label prefHeight="20.0" prefWidth="200.0" styleClass="header-top" stylesheets="@../Design/ReceptionDesign.css" text="Appointments  Information" AnchorPane.leftAnchor="28.0" AnchorPane.rightAnchor="658.0" AnchorPane.topAnchor="7.0">
                                        <font>
                                           <Font size="14.0" />
                                        </font>
                                     </Label>
-                                    <TableView fx:id="TableINAppointment" prefHeight="257.0" prefWidth="842.0" style="-fx-background-color: #ededed;" stylesheets="@../Design/ReceptionDesign.css" AnchorPane.bottomAnchor="15.0" AnchorPane.leftAnchor="19.0" AnchorPane.rightAnchor="20.0" AnchorPane.topAnchor="38.0">
+                                    <TableView fx:id="TableINAppointment" prefHeight="233.0" prefWidth="813.0" style="-fx-background-color: #ededed;" stylesheets="@../Design/ReceptionDesign.css" AnchorPane.bottomAnchor="100.0" AnchorPane.leftAnchor="19.0" AnchorPane.rightAnchor="20.0" AnchorPane.topAnchor="38.0">
                                        <columns>
-                                          <TableColumn fx:id="colAppointmentIDAppointment" maxWidth="2000.0" prefWidth="150.0" text="ID" />
+                                          <TableColumn fx:id="colAppointmentIDAppointment" maxWidth="1500.0" prefWidth="150.0" text="ID" />
                                           <TableColumn fx:id="colPatientNameAppointment" prefWidth="78.0" text="Patient Name" />
                                           <TableColumn fx:id="colSpecialty" prefWidth="162.0" text="Specialty" />
                                           <TableColumn fx:id="colDoctorNameAppointment" maxWidth="3500.0" prefWidth="100.0" text="Doctor Name" />
                                           <TableColumn fx:id="colDateAppointment" maxWidth="4000.0" prefWidth="100.0" text="Date" />
-                                          <TableColumn fx:id="colTimeAppointment" prefWidth="100.0" text="Time" />
-                                          <TableColumn fx:id="colStatusAppointment" prefWidth="100.0" text="Status" />
+                                          <TableColumn fx:id="colSessionTime" maxWidth="4000.0" prefWidth="90.0" text="Session Time" />
+                                          <TableColumn fx:id="colStartTime" maxWidth="4000.0" prefWidth="90.0" text="Start Time" />
+                                          <TableColumn fx:id="colRoomNumber" prefWidth="129.0" text="Room Number" />
+                                          <TableColumn fx:id="colStatusAppointment" prefWidth="86.0" text="Status" />
                                        </columns>
                                        <columnResizePolicy>
                                           <TableView fx:constant="CONSTRAINED_RESIZE_POLICY" />
                                        </columnResizePolicy>
                                     </TableView>
-                                    <Button fx:id="addNewRow" layoutX="796.0" layoutY="2.0" mnemonicParsing="false" prefHeight="30.0" prefWidth="25.0" styleClass="btn-2" stylesheets="@../Design/ReceptionDesign.css" text="+" AnchorPane.rightAnchor="31.0" />
+                                    <Button fx:id="addNewRow" layoutX="797.0" layoutY="5.0" mnemonicParsing="false" prefHeight="7.0" prefWidth="16.0" styleClass="btn-2" stylesheets="@../Design/ReceptionDesign.css" text="+" AnchorPane.rightAnchor="30.0" />
+                                    <Button fx:id="insertAppointments" layoutX="687.0" layoutY="292.0" mnemonicParsing="false" prefHeight="30.0" prefWidth="70.0" styleClass="btn-2" stylesheets="@../Design/ReceptionDesign.css" text="Insert" AnchorPane.bottomAnchor="49.0" AnchorPane.rightAnchor="95.0" />
+                                    <Button fx:id="updateAppointments" layoutX="687.0" layoutY="327.0" mnemonicParsing="false" prefHeight="30.0" prefWidth="70.0" styleClass="btn-2" stylesheets="@../Design/ReceptionDesign.css" text="Update" AnchorPane.bottomAnchor="14.0" AnchorPane.rightAnchor="95.0" />
+                                    <Button fx:id="clear_Appointments" layoutX="762.0" layoutY="292.0" mnemonicParsing="false" prefHeight="30.0" prefWidth="70.0" styleClass="btn-2" stylesheets="@../Design/ReceptionDesign.css" text="Clear" AnchorPane.bottomAnchor="49.0" AnchorPane.rightAnchor="20.0" />
+                                    <Button fx:id="deleteAppointments" layoutX="762.0" layoutY="327.0" mnemonicParsing="false" prefHeight="30.0" prefWidth="70.0" styleClass="btn-2" stylesheets="@../Design/ReceptionDesign.css" text="Delete" AnchorPane.bottomAnchor="14.0" AnchorPane.rightAnchor="20.0" />
+                                    <Button fx:id="deleteRowApptTable" layoutX="762.0" layoutY="5.0" mnemonicParsing="false" prefHeight="7.0" prefWidth="16.0" styleClass="btn-2" stylesheets="@../Design/ReceptionDesign.css" text="-" AnchorPane.rightAnchor="68.5" />
                                  </children>
                               </AnchorPane>
                                     </children>

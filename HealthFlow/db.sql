@@ -438,3 +438,106 @@ ALTER TABLE doctors
 -- 3) أضف فهرس للبحث السريع
 CREATE INDEX IF NOT EXISTS idx_doctor_availability
     ON doctors(availability_status);
+
+
+
+------------------------------------------------------------------
+-- دالة الاشعار في الداتا بيز انه صار عملية اضافة موعد
+-- 1) دالة ترسل إشعارًا عند أي تغيير على المواعيد
+CREATE OR REPLACE FUNCTION notify_appointments_changed()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  -- نرسل معرف الموعد كـ payload (إن وُجد)
+  PERFORM pg_notify('appointments_changed',
+                    COALESCE(NEW.id::text, OLD.id::text, ''));
+RETURN NULL; -- AFTER triggers لا تحتاج إرجاع الصف
+END;
+$$;
+
+
+-- 2) تريغر بعد الإدراج
+DROP TRIGGER IF EXISTS trg_appt_notify_insert ON appointments;
+CREATE TRIGGER trg_appt_notify_insert
+    AFTER INSERT ON appointments
+    FOR EACH ROW
+    EXECUTE FUNCTION notify_appointments_changed();
+
+-- 3) تريغر بعد التعديل
+DROP TRIGGER IF EXISTS trg_appt_notify_update ON appointments;
+CREATE TRIGGER trg_appt_notify_update
+    AFTER UPDATE ON appointments
+    FOR EACH ROW
+    EXECUTE FUNCTION notify_appointments_changed();
+
+-- 4) تريغر بعد الحذف
+DROP TRIGGER IF EXISTS trg_appt_notify_delete ON appointments;
+CREATE TRIGGER trg_appt_notify_delete
+    AFTER DELETE ON appointments
+    FOR EACH ROW
+    EXECUTE FUNCTION notify_appointments_changed();
+
+
+-- في حال بدي اشيلها
+-- DROP TRIGGER IF EXISTS trg_appt_notify_insert ON appointments;
+-- DROP TRIGGER IF EXISTS trg_appt_notify_update ON appointments;
+-- DROP TRIGGER IF EXISTS trg_appt_notify_delete ON appointments;
+-- DROP FUNCTION IF EXISTS notify_appointments_changed();
+
+------------------------------------------------------------------
+-- قناة الإشعارات
+-- سيصلك payload بسيط (JSON) لكن احنا بس بنستخدم الإشعار نفسه
+
+-- 1) دالة ترسل إشعارًا عند أي تغيير على جدول المرضى
+
+CREATE OR REPLACE FUNCTION notify_patients_changed() RETURNS trigger AS $$
+BEGIN
+  PERFORM pg_notify(
+    'patients_changed',
+    json_build_object(
+      'op', TG_OP,
+      'patient_id', COALESCE(NEW.id, OLD.id),
+      'user_id',    COALESCE(NEW.user_id, OLD.user_id)
+    )::text
+  );
+RETURN COALESCE(NEW, OLD);
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_patients_notify_insupddel ON patients;
+CREATE TRIGGER trg_patients_notify_insupddel
+    AFTER INSERT OR UPDATE OR DELETE ON patients
+    FOR EACH ROW
+    EXECUTE FUNCTION notify_patients_changed();
+
+
+-- لو تم تعديل بيانات المستخدم (full_name, phone, ...الخ)
+-- المرتبط بمريض، برضه نبعث إشعار.
+CREATE OR REPLACE FUNCTION notify_users_patient_changed() RETURNS trigger AS $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM patients p WHERE p.user_id = COALESCE(NEW.id, OLD.id)) THEN
+    PERFORM pg_notify(
+      'patients_changed',
+      json_build_object(
+        'op', TG_OP,
+        'user_id', COALESCE(NEW.id, OLD.id)
+      )::text
+    );
+END IF;
+RETURN COALESCE(NEW, OLD);
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_users_notify_for_patients ON users;
+CREATE TRIGGER trg_users_notify_for_patients
+    AFTER UPDATE OR DELETE ON users
+FOR EACH ROW
+EXECUTE FUNCTION notify_users_patient_changed();
+
+
+-- مثال منع تداخل لنفس الطبيب
+CREATE EXTENSION IF NOT EXISTS btree_gist;
+ALTER TABLE appointments
+    ADD CONSTRAINT no_overlap_per_doctor
+    EXCLUDE USING gist (doctor_id WITH =, appt_range WITH &&);

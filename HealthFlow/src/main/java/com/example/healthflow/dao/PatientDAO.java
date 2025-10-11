@@ -1,6 +1,7 @@
 package com.example.healthflow.dao;
 
-import com.example.healthflow.model.dto.PatientView;
+import com.example.healthflow.model.PatientRow;
+//import com.example.healthflow.model.dto.PatientView;
 
 import java.sql.Connection;
 import java.sql.SQLException;
@@ -15,7 +16,7 @@ public interface PatientDAO {
     /** ✅ جديد: بدون gender */
     void update(long patientId, LocalDate dob, String history, Connection c) throws SQLException;
 
-    List<PatientView> findAll() throws SQLException;
+    List<PatientRow> findAll() throws SQLException;
 }
 
 
