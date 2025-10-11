@@ -870,7 +870,7 @@ public class ReceptionController {
     }
 
 
-     private void refreshSlots() {
+    private void refreshSlots() {
 
         if (cmbSlots == null) return;
         var doc = (avilabelDoctorApp == null) ? null : avilabelDoctorApp.getValue();
@@ -887,17 +887,27 @@ public class ReceptionController {
         new Thread(() -> {
             try {
                 var slots = doctorDAO.listFreeSlots(doc.doctorId, day, open, close, slotMinutes);
+                // 🔒 أمان إضافي: استبعد أي فتحة تبدأ عند أو بعد وقت الإغلاق
+                // أو تنتهي عند/بعد الإغلاق (حتى لو رجعتها الدالة بطريق الخطأ)
+                slots.removeIf(s -> {
+                    LocalTime fromT = s.from().toLocalTime();
+                    LocalTime toT = s.to().toLocalTime();
+                    // لا نعرض 03:00 PM كبداية أبداً، ولا أي فتحة ينتهي وقتها عند/بعد الإغلاق
+                    return !fromT.isBefore(close) || !toT.isBefore(close);
+                });
                 if (day.equals(LocalDate.now())) {
                     LocalDateTime now = LocalDateTime.now().withSecond(0).withNano(0);
                     int mod = now.getMinute() % slotMinutes;
                     LocalDateTime cutoff = (mod == 0) ? now : now.plusMinutes(slotMinutes - mod);
+                    // استبعد الماضي لليوم الحالي
                     slots.removeIf(s -> s.from().isBefore(cutoff));
+                    // ولو الوقت الحالي بعد الإغلاق → أفرغ القائمة وأعرض رسالة
                     if (now.toLocalTime().isAfter(close)) {
                         Platform.runLater(() -> {
                             cmbSlots.getItems().clear();
                             showInfo("Working Hours", "Clinic working hours are over for today.");
                         });
-                        return;
+                        return; // أوقف المعالجة لهذا اليوم
                     }
                 }
                 var data = FXCollections.observableArrayList(slots);
@@ -1661,47 +1671,140 @@ public class ReceptionController {
             colStatusAppointment.setCellValueFactory(cd -> cd.getValue().statusProperty());
 
         // --- Start Time column (يعرض الوقت بصيغة 12h)
+//        if (colStartTime != null) {
+//            colStartTime.setCellValueFactory(cd ->
+//                    new javafx.beans.property.SimpleStringProperty(fmt12(cd.getValue().getTime()))
+//            );
+//
+//            // تحرير الوقت كنص: يقبل HH:mm أو hh:mm AM/PM
+//            colStartTime.setCellFactory(
+//                    javafx.scene.control.cell.TextFieldTableCell.forTableColumn(
+//                            new javafx.util.StringConverter<String>() {
+//                                @Override public String toString(String s) { return s == null ? "" : s; }
+//                                @Override public String fromString(String s) { return (s == null) ? null : s.trim(); }
+//                            }
+//                    )
+//            );
+//
+//            colStartTime.setOnEditCommit(ev -> {
+//                var row = ev.getRowValue();
+//                String txt = ev.getNewValue();
+//                if (row == null || txt == null || txt.isBlank()) return;
+//                try {
+//                    java.time.LocalTime nt;
+//                    try {
+//                        nt = java.time.LocalTime.parse(txt.trim()); // HH:mm
+//                    } catch (Exception e1) {
+//                        nt = java.time.LocalTime.parse(
+//                                txt.trim().toUpperCase(),
+//                                java.time.format.DateTimeFormatter.ofPattern("hh:mm a")
+//                        ); // hh:mm AM/PM
+//                    }
+//                    row.setTime(nt);
+//                    if (row.getId() > 0 && row.getDate() != null) {
+//                        updateAppointmentStartAt(row.getId(), row.getDate(), nt);
+//                    }
+//                    if (TableINAppointment != null) TableINAppointment.refresh();
+//                    if (row.getId() <= 0) { row.setDirty(true); }
+//                    updateDirtyAlert();
+//                } catch (Exception ex) {
+//                    showError("Invalid time", new RuntimeException("Use HH:mm or hh:mm AM/PM"));
+//                }
+//            });
+//        }
+
         if (colStartTime != null) {
+            // عرض للقراءة فقط بصيغة 12h
             colStartTime.setCellValueFactory(cd ->
                     new javafx.beans.property.SimpleStringProperty(fmt12(cd.getValue().getTime()))
             );
 
-            // تحرير الوقت كنص: يقبل HH:mm أو hh:mm AM/PM
-            colStartTime.setCellFactory(
-                    javafx.scene.control.cell.TextFieldTableCell.forTableColumn(
-                            new javafx.util.StringConverter<String>() {
-                                @Override public String toString(String s) { return s == null ? "" : s; }
-                                @Override public String fromString(String s) { return (s == null) ? null : s.trim(); }
-                            }
-                    )
-            );
+            // محرر ComboBox بأوقات العيادة (أنسب وأسهل وأضمن)
+            colStartTime.setCellFactory(col -> new TableCell<ApptRow, String>() {
+                private final ComboBox<String> combo = new ComboBox<>();
 
-            colStartTime.setOnEditCommit(ev -> {
-                var row = ev.getRowValue();
-                String txt = ev.getNewValue();
-                if (row == null || txt == null || txt.isBlank()) return;
-                try {
-                    java.time.LocalTime nt;
-                    try {
-                        nt = java.time.LocalTime.parse(txt.trim()); // HH:mm
-                    } catch (Exception e1) {
-                        nt = java.time.LocalTime.parse(
-                                txt.trim().toUpperCase(),
-                                java.time.format.DateTimeFormatter.ofPattern("hh:mm a")
-                        ); // hh:mm AM/PM
+                {
+                    combo.setVisibleRowCount(10);
+                    combo.setPromptText("Select time");
+
+                    // افتح المحرر على نقرة واحدة والصف محدد
+                    setOnMouseClicked(e -> {
+                        if (!isEmpty() && getTableRow() != null && getTableRow().isSelected()) {
+                            startEdit();
+                            combo.show();
+                        }
+                    });
+
+                    // املأ الخيارات عند فتح القائمة بناءً على تاريخ الصف
+                    combo.setOnShown(e -> {
+                        var rowItem = (getTableRow() == null) ? null : getTableRow().getItem();
+                        if (rowItem == null) return;
+                        var choices = FXCollections.observableArrayList(
+                                generateClinicTimes(rowItem.getDate())
+                        );
+                        combo.setItems(choices);
+                        if (rowItem.getTime() != null) {
+                            String cur = rowItem.getTime().format(SLOT_FMT_12H);
+                            combo.getSelectionModel().select(cur);
+                        }
+                    });
+
+                    // عند الاختيار: حدّث الموديل والداتابيز
+                    combo.setOnAction(e -> {
+                        var rowItem = (getTableRow() == null) ? null : getTableRow().getItem();
+                        String sel = combo.getValue();
+                        if (rowItem == null || sel == null || sel.isBlank()) return;
+                        try {
+                            LocalTime nt = LocalTime.parse(sel, SLOT_FMT_12H);
+                            rowItem.setTime(nt);
+                            rowItem.setDirty(true);
+                            if (rowItem.getId() > 0 && rowItem.getDate() != null) {
+                                updateAppointmentStartAt(rowItem.getId(), rowItem.getDate(), nt);
+                            }
+                            commitEdit(sel);
+                            if (TableINAppointment != null) TableINAppointment.refresh();
+                            updateDirtyAlert();
+                        } catch (Exception ex) {
+                            showError("Invalid time", new RuntimeException("Unexpected time format"));
+                        }
+                    });
+                }
+
+                @Override
+                public void startEdit() {
+                    super.startEdit();
+                    setGraphic(combo);
+                    setText(null);
+                }
+
+                @Override
+                public void cancelEdit() {
+                    super.cancelEdit();
+                    setGraphic(null);
+                    setText(getItem());
+                }
+
+                @Override
+                protected void updateItem(String item, boolean empty) {
+                    super.updateItem(item, empty);
+                    if (empty) {
+                        setGraphic(null);
+                        setText(null);
+                        return;
                     }
-                    row.setTime(nt);
-                    if (row.getId() > 0 && row.getDate() != null) {
-                        updateAppointmentStartAt(row.getId(), row.getDate(), nt);
+                    boolean showEditor = isEditing() && getTableRow() != null && getTableRow().isSelected();
+                    if (showEditor) {
+                        setGraphic(combo);
+                        setText(null);
+                    } else {
+                        setGraphic(null);
+                        setText(item);
                     }
-                    if (TableINAppointment != null) TableINAppointment.refresh();
-                    if (row.getId() <= 0) { row.setDirty(true); }
-                    updateDirtyAlert();
-                } catch (Exception ex) {
-                    showError("Invalid time", new RuntimeException("Use HH:mm or hh:mm AM/PM"));
                 }
             });
         }
+
+
         if (colRoomNumber != null) {
             colRoomNumber.setEditable(false);
             colRoomNumber.setCellValueFactory(cd -> new ReadOnlyStringWrapper(
@@ -1753,6 +1856,31 @@ public class ReceptionController {
         }
         if (TableINAppointment != null) TableINAppointment.refresh();
     }
+
+    // توليد قائمة الأوقات بصيغة 12h وفق دوام العيادة وبخطوة مدة الجلسة
+    private java.util.List<String> generateClinicTimes(java.time.LocalDate date) {
+        java.util.List<String> res = new java.util.ArrayList<>();
+        java.time.LocalTime open = java.time.LocalTime.of(9, 0);
+        java.time.LocalTime close = java.time.LocalTime.of(15, 0);
+        int step = DEFAULT_SESSION_MIN; // 20 دقيقة
+
+        for (java.time.LocalTime t = open; t.isBefore(close); t = t.plusMinutes(step)) {
+            res.add(t.format(SLOT_FMT_12H));
+        }
+
+        // إن كان التاريخ هو اليوم: لا تعرض أوقات مضت
+        if (date != null && date.equals(java.time.LocalDate.now())) {
+            java.time.LocalDateTime now = java.time.LocalDateTime.now().withSecond(0).withNano(0);
+            int mod = now.getMinute() % step;
+            java.time.LocalTime cutoff = (mod == 0)
+                    ? now.toLocalTime()
+                    : now.toLocalTime().plusMinutes(step - mod);
+            res.removeIf(s -> java.time.LocalTime.parse(s, SLOT_FMT_12H).isBefore(cutoff));
+            res.removeIf(s -> java.time.LocalTime.parse(s, SLOT_FMT_12H).compareTo(close) >= 0);
+        }
+        return res;
+    }
+
 
     /**
      * تهيئة التحرير المباشر على جدول المواعيد
