@@ -195,6 +195,12 @@ public class ReceptionController {
     private TableColumn<DoctorDAO.AppointmentRow, String> colDoctorNameDash;
     @FXML
     private TableColumn<DoctorDAO.AppointmentRow, String> colPatientNameDash;
+    @FXML
+    private TableColumn<DoctorDAO.AppointmentRow, String> colSpecialtyDash;
+    @FXML
+    private TableColumn<DoctorDAO.AppointmentRow, String> colRoomDash;
+    @FXML
+    private DatePicker dataPickerDashboard;
 
     @FXML
     private BarChart<String, Number> appointmentStatusChart;
@@ -250,8 +256,7 @@ public class ReceptionController {
     private Label LabelToAlert;
 
 
-    @FXML
-    private Button deleteButtonAppointment;
+
     @FXML
     private Label getPatientName;
     @FXML
@@ -289,10 +294,14 @@ public class ReceptionController {
     private ComboBox<DoctorDAO.Slot> cmbSlots;
 
     @FXML
-    private Label DoctorAvilable;
+    private Label AppointmentDateDetailes;
 
-
+    private static final DateTimeFormatter DATE_FMT_HUMAN = DateTimeFormatter.ofPattern("EEE, MMM dd, yyyy");
     private static final java.time.ZoneId APP_ZONE = java.time.ZoneId.of("Asia/Gaza");
+
+    // Cache: appointment.id -> patient's national_id (or fallback patient id)
+    private final java.util.concurrent.ConcurrentHashMap<Long, String> apptPatientIdCache
+            = new java.util.concurrent.ConcurrentHashMap<>();
 
     // helpers:
     private static java.time.OffsetDateTime toAppOffset(java.time.LocalDate d, java.time.LocalTime t) {
@@ -302,19 +311,86 @@ public class ReceptionController {
         return odt == null ? null : odt.atZoneSameInstant(APP_ZONE).toLocalDateTime();
     }
 
-    private void updateDirtyAlert() {
-        int n = (int) apptEditable.stream().filter(Appointment.ApptRow::isDirty).count();
-        if (LabelToAlert != null) {
-            if (n > 0) {
-                LabelToAlert.setText(n + (n == 1 ? " unsaved change" : " unsaved changes"));
-                LabelToAlert.setStyle("-fx-text-fill: red; -fx-font-weight: bold;");
-                LabelToAlert.setVisible(true);
-            } else {
-                LabelToAlert.setText("");
-                LabelToAlert.setVisible(false);
+    // ===== Transient banner on LabelToAlert (with fade) =====
+    private void showToast(String kind, String msg) {
+        Platform.runLater(() -> {
+            if (LabelToAlert == null) return;
+            String icon, style;
+            switch (kind == null ? "info" : kind.toLowerCase()) {
+                case "error":
+                    icon = "❌ ";
+                    style = "-fx-background-color:#ffe6e6; -fx-text-fill:#b00020; -fx-border-color:#b00020; "
+                            + "-fx-border-radius:6; -fx-background-radius:6; -fx-padding:6 10; -fx-font-weight:bold;";
+                    break;
+                case "warn":
+                    icon = "⚠️ ";
+                    style = "-fx-background-color:#fff4e5; -fx-text-fill:#8a6d3b; -fx-border-color:#f0ad4e; "
+                            + "-fx-border-radius:6; -fx-background-radius:6; -fx-padding:6 10; -fx-font-weight:bold;";
+                    break;
+                case "success":
+                    icon = "✅ ";
+                    style = "-fx-background-color:#e8f5e9; -fx-text-fill:#2e7d32; -fx-border-color:#66bb6a; "
+                            + "-fx-border-radius:6; -fx-background-radius:6; -fx-padding:6 10; -fx-font-weight:bold;";
+                    break;
+                default:
+                    icon = "ℹ️ ";
+                    style = "-fx-background-color:#e6f0ff; -fx-text-fill:#1a4fb3; -fx-border-color:#1a4fb3; "
+                            + "-fx-border-radius:6; -fx-background-radius:6; -fx-padding:6 10; -fx-font-weight:bold;";
             }
-        }
+            LabelToAlert.setStyle(style);
+            LabelToAlert.setText(icon + (msg == null ? "" : msg));
+            LabelToAlert.setOpacity(0);
+            LabelToAlert.setVisible(true);
+
+            var fadeIn = new javafx.animation.FadeTransition(Duration.millis(250), LabelToAlert);
+            fadeIn.setFromValue(0); fadeIn.setToValue(1); fadeIn.play();
+
+            var pause = new javafx.animation.PauseTransition(Duration.seconds(4));
+            pause.setOnFinished(ev -> {
+                var fadeOut = new javafx.animation.FadeTransition(Duration.millis(300), LabelToAlert);
+                fadeOut.setFromValue(1); fadeOut.setToValue(0);
+                fadeOut.setOnFinished(__ -> {
+                    LabelToAlert.setVisible(false);
+                    LabelToAlert.setText("");
+                    LabelToAlert.setOpacity(1);
+                });
+                fadeOut.play();
+            });
+            pause.play();
+        });
     }
+
+    private boolean isPastDate(LocalDate d) {
+        return d != null && d.isBefore(LocalDate.now());
+    }
+
+    // enforce UI rules when date changes (disable time controls for past dates)
+    private void enforceDateRules() {
+        LocalDate day = (AppointmentDate == null) ? null : AppointmentDate.getValue();
+        boolean past = isPastDate(day);
+        if (cmbSlots != null) {
+            cmbSlots.setDisable(past);
+            if (past) cmbSlots.getItems().clear();
+        }
+        if (past) {
+            showToast("error", "The selected date is in the past. Please choose today or a future date.");
+        }
+        if (TableINAppointment != null) TableINAppointment.refresh();
+    }
+
+//    private void updateDirtyAlert() {
+//        int n = (int) apptEditable.stream().filter(Appointment.ApptRow::isDirty).count();
+//        if (LabelToAlert != null) {
+//            if (n > 0) {
+//                LabelToAlert.setText(n + (n == 1 ? " unsaved change" : " unsaved changes"));
+//                LabelToAlert.setStyle("-fx-text-fill: red; -fx-font-weight: bold;");
+//                LabelToAlert.setVisible(true);
+//            } else {
+//                LabelToAlert.setText("");
+//                LabelToAlert.setVisible(false);
+//            }
+//        }
+//    }
 
 
     // --- Auto refresh infra ---
@@ -526,6 +602,7 @@ public class ReceptionController {
                 a.setHeaderText(null);
                 a.setContentText("Please select a patient from the table first.");
                 a.showAndWait();
+                showToast("warn", "Please select a patient from the table first.");
                 return;
             }
             if (getPatientName != null) getPatientName.setText(row.getFullName());
@@ -608,6 +685,8 @@ public class ReceptionController {
                 TableINAppointment.getItems().remove(selected);
             });
         }
+        if (AppointmentDate != null)
+            AppointmentDate.valueProperty().addListener((o, a, b) -> { refreshSlots(); enforceDateRules(); });
 
         // initial data loads
         new Thread(this::loadAppointmentsTable, "appt-load").start();
@@ -624,6 +703,28 @@ public class ReceptionController {
         // avilabelDoctorApp.valueProperty() -> refreshSlots()
         // cmbSlots.setOnShown(...) -> refreshSlots()
     }
+    private void updateAppointmentDetailsLabel(Appointment.ApptRow row) {
+        if (AppointmentDateDetailes == null) return;
+        if (row == null || row.getDate() == null || row.getTime() == null) {
+            AppointmentDateDetailes.setText("");
+            AppointmentDateDetailes.setStyle("");
+            return;
+        }
+        int mins = row.getSessionTime() > 0 ? row.getSessionTime() : DEFAULT_SESSION_MIN;
+        LocalDate d = row.getDate();
+        LocalTime start = row.getTime();
+        LocalTime end = start.plusMinutes(mins);
+        String txt = d.format(DATE_FMT_HUMAN) + " — " +
+                start.format(SLOT_FMT_12H) + " \u2192 " + end.format(SLOT_FMT_12H) +
+                " (" + mins + " min)";
+        AppointmentDateDetailes.setText(txt);
+        AppointmentDateDetailes.setStyle(
+                "-fx-background-color:#e6f0ff; -fx-text-fill:#1a4fb3; " +
+                        "-fx-border-color:#1a4fb3; -fx-border-radius:6; -fx-background-radius:6; " +
+                        "-fx-padding:4 8; -fx-font-weight:bold;"
+        );
+    }
+
 
     /**
      * TableCell تعرض DatePicker لتعديل تاريخ الموعد داخل الجدول
@@ -660,8 +761,11 @@ public class ReceptionController {
                     // ريفرش جدول/أوقات
                     commitEdit(d);
                     if (TableINAppointment != null) TableINAppointment.refresh();
-                    updateDirtyAlert();
+                    updateAppointmentDetailsLabel(rowItem);  // أو المتغير المحلي للصف
+//                    updateDirtyAlert();
                 });
+
+
 
                 // افتح الـ DatePicker عند بداية التحرير
                 this.setOnMouseClicked(me -> {
@@ -832,6 +936,7 @@ public class ReceptionController {
                     rowItem.setDirty(true);
                     commitEdit(opt.fullName);
                     if (TableINAppointment != null) TableINAppointment.refresh();
+                    updateAppointmentDetailsLabel(rowItem);
                 });
             }
 
@@ -906,9 +1011,16 @@ public class ReceptionController {
                         Platform.runLater(() -> {
                             cmbSlots.getItems().clear();
                             showInfo("Working Hours", "Clinic working hours are over for today.");
+                            showToast("info", "Clinic working hours are over for today.");
                         });
                         return; // أوقف المعالجة لهذا اليوم
                     }
+                }
+                if (day != null && isPastDate(day)) {
+                    cmbSlots.setDisable(true);
+                    cmbSlots.getItems().clear();
+                    showToast("error", "The selected date is in the past. Please choose today or a future date.");
+                    return;
                 }
                 var data = FXCollections.observableArrayList(slots);
                 Platform.runLater(() -> cmbSlots.setItems(data));
@@ -1463,7 +1575,6 @@ public class ReceptionController {
         System.out.println("DbNotifications: starting listeners...");
     }
 
-
     /**
      * Poll احتياطي خفيف فقط (تعطيل التحديث كل 1 دقيقة)
      */
@@ -1513,6 +1624,7 @@ public class ReceptionController {
         a.setHeaderText(null);
         a.setContentText(ex == null ? title : ex.getMessage());
         a.showAndWait();
+        showToast("error", a.getContentText());
         return ex == null ? title : ex.getMessage();
     }
 
@@ -1651,6 +1763,7 @@ public class ReceptionController {
     private void wireAppointmentsTables() {
         if (TableINAppointment == null) return;
         TableINAppointment.setItems(apptEditable);
+
         // === تفعيل التحرير داخل جدول المواعيد ===
         TableINAppointment.setEditable(true);
         colDateAppointment.setEditable(true);
@@ -1669,49 +1782,13 @@ public class ReceptionController {
         if (colSpecialty != null) colSpecialty.setCellValueFactory(cd -> cd.getValue().specialtyProperty());
         if (colStatusAppointment != null)
             colStatusAppointment.setCellValueFactory(cd -> cd.getValue().statusProperty());
-
-        // --- Start Time column (يعرض الوقت بصيغة 12h)
-//        if (colStartTime != null) {
-//            colStartTime.setCellValueFactory(cd ->
-//                    new javafx.beans.property.SimpleStringProperty(fmt12(cd.getValue().getTime()))
-//            );
-//
-//            // تحرير الوقت كنص: يقبل HH:mm أو hh:mm AM/PM
-//            colStartTime.setCellFactory(
-//                    javafx.scene.control.cell.TextFieldTableCell.forTableColumn(
-//                            new javafx.util.StringConverter<String>() {
-//                                @Override public String toString(String s) { return s == null ? "" : s; }
-//                                @Override public String fromString(String s) { return (s == null) ? null : s.trim(); }
-//                            }
-//                    )
-//            );
-//
-//            colStartTime.setOnEditCommit(ev -> {
-//                var row = ev.getRowValue();
-//                String txt = ev.getNewValue();
-//                if (row == null || txt == null || txt.isBlank()) return;
-//                try {
-//                    java.time.LocalTime nt;
-//                    try {
-//                        nt = java.time.LocalTime.parse(txt.trim()); // HH:mm
-//                    } catch (Exception e1) {
-//                        nt = java.time.LocalTime.parse(
-//                                txt.trim().toUpperCase(),
-//                                java.time.format.DateTimeFormatter.ofPattern("hh:mm a")
-//                        ); // hh:mm AM/PM
-//                    }
-//                    row.setTime(nt);
-//                    if (row.getId() > 0 && row.getDate() != null) {
-//                        updateAppointmentStartAt(row.getId(), row.getDate(), nt);
-//                    }
-//                    if (TableINAppointment != null) TableINAppointment.refresh();
-//                    if (row.getId() <= 0) { row.setDirty(true); }
-//                    updateDirtyAlert();
-//                } catch (Exception ex) {
-//                    showError("Invalid time", new RuntimeException("Use HH:mm or hh:mm AM/PM"));
-//                }
-//            });
-//        }
+        TableINAppointment.getSelectionModel().selectedItemProperty().addListener((obs, oldRow, newRow) -> {
+            updatePatientFieldsFromAppt(newRow);
+            updateAppointmentDetailsLabel(newRow);
+        });
+        Platform.runLater(() ->
+                updateAppointmentDetailsLabel(TableINAppointment.getSelectionModel().getSelectedItem())
+        );
 
         if (colStartTime != null) {
             // عرض للقراءة فقط بصيغة 12h
@@ -1728,8 +1805,19 @@ public class ReceptionController {
                     combo.setPromptText("Select time");
 
                     // افتح المحرر على نقرة واحدة والصف محدد
+//                    setOnMouseClicked(e -> {
+//                        if (!isEmpty() && getTableRow() != null && getTableRow().isSelected()) {
+//                            startEdit();
+//                            combo.show();
+//                        }
+//                    });
                     setOnMouseClicked(e -> {
                         if (!isEmpty() && getTableRow() != null && getTableRow().isSelected()) {
+                            var rowItem = (getTableRow() == null) ? null : getTableRow().getItem();
+                            if (rowItem != null && isPastDate(rowItem.getDate())) {
+                                showToast("error", "You cannot select a time for a past date.");
+                                return;
+                            }
                             startEdit();
                             combo.show();
                         }
@@ -1747,6 +1835,10 @@ public class ReceptionController {
                             String cur = rowItem.getTime().format(SLOT_FMT_12H);
                             combo.getSelectionModel().select(cur);
                         }
+                        if (isPastDate(rowItem.getDate())) {
+                            combo.hide();
+                            showToast("error", "The selected date is in the past. Please update the date first.");                            return;
+                        }
                     });
 
                     // عند الاختيار: حدّث الموديل والداتابيز
@@ -1763,7 +1855,7 @@ public class ReceptionController {
                             }
                             commitEdit(sel);
                             if (TableINAppointment != null) TableINAppointment.refresh();
-                            updateDirtyAlert();
+//                            updateDirtyAlert();
                         } catch (Exception ex) {
                             showError("Invalid time", new RuntimeException("Unexpected time format"));
                         }
@@ -1847,8 +1939,9 @@ public class ReceptionController {
                 int newVal = ev.getNewValue().intValue();
                 if (newVal <= 0) newVal = DEFAULT_SESSION_MIN; // دائماً على الأقل 20
                 row.setSessionTime(newVal);
+                updateAppointmentDetailsLabel(row);
                 row.setDirty(true);
-                updateDirtyAlert();
+//                updateDirtyAlert();
 
                 if (TableINAppointment != null)
                     TableINAppointment.refresh();
@@ -1898,7 +1991,7 @@ public class ReceptionController {
                 if (row == null || v == null) return;
                 row.setPatientName(v);
                 row.setDirty(true);
-                updateDirtyAlert();
+//                updateDirtyAlert();
             });
         }
 
@@ -1918,7 +2011,7 @@ public class ReceptionController {
                 row.setDoctorName(null);
                 row.setRoomNumber(null);
                 row.setDirty(true);
-                updateDirtyAlert();
+//                updateDirtyAlert();
                 ensureDoctorsForSpecAsync(sp);  // حمّل قائمة أطباء التخصص الجديد
                 if (TableINAppointment != null) TableINAppointment.refresh();
             });
@@ -1942,7 +2035,7 @@ public class ReceptionController {
                 if (row == null || st == null) return;
                 row.setStatus(st);
                 row.setDirty(true);
-                updateDirtyAlert();
+//                updateDirtyAlert();
             });
         }
     }
@@ -1967,6 +2060,8 @@ public class ReceptionController {
         apptEditable.add(0, r);
         TableINAppointment.getSelectionModel().select(r);
         TableINAppointment.scrollTo(r);
+        if (getPatientName != null) getPatientName.setText(p.getFullName());
+        if (getPatientID != null)  getPatientID.setText(String.valueOf(p.getPatientId()));
     }
 
     // Add a blank draft row from the + button
@@ -1981,14 +2076,30 @@ public class ReceptionController {
         apptEditable.add(0, r);
         TableINAppointment.getSelectionModel().select(r);
         TableINAppointment.scrollTo(r);
+        if (getPatientName != null) getPatientName.setText("");
+        if (getPatientID != null)  getPatientID.setText("");
     }
 
     // Clear mini booking form on the left (specialty/doctor/slot)
+//    private void doClearAppointmentForm() {
+//        if (DoctorspecialtyApp != null) DoctorspecialtyApp.getSelectionModel().clearSelection();
+//        if (avilabelDoctorApp != null) avilabelDoctorApp.getSelectionModel().clearSelection();
+//        if (AppointmentDate != null) AppointmentDate.setValue(LocalDate.now());
+//        if (cmbSlots != null) cmbSlots.getItems().clear();
+//    }
+
+
     private void doClearAppointmentForm() {
-        if (DoctorspecialtyApp != null) DoctorspecialtyApp.getSelectionModel().clearSelection();
-        if (avilabelDoctorApp != null) avilabelDoctorApp.getSelectionModel().clearSelection();
-        if (AppointmentDate != null) AppointmentDate.setValue(LocalDate.now());
-        if (cmbSlots != null) cmbSlots.getItems().clear();
+        // Only clear the table selection; do not modify any DB state
+        if (TableINAppointment != null) {
+            TableINAppointment.getSelectionModel().clearSelection();
+            try { TableINAppointment.getFocusModel().focus(-1); } catch (Exception ignore) {}
+        }
+        // Clear the top patient info labels and the date/time summary label
+        if (getPatientName != null) getPatientName.setText("");
+        if (getPatientID != null)  getPatientID.setText("");
+        updateAppointmentDetailsLabel(null);
+        showToast("info", "Selection cleared.");
     }
 
     // Load appointments table once (used at init)
@@ -2015,6 +2126,7 @@ public class ReceptionController {
                 mapped.add(ar);
             }
             Platform.runLater(() -> TableUtils.applyDelta(apptEditable, mapped, ApptRow::getId));
+            Platform.runLater(() -> updatePatientFieldsFromAppt((TableINAppointment == null) ? null : TableINAppointment.getSelectionModel().getSelectedItem()));
         } catch (Exception ex) {
             Platform.runLater(() -> showError("Load Appointments", ex));
         }
@@ -2244,7 +2356,102 @@ public class ReceptionController {
 
     private void wireDashboardAppointmentsSearch() { /* optional: implement filtering for dashboard table */ }
 
-//    private void loadDoctorsBG() { /* optional: load doctors into doctorData if needed */ }
+    //    private void loadDoctorsBG() { /* optional: load doctors into doctorData if needed */ }
+
+    // يحدّث حقول المريض (الاسم + رقم الهوية) بناءً على صف الموعد المحدّد
+//    private void updatePatientFieldsFromAppt(ApptRow row) {
+//        if (getPatientName == null && getPatientID == null) return;
+//
+//        // الاسم من صف الموعد (إن وُجد)
+//        String name = (row == null || row.getPatientName() == null) ? "" : row.getPatientName();
+//        if (getPatientName != null) getPatientName.setText(name);
+//
+//        // إذا لا يوجد صف صالح أو لا يحتوي على id للموعد، امسح الحقل واخرج
+//        if (row == null || row.getId() <= 0) {
+//            if (getPatientID != null) getPatientID.setText("");
+//            return;
+//        }
+//
+//        // استعلم من قاعدة البيانات للحصول على national_id للمريض المرتبط بالموعد
+//        final String sql = "SELECT p.id AS pid, u.national_id AS nid " +
+//                "FROM appointments a " +
+//                "JOIN patients p ON p.id = a.patient_id " +
+//                "JOIN users u ON u.id = p.user_id " +
+//                "WHERE a.id = ?";
+//        try (Connection c = Database.get(); PreparedStatement ps = c.prepareStatement(sql)) {
+//            ps.setLong(1, row.getId());
+//            try (ResultSet rs = ps.executeQuery()) {
+//                if (rs.next()) {
+//                    long pid = rs.getLong("pid");
+//                    String nid = rs.getString("nid");
+//                    String display = (nid != null && !nid.isBlank()) ? nid : Long.toString(pid);
+//                    if (getPatientID != null) getPatientID.setText(display);
+//                } else {
+//                    // في حال لم نجد نتيجة (لا يجب أن يحدث عادة)
+//                    if (getPatientID != null) getPatientID.setText("");
+//                }
+//            }
+//        } catch (SQLException e) {
+//            // في حال فشل الاستعلام، لا نفشل الواجهة — نُظهر رسالة قصيرة
+//            showToast("warn", "Could not load patient's ID for the selected appointment.");
+//            if (getPatientID != null) getPatientID.setText("");
+//        }
+//    }
+    // يحدّث الاسم + رقم الهوية بدون حجب واجهة المستخدم
+    private void updatePatientFieldsFromAppt(ApptRow row) {
+        if (getPatientName == null && getPatientID == null) return;
+
+        // الاسم (خفيف)
+        String name = (row == null || row.getPatientName() == null) ? "" : row.getPatientName();
+        if (getPatientName != null) getPatientName.setText(name);
+
+        // إن ما في صف صالح
+        if (row == null || row.getId() <= 0) {
+            if (getPatientID != null) getPatientID.setText("");
+            return;
+        }
+
+        long apptId = row.getId();
+
+        // جرّب الكاش أولاً
+        String cached = apptPatientIdCache.get(apptId);
+        if (cached != null) {
+            if (getPatientID != null) getPatientID.setText(cached);
+            return;
+        }
+
+        // مؤقتاً: إشارة خفيفة أنه لسه بتحميل
+        if (getPatientID != null) getPatientID.setText("…");
+
+        // حمّل في الخلفية
+        new Thread(() -> {
+            final String sql = "SELECT p.id AS pid, u.national_id AS nid " +
+                    "FROM appointments a " +
+                    "JOIN patients p ON p.id = a.patient_id " +
+                    "JOIN users u ON u.id = p.user_id " +
+                    "WHERE a.id = ?";
+            String display = "";
+            try (Connection c = Database.get(); PreparedStatement ps = c.prepareStatement(sql)) {
+                ps.setLong(1, apptId);
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) {
+                        long pid = rs.getLong("pid");
+                        String nid = rs.getString("nid");
+                        display = (nid != null && !nid.isBlank()) ? nid : Long.toString(pid);
+                    }
+                }
+            } catch (SQLException ignored) {
+                // نتجنب التوستات المتكررة هنا حتى ما نبطّئ التنقل
+            }
+            final String toShow = display;
+            if (toShow != null && !toShow.isBlank()) {
+                apptPatientIdCache.put(apptId, toShow);
+            }
+            Platform.runLater(() -> {
+                if (getPatientID != null) getPatientID.setText(toShow == null ? "" : toShow);
+            });
+        }, "load-appt-nid-" + apptId).start();
+    }
 
     private void updatePatientDetailsChart() {
         if (appointmentStatusChart == null) return;

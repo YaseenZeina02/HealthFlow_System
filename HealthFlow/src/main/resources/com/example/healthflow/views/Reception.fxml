@@ -135,7 +135,7 @@
                             <children>
 
                                             <!-- ===== Dashboard ===== -->
-                                <AnchorPane fx:id="DashboardAnchorPane" prefHeight="558.4" prefWidth="889.6" visible="false" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+                                <AnchorPane fx:id="DashboardAnchorPane" prefHeight="558.4" prefWidth="889.6" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
                                     <children>
                                         <AnchorPane layoutX="11.0" layoutY="14.0" prefHeight="207.0" prefWidth="869.0" AnchorPane.leftAnchor="11.0" AnchorPane.rightAnchor="10.0" AnchorPane.topAnchor="8.0">
                                             <children>
@@ -270,22 +270,25 @@
                                                     <columns>
                                                         <TableColumn fx:id="colAppointmentID" prefWidth="113.0" text="Appointment ID" />
                                                         <TableColumn fx:id="colPatientNameDash" prefWidth="79.0" text="Patient Name" />
+                                          <TableColumn fx:id="colSpecialtyDash" prefWidth="75.0" text="Specialty" />
                                                         <TableColumn fx:id="colDoctorNameDash" prefWidth="75.0" text="Doctor name" />
                                                         <TableColumn fx:id="colAppintementDateDash" prefWidth="114.0" text="Date" />
                                                         <TableColumn fx:id="colAppintementTimeDash" prefWidth="77.0" text="Time" />
+                                          <TableColumn fx:id="colRoomDash" prefWidth="77.0" text="Room" />
                                                         <TableColumn fx:id="colActionDash" prefWidth="74.0" text="Action" />
                                                     </columns>
                                                     <columnResizePolicy>
                                                         <TableView fx:constant="CONSTRAINED_RESIZE_POLICY" />
                                                     </columnResizePolicy>
                                                 </TableView>
-                                    <Label alignment="CENTER" layoutX="246.0" layoutY="8.0" prefHeight="30.0" prefWidth="65.0" styleClass="text-gradient" stylesheets="@../Design/ReceptionDesign.css" text="Search" AnchorPane.rightAnchor="295.0" AnchorPane.topAnchor="10.0">
+                                    <Label alignment="CENTER" layoutX="254.0" layoutY="9.0" prefHeight="30.0" prefWidth="65.0" styleClass="text-gradient" stylesheets="@../Design/ReceptionDesign.css" text="Search" AnchorPane.rightAnchor="287.0" AnchorPane.topAnchor="9.0">
                                        <font>
                                           <Font name="System Bold Italic" size="20.0" />
                                        </font>
                                     </Label>
                                     <TextField fx:id="searchAppointmentDach" layoutX="319.0" layoutY="11.0" prefHeight="26.0" prefWidth="197.0" promptText="search" styleClass="box" AnchorPane.rightAnchor="90.0" AnchorPane.topAnchor="10.0" />
                                     <Button fx:id="clearSelectionDach" layoutX="529.0" layoutY="10.0" mnemonicParsing="false" prefHeight="28.0" prefWidth="56.0" styleClass="btn-2" stylesheets="@../Design/ReceptionDesign.css" text="Clear" AnchorPane.rightAnchor="21.0" AnchorPane.topAnchor="10.0" />
+                                    <DatePicker fx:id="dataPickerDashboard" layoutX="196.0" layoutY="13.0" prefHeight="20.0" prefWidth="0.0" />
                                             </children>
                                         </AnchorPane>
 
@@ -456,7 +459,7 @@
                                 </AnchorPane>
 
                                             <!-- ===== Appointments Pane ===== -->
-                                <AnchorPane fx:id="AppointmentsAnchorPane" layoutY="1.0" prefHeight="558.0" prefWidth="890.0" style="-fx-background-color: #ededed;" stylesheets="@../Design/ReceptionDesign.css" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="1.0">
+                                <AnchorPane fx:id="AppointmentsAnchorPane" layoutY="1.0" prefHeight="558.0" prefWidth="890.0" style="-fx-background-color: #ededed;" stylesheets="@../Design/ReceptionDesign.css" visible="false" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="1.0">
                                     <children>
                               <AnchorPane layoutX="16.0" layoutY="14.0" prefHeight="110.0" prefWidth="850.0" style="-fx-background-color: #ffffff; -fx-background-radius: 5;" styleClass="shadow" AnchorPane.leftAnchor="19.0" AnchorPane.rightAnchor="21.0">
                                  <children>
@@ -465,14 +468,12 @@
                                           <Font size="14.0" />
                                        </font>
                                     </Label>
-                                    <Label layoutX="20.0" layoutY="38.0" prefHeight="24.0" prefWidth="83.0" text="Patient Name :" />
-                                    <Label fx:id="getPatientName" layoutX="109.0" layoutY="38.0" prefHeight="24.0" prefWidth="112.0" text="i" />
+                                    <Label layoutX="20.0" layoutY="38.0" prefHeight="24.0" prefWidth="95.0" text="Patient Name :" />
+                                    <Label fx:id="getPatientName" layoutX="111.0" layoutY="38.0" prefHeight="24.0" prefWidth="112.0" />
                                     <Label layoutX="20.0" layoutY="62.0" prefHeight="24.0" prefWidth="70.0" text="Patient ID:" />
-                                    <Label fx:id="getPatientID" layoutX="109.0" layoutY="62.0" prefHeight="24.0" prefWidth="132.0" text="77" />
-                                    <Label fx:id="LabelToAlert" layoutX="421.0" layoutY="61.0" prefHeight="44.0" prefWidth="339.0" text="." AnchorPane.bottomAnchor="2.0" AnchorPane.rightAnchor="21.0" />
-                                    <ComboBox fx:id="cmbSlots" layoutX="287.0" layoutY="56.0" prefHeight="7.0" prefWidth="172.0" styleClass="box" />
-                                    <Label fx:id="getPatientID1" layoutX="202.0" layoutY="60.0" prefHeight="28.0" prefWidth="90.0" text="Time Avilable" />
-                                    <Label fx:id="DoctorAvilable" layoutX="203.0" layoutY="7.0" prefHeight="44.0" prefWidth="367.0" text="." />
+                                    <Label fx:id="getPatientID" layoutX="79.0" layoutY="62.0" prefHeight="24.0" prefWidth="132.0" />
+                                    <Label fx:id="LabelToAlert" layoutX="421.0" layoutY="61.0" prefHeight="44.0" prefWidth="312.0" text="." AnchorPane.bottomAnchor="2.0" AnchorPane.rightAnchor="21.0" />
+                                    <Label fx:id="AppointmentDateDetailes" layoutX="469.0" layoutY="6.0" prefHeight="44.0" prefWidth="367.0" text="." AnchorPane.rightAnchor="14.0" />
                                  </children>
                               </AnchorPane>
                               <AnchorPane layoutX="18.0" layoutY="134.0" prefHeight="412.0" prefWidth="852.0" style="-fx-background-color: #ffffff; -fx-background-radius: 5;" styleClass="shadow" AnchorPane.bottomAnchor="12.0" AnchorPane.leftAnchor="18.0" AnchorPane.rightAnchor="20.0" AnchorPane.topAnchor="134.0">
