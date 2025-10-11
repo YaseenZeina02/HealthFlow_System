@@ -13,10 +13,14 @@ public class DoctorRow {
     private final StringProperty bio = new SimpleStringProperty();
     private final StringProperty statusText = new SimpleStringProperty();
     private final BooleanProperty available = new SimpleBooleanProperty(false);
+    private final StringProperty roomNumber = new SimpleStringProperty();
 
+
+
+    public DoctorRow(){}
 
     public DoctorRow(long doctorId, String fullName, String gender, String phone,
-                     String specialty, String bio, String statusText) {
+                     String specialty, String bio, String statusText, String roomNumber) {
         setDoctorId(doctorId);
         setFullName(fullName);
         setGender(gender);
@@ -25,6 +29,7 @@ public class DoctorRow {
         setBio(bio);
         setStatusText(statusText);
         setAvailable("AVAILABLE".equalsIgnoreCase(statusText));
+        setRoomNumber(roomNumber); // ✅ إضافة الغرفة هنا
     }
 
     public long getDoctorId() { return doctorId.get(); }
@@ -58,4 +63,15 @@ public class DoctorRow {
     public boolean isAvailable() { return available.get(); }
     public void setAvailable(boolean v) { available.set(v); }
     public BooleanProperty availableProperty() { return available; }
+
+    public String getRoomNumber() {
+        return roomNumber.get();
+    }
+    public void setRoomNumber(String room) {
+        this.roomNumber.set(room);
+    }
+
+    public StringProperty roomNumberProperty() {
+        return roomNumber;
+    }
 }

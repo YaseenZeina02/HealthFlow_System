@@ -1,5 +1,6 @@
 package com.example.healthflow.controllers;
 
+import com.example.healthflow.dao.AppointmentJdbcDAO;
 import com.example.healthflow.db.Database;
 import com.example.healthflow.dao.DoctorDAO;
 import com.example.healthflow.model.Appointment;
@@ -272,6 +273,8 @@ public class ReceptionController {
     @FXML
     private TableColumn<DoctorRow, String> colDoctor_Status;
     @FXML
+    private TableColumn<DoctorRow, String> colDocRoomNumber;
+    @FXML
     private TableColumn<DoctorRow, Boolean> colDoctor_available;
 
     @FXML
@@ -345,23 +348,13 @@ public class ReceptionController {
 
 
 
+
+
     private static final String[] ROOMS = {"Room 1", "Room 2", "Room 3", "Room 4", "Room 5", "Room 6", "Room 7", "Room 8", "Room 9"};
 
     // Cache for free slots per doctor/day to make row selection instant
     private final Map<Long, Map<LocalDate, ObservableList<DoctorDAO.Slot>>> slotCache = new ConcurrentHashMap<>();
 
-    // Cache rooms per (doctor|date|time) to avoid re-querying on each paint
-    private final Map<String, ObservableList<String>> roomsCache = new ConcurrentHashMap<>();
-
-//    private static String roomKey(String doctorName, LocalDate date, LocalTime time) {
-//        String d = (doctorName == null) ? "-" : doctorName;
-//        String day = (date == null) ? "-" : date.toString();
-//        String t = (time == null) ? "-" : time.toString();
-//        return d + "|" + day + "|" + t;
-//    }
-    private String roomKey(long doctorId, LocalDate date, LocalTime time) {
-        return doctorId + "|" + (date == null ? "" : date) + "|" + (time == null ? "" : time);
-    }
 
     // Best-effort: cancel pending debounced refresh if the implementation exposes such method
     private void cancelPendingUiRefresh() {
@@ -550,7 +543,10 @@ public class ReceptionController {
                 }
             }, "hdr-user-load").start();
             new Thread(this::loadPatientsBG, "patients-load").start();
-            new Thread(this::loadDoctorsBG, "doctors-load").start();
+            new Thread(() -> {
+                var list = DoctorDAO.loadDoctorsBG();
+                Platform.runLater(() -> doctorData.setAll(list));
+            }, "doctors-load").start();
         });
 
         // Slots combobox rendering
@@ -620,8 +616,7 @@ public class ReceptionController {
         // === التحديث اللحظي + تهيئة أولية ===
         startDbNotifications();      // يبدأ LISTEN
         scheduleCoalescedRefresh();  // تعبئة أولية
-//        startAutoRefresh();          // Poll احتياطي كل 10 ثواني
-//        autoRefreshExec.scheduleAtFixedRate(this::scheduleCoalescedRefresh, 10, 20, TimeUnit.SECONDS);
+
     }
     private void setupAppointmentSlotsListener() {
         // listeners already wired in initialize():
@@ -779,23 +774,27 @@ public class ReceptionController {
      */
     private TableCell<Appointment.ApptRow, String> doctorComboCell() {
         return new TableCell<Appointment.ApptRow, String>() {
-            private final ComboBox<String> combo = new ComboBox<>();
-            private Map<String, Long> nameToId = Collections.emptyMap();
+            private final ComboBox<DoctorDAO.DoctorOption> combo = new ComboBox<>();
 
             {
-                combo.setPromptText("Select doctor");
                 combo.setVisibleRowCount(8);
-
-                // إذا فقد الصف التحديد اغلق المحرر فوراً
-                final javafx.beans.value.ChangeListener<Boolean> selListener = (obs, wasSel, isSel) -> {
-                    if (!isSel && isEditing()) cancelEdit();
-                };
-                tableRowProperty().addListener((o, oldRow, newRow) -> {
-                    if (oldRow != null) oldRow.selectedProperty().removeListener(selListener);
-                    if (newRow != null) newRow.selectedProperty().addListener(selListener);
+                combo.setPromptText("Select doctor");
+                combo.setCellFactory(list -> new ListCell<>() {
+                    @Override
+                    protected void updateItem(DoctorDAO.DoctorOption item, boolean empty) {
+                        super.updateItem(item, empty);
+                        setText(empty || item == null ? null : item.fullName + "  (Room: " + item.roomNumber + ")");
+                    }
+                });
+                combo.setButtonCell(new ListCell<>() {
+                    @Override
+                    protected void updateItem(DoctorDAO.DoctorOption item, boolean empty) {
+                        super.updateItem(item, empty);
+                        setText(empty || item == null ? null : item.fullName + "  (Room: " + item.roomNumber + ")");
+                    }
                 });
 
-                // افتح المحرر فور لمسة واحدة على الصف المحدد
+                // افتح المحرر على نقرة واحدة حين يكون الصف محددًا
                 setOnMouseClicked(e -> {
                     if (!isEmpty() && getTableRow() != null && getTableRow().isSelected()) {
                         startEdit();
@@ -803,340 +802,42 @@ public class ReceptionController {
                     }
                 });
 
-                combo.setOnAction(e -> {
-                    var rowItem = getTableRow() != null ? getTableRow().getItem() : null;
+                // حمّل الأطباء المتاحين للتخصص الحالي عند فتح القائمة
+                combo.setOnShown(e -> {
+                    var rowItem = (getTableRow() == null) ? null : getTableRow().getItem();
                     if (rowItem == null) return;
-                    String sel = combo.getValue();
-                    if (sel == null || sel.isBlank()) return;
-
-                    Long did = nameToId.get(sel);
-                    if (did != null) {
-                        rowItem.setDoctorId(did);
-                        rowItem.setDoctorName(sel);
-                        rowItem.setDirty(true);
-                        // تغيّر الدكتور → حدّث الأعمدة المعتمدة عليه (الأوقات/الغرف)
-                        if (TableINAppointment != null) TableINAppointment.refresh();
-                    }
-                    commitEdit(sel);
-                });
-            }
-
-            @Override
-            public void startEdit() {
-                super.startEdit();
-                var rowItem = (getTableRow() == null) ? null : getTableRow().getItem();
-                if (rowItem != null) {
-                    var spec = rowItem.getSpecialty();
-                    List<DoctorDAO.DoctorOption> opts;
+                    String spec = rowItem.getSpecialty();
+                    java.util.List<DoctorDAO.DoctorOption> opts;
                     try {
                         opts = doctorDAO.listAvailableBySpecialty(spec);
                     } catch (Exception ex) {
-                        opts = Collections.emptyList();
+                        opts = java.util.Collections.emptyList();
                     }
-                    Map<String, Long> m = new LinkedHashMap<>();
-                    for (var o : opts) m.put(o.fullName, o.doctorId);
-                    nameToId = m;
-
-                    combo.setItems(FXCollections.observableArrayList(m.keySet()));
-                    combo.setValue(rowItem.getDoctorName());
-                }
-                setGraphic(combo);
-                setText(null);
-            }
-
-            @Override
-            public void cancelEdit() {
-                super.cancelEdit();
-                setGraphic(null);
-                setText(getItem());
-            }
-
-            @Override
-            protected void updateItem(String item, boolean empty) {
-                super.updateItem(item, empty);
-                if (empty) {
-                    setGraphic(null);
-                    setText(null);
-                    return;
-                }
-
-                // أغلق المحرر لو فقد الصف التحديد
-                if (getTableRow() != null && !getTableRow().isSelected() && isEditing()) {
-                    cancelEdit();
-                }
-                boolean showEditor = isEditing() && getTableRow() != null && getTableRow().isSelected();
-                if (showEditor) {
-                    setGraphic(combo);
-                    setText(null);
-                } else {
-                    setGraphic(null);
-                    setText(item);
-                }
-            }
-        };
-    }
-
-    /**
-     * Room column: show ComboBox only when row is selected/editing
-     */
-//    private TableCell<Appointment.ApptRow, String> roomComboInlineCell() {
-//        return new TableCell<Appointment.ApptRow, String>() {
-//            private final ComboBox<String> combo = new ComboBox<>();
-//
-//            {
-//                combo.setPromptText("Select room");
-//                combo.setVisibleRowCount(9);
-//
-//                // إذا فقد الصف التحديد اغلق المحرر فوراً
-//                final javafx.beans.value.ChangeListener<Boolean> selListener = (obs, wasSel, isSel) -> {
-//                    if (!isSel && isEditing()) cancelEdit();
-//                };
-//                tableRowProperty().addListener((o, oldRow, newRow) -> {
-//                    if (oldRow != null) oldRow.selectedProperty().removeListener(selListener);
-//                    if (newRow != null) newRow.selectedProperty().addListener(selListener);
-//                });
-//
-//                setOnMouseClicked(e -> {
-//                    if (!isEmpty() && getTableRow() != null && getTableRow().isSelected()) {
-//                        startEdit();
-//                        combo.show();
-//                    }
-//                });
-//
-//                combo.setOnShown(e -> {
-////                    var r = (getTableRow() == null) ? null : getTableRow().getItem();
-////                    if (r == null) return;
-////                    String key = roomKey(r.getDoctorName(), r.getDate(), r.getTime());
-////
-////                    // أولاً عبّي من الكاش مباشرة لو موجود لتجربة سريعة
-////                    var cached = roomsCache.get(key);
-////                    if (cached != null) {
-////                        combo.setItems(cached);
-////                    }
-////
-////                    // ثم حدّث بالقيم الأحدث في الخلفية
-////                    new Thread(() -> {
-////                        ObservableList<String> rooms = null;
-////                        try {
-////                            rooms = FXCollections.observableArrayList(listAvailableRooms(r.getDoctorName(), r.getDate(), r.getTime()));
-////                        } catch (SQLException ex) {
-////                            throw new RuntimeException(ex);
-////                        }
-////                        roomsCache.put(key, rooms);
-////                        ObservableList<String> finalRooms = rooms;
-////                        Platform.runLater(() -> {
-////                            // لا تكتب فوق اختيار المستخدم إذا كان غيّره
-////                            if (getTableRow() == null || getTableRow().getItem() != r) return;
-////                            combo.setItems(finalRooms);
-////                            combo.setValue(r.getRoomNumber());
-////                        });
-////                    }, "load-rooms-cell").start();
-//
-//                    // عند الفتح
-//                    var r = (getTableRow() == null) ? null : getTableRow().getItem();
-//                    if (r == null) return;
-//                    String key = roomKey(r.getDoctorId(), r.getDate(), r.getTime());   // <-- بدل الاسم بالـ id
-//
-//                    var cached = roomsCache.get(key);
-//                    if (cached != null) combo.setItems(cached);
-//
-//                    new Thread(() -> {
-//                        ObservableList<String> rooms;
-//                        try {
-//                            rooms = FXCollections.observableArrayList(
-//                                    listAvailableRooms(r.getDoctorId(), r.getDate(), r.getTime()) // <-- مرر الـ id
-//                            );
-//                        } catch (SQLException ex) {
-//                            ex.printStackTrace();  // أو showWarn(...)
-//                            return;
-//                        }
-//                        roomsCache.put(key, rooms);
-//                        Platform.runLater(() -> {
-//                            if (getTableRow() == null || getTableRow().getItem() != r) return;
-//                            combo.setItems(rooms);
-//                            combo.setValue(r.getRoomNumber());
-//                        });
-//                    }, "load-rooms-cell").start();
-//                });
-//
-//                combo.setOnAction(e -> {
-//                    var r = (getTableRow() == null) ? null : getTableRow().getItem();
-//                    if (r == null) return;
-//                    String sel = combo.getValue();
-//                    if (sel == null || sel.isBlank()) return;
-//                    r.setRoomNumber(sel);
-//                    r.setDirty(true);
-//                    commitEdit(sel);
-//                });
-//            }
-//
-//            @Override
-//            public void startEdit() {
-//                super.startEdit();
-//                var r = (getTableRow() == null) ? null : getTableRow().getItem();
-//                if (r != null) {
-//                    String key = roomKey(r.getDoctorId(), r.getDate(), r.getTime());
-//                    var cached = roomsCache.get(key);
-//                    if (cached != null) {
-//                        combo.setItems(cached);
-//                        combo.setValue(r.getRoomNumber());
-//                    } else {
-//                        combo.setItems(FXCollections.observableArrayList());
-//                        // حمّل الغرف بالخلفية ثم حدّث
-//                        new Thread(() -> {
-//                            ObservableList<String> rooms = null;
-//                            try {
-//                                rooms = FXCollections.observableArrayList(listAvailableRooms(r.getDoctorId(), r.getDate(), r.getTime()));
-//                            } catch (SQLException e) {
-//                                throw new RuntimeException(e);
-//                            }
-//                            roomsCache.put(key, rooms);
-//                            ObservableList<String> finalRooms = rooms;
-//                            Platform.runLater(() -> {
-//                                if (getTableRow() == null || getTableRow().getItem() != r) return;
-//                                combo.setItems(finalRooms);
-//                                combo.setValue(r.getRoomNumber());
-//                            });
-//                        }, "load-rooms-startEdit").start();
-//                    }
-//                }
-//                setGraphic(combo);
-//                setText(null);
-//            }
-//
-//            @Override
-//            public void cancelEdit() {
-//                super.cancelEdit();
-//                setGraphic(null);
-//                setText(getItem());
-//            }
-//
-//            @Override
-//            protected void updateItem(String item, boolean empty) {
-//                super.updateItem(item, empty);
-//                if (empty) {
-//                    setGraphic(null);
-//                    setText(null);
-//                    return;
-//                }
-//
-//                // أغلق المحرر لو فقد الصف التحديد
-//                if (getTableRow() != null && !getTableRow().isSelected() && isEditing()) {
-//                    cancelEdit();
-//                }
-//
-//                boolean showEditor = isEditing() && getTableRow() != null && getTableRow().isSelected();
-//                if (showEditor) {
-//                    setGraphic(combo);
-//                    setText(null);
-//                } else {
-//                    setGraphic(null);
-//                    setText(item);
-//                }
-//            }
-//        };
-//    }
-     // Room column: show ComboBox only when row is selected/editing (using doctor ID)
-     private TableCell<Appointment.ApptRow, String> roomComboInlineCell() {
-        return new TableCell<Appointment.ApptRow, String>() {
-            private final ComboBox<String> combo = new ComboBox<>();
-
-            {
-                combo.setPromptText("Select room");
-                combo.setVisibleRowCount(9);
-
-                // أغلق المحرر إذا فقد الصف التحديد
-                final javafx.beans.value.ChangeListener<Boolean> selListener = (obs, wasSel, isSel) -> {
-                    if (!isSel && isEditing()) cancelEdit();
-                };
-                tableRowProperty().addListener((o, oldRow, newRow) -> {
-                    if (oldRow != null) oldRow.selectedProperty().removeListener(selListener);
-                    if (newRow != null) newRow.selectedProperty().addListener(selListener);
-                });
-
-                // افتح المحرر بلمسة واحدة عندما يكون الصف محدد
-                setOnMouseClicked(e -> {
-                    if (!isEmpty() && getTableRow() != null && getTableRow().isSelected()) {
-                        startEdit();
-                        combo.show();
+                    combo.setItems(FXCollections.observableArrayList(opts));
+                    // اختَر الحالي إن كان مضبوطًا
+                    if (rowItem.getDoctorId() > 0) {
+                        for (var o : opts) if (o.doctorId == rowItem.getDoctorId()) { combo.getSelectionModel().select(o); break; }
                     }
                 });
 
-                // عند فتح القائمة: عبّي من الكاش ثم حدّث بالخلفية
-                combo.setOnShown(e -> {
-                    ApptRow r = (getTableRow() == null) ? null : getTableRow().getItem();
-                    if (r == null) return;
-                    final String key = roomKey(r.getDoctorId(), r.getDate(), r.getTime()); // <-- doctorId
-
-                    // من الكاش أولاً (سريع)
-                    ObservableList<String> cached = roomsCache.get(key);
-                    if (cached != null) combo.setItems(cached);
-
-                    // حمّل أحدث بيانات بالخلفية
-                    new Thread(() -> {
-                        ObservableList<String> rooms;
-                        try {
-                            rooms = FXCollections.observableArrayList(
-                                    listAvailableRooms(r.getDoctorId(), r.getDate(), r.getTime())
-                            );
-                        } catch (SQLException ex) {
-                            ex.printStackTrace();
-                            return;
-                        }
-                        roomsCache.put(key, rooms);
-                        Platform.runLater(() -> {
-                            // تأكد إن نفس الصف لسه هنا
-                            if (getTableRow() == null || getTableRow().getItem() != r) return;
-                            combo.setItems(rooms);
-                            combo.setValue(r.getRoomNumber());
-                        });
-                    }, "load-rooms-cell").start();
-                });
-
-                // لما يختار غرفة
+                // تحديث الموديل عند الاختيار
                 combo.setOnAction(e -> {
-                    ApptRow r = (getTableRow() == null) ? null : getTableRow().getItem();
-                    if (r == null) return;
-                    String sel = combo.getValue();
-                    if (sel == null || sel.isBlank()) return;
-                    r.setRoomNumber(sel);
-                    r.setDirty(true);
-                    updateDirtyAlert();
-                    commitEdit(sel);
+                    var rowItem = (getTableRow() == null) ? null : getTableRow().getItem();
+                    var opt = combo.getValue();
+                    if (rowItem == null || opt == null) return;
+                    rowItem.setDoctorId(opt.doctorId);
+                    rowItem.setDoctorName(opt.fullName);
+                    // ✅ أهم سطر: ثبّت الغرفة في الصف عند اختيار الدكتور
+                    rowItem.setRoomNumber(opt.roomNumber);
+                    rowItem.setDirty(true);
+                    commitEdit(opt.fullName);
+                    if (TableINAppointment != null) TableINAppointment.refresh();
                 });
             }
 
             @Override
             public void startEdit() {
                 super.startEdit();
-                ApptRow r = (getTableRow() == null) ? null : getTableRow().getItem();
-                if (r != null) {
-                    final String key = roomKey(r.getDoctorId(), r.getDate(), r.getTime());
-                    ObservableList<String> cached = roomsCache.get(key);
-                    if (cached != null) {
-                        combo.setItems(cached);
-                        combo.setValue(r.getRoomNumber());
-                    } else {
-                        combo.setItems(FXCollections.observableArrayList());
-                        new Thread(() -> {
-                            ObservableList<String> rooms;
-                            try {
-                                rooms = FXCollections.observableArrayList(
-                                        listAvailableRooms(r.getDoctorId(), r.getDate(), r.getTime())
-                                );
-                            } catch (SQLException ex) {
-                                ex.printStackTrace();
-                                return;
-                            }
-                            roomsCache.put(key, rooms);
-                            Platform.runLater(() -> {
-                                if (getTableRow() == null || getTableRow().getItem() != r) return;
-                                combo.setItems(rooms);
-                                combo.setValue(r.getRoomNumber());
-                            });
-                        }, "load-rooms-startEdit").start();
-                    }
-                }
                 setGraphic(combo);
                 setText(null);
             }
@@ -1156,10 +857,6 @@ public class ReceptionController {
                     setText(null);
                     return;
                 }
-                // أغلق المحرر لو فقد الصف التحديد
-                if (getTableRow() != null && !getTableRow().isSelected() && isEditing()) {
-                    cancelEdit();
-                }
                 boolean showEditor = isEditing() && getTableRow() != null && getTableRow().isSelected();
                 if (showEditor) {
                     setGraphic(combo);
@@ -1171,6 +868,7 @@ public class ReceptionController {
             }
         };
     }
+
 
      private void refreshSlots() {
 
@@ -1537,6 +1235,7 @@ public class ReceptionController {
         if (colDoctor_Status != null) colDoctor_Status.setCellValueFactory(cd -> cd.getValue().statusTextProperty());
         if (colDoctor_available != null)
             colDoctor_available.setCellValueFactory(cd -> cd.getValue().availableProperty());
+        if (colDocRoomNumber != null) colDocRoomNumber.setCellValueFactory(cd -> cd.getValue().roomNumberProperty());
         if (DocTable_Recption != null) DocTable_Recption.setItems(doctorData);
     }
 
@@ -1651,7 +1350,7 @@ public class ReceptionController {
         uiRefresh.request(() -> {
             new Thread(() -> {
                 try {
-                    var apptRows = doctorDAO.listScheduledAppointments();
+                    var apptRows = AppointmentJdbcDAO.listScheduledAppointments();
                     var mapped = FXCollections.<ApptRow>observableArrayList();
                     for (var r : apptRows) {
                         ApptRow ar = new ApptRow();
@@ -1666,7 +1365,10 @@ public class ReceptionController {
                             ar.setDate(ldt1.toLocalDate());
                             ar.setTime(ldt1.toLocalTime());
                         }
-                        ar.setRoomNumber(r.location);   // <-- أضِف هذا
+
+                        // ✅ أضف هذا السطر:
+                        ar.setRoomNumber(r.location);
+
                         ar.setNew(false);
                         ar.setDirty(false);
                         mapped.add(ar);
@@ -1675,18 +1377,18 @@ public class ReceptionController {
                     var dashRows = apptRows;
                     if (TableAppInDashboard != null && searchAppointmentDach != null) {
                         String q = searchAppointmentDach.getText();
-                        if (q != null && !q.isBlank()) dashRows = doctorDAO.searchScheduledAppointments(q);
+                        if (q != null && !q.isBlank()) dashRows = AppointmentJdbcDAO.searchScheduledAppointments(q);
                     }
                     final var dashRowsFinal = dashRows;
 
-                    int doctors = doctorDAO.countAvailableDoctors();
-                    int appts = doctorDAO.countAppointments();
-                    int patients = doctorDAO.countPatients();
-                    int completed = doctorDAO.countCompletedAppointments();
-                    int scheduled = doctorDAO.countScheduledAppointments();
+                    int doctors = AppointmentJdbcDAO.countAvailableDoctors();
+                    int appts = AppointmentJdbcDAO.countAppointments();
+                    int patients = AppointmentJdbcDAO.countPatients();
+                    int completed = AppointmentJdbcDAO.countCompletedAppointments();
+                    int scheduled = AppointmentJdbcDAO.countScheduledAppointments();
 
                     Platform.runLater(() -> {
-                        TableUtils.applyDelta(apptEditable, mapped, ApptRow::getId);
+                        apptEditable.setAll(mapped); // استبدال ذري
                         if (TableAppInDashboard != null) apptData.setAll(dashRowsFinal);
                         if (NumberOfTotalDoctors != null) NumberOfTotalDoctors.setText(String.valueOf(doctors));
                         if (NumberOfTotalAppointments != null) NumberOfTotalAppointments.setText(String.valueOf(appts));
@@ -1760,7 +1462,7 @@ public class ReceptionController {
         autoRefreshExec.scheduleAtFixedRate(() -> {
             try {
                 loadPatientsBG();
-                loadDoctorsBG();
+                DoctorDAO.loadDoctorsBG();
             } catch (Exception ignore) {
             }
         }, 0, 60, TimeUnit.SECONDS);
@@ -1958,10 +1660,6 @@ public class ReceptionController {
         if (colStatusAppointment != null)
             colStatusAppointment.setCellValueFactory(cd -> cd.getValue().statusProperty());
 
-//        if (colStartTime != null)
-//            colStartTime.setCellValueFactory(cd -> new SimpleStringProperty(fmt12(cd.getValue().getTime())));
-//        if (colStartTime != null) colStartTime.setEditable(false);
-
         // --- Start Time column (يعرض الوقت بصيغة 12h)
         if (colStartTime != null) {
             colStartTime.setCellValueFactory(cd ->
@@ -2003,6 +1701,12 @@ public class ReceptionController {
                     showError("Invalid time", new RuntimeException("Use HH:mm or hh:mm AM/PM"));
                 }
             });
+        }
+        if (colRoomNumber != null) {
+            colRoomNumber.setEditable(false);
+            colRoomNumber.setCellValueFactory(cd -> new ReadOnlyStringWrapper(
+                    cd.getValue().getRoomNumber() == null ? "" : cd.getValue().getRoomNumber()
+            ));
         }
 
         // Date as DatePicker
@@ -2047,17 +1751,8 @@ public class ReceptionController {
                     TableINAppointment.refresh();
             });
         }
-
-        if (colRoomNumber != null) {
-            colRoomNumber.setCellValueFactory(cd -> cd.getValue().roomNumberProperty());
-            colRoomNumber.setCellFactory(col -> roomComboInlineCell());
-            colRoomNumber.setEditable(true);
-        }
-
         if (TableINAppointment != null) TableINAppointment.refresh();
     }
-
-
 
     /**
      * تهيئة التحرير المباشر على جدول المواعيد
@@ -2107,11 +1802,6 @@ public class ReceptionController {
             colDoctorNameAppointment.setCellFactory(col -> doctorComboCell());
         }
 
-        // Room column (by doctorId/date/time)
-        if (colRoomNumber != null) {
-            colRoomNumber.setEditable(true);
-            colRoomNumber.setCellFactory(col -> roomComboInlineCell());
-        }
 
         // Status column as ComboBox
         if (colStatusAppointment != null) {
@@ -2176,7 +1866,7 @@ public class ReceptionController {
     // Load appointments table once (used at init)
     private void loadAppointmentsTable() {
         try {
-            var apptRows = doctorDAO.listScheduledAppointments();
+            var apptRows = AppointmentJdbcDAO.listScheduledAppointments();
             var mapped = FXCollections.<ApptRow>observableArrayList();
             for (var r : apptRows) {
                 ApptRow ar = new ApptRow();
@@ -2204,11 +1894,11 @@ public class ReceptionController {
 
     private void updateAppointmentCounters() {
         try {
-            int doctors = doctorDAO.countAvailableDoctors();
-            int appts = doctorDAO.countAppointments();
-            int patients = doctorDAO.countPatients();
-            int completed = doctorDAO.countCompletedAppointments();
-            int scheduled = doctorDAO.countScheduledAppointments();
+            int doctors = AppointmentJdbcDAO.countAvailableDoctors();
+            int appts = AppointmentJdbcDAO.countAppointments();
+            int patients = AppointmentJdbcDAO.countPatients();
+            int completed = AppointmentJdbcDAO.countCompletedAppointments();
+            int scheduled = AppointmentJdbcDAO.countScheduledAppointments();
             Platform.runLater(() -> {
                 if (NumberOfTotalDoctors != null) NumberOfTotalDoctors.setText(String.valueOf(doctors));
                 if (NumberOfTotalAppointments != null) NumberOfTotalAppointments.setText(String.valueOf(appts));
@@ -2311,7 +2001,7 @@ public class ReceptionController {
                 INSERT INTO appointments
                   (doctor_id, patient_id, appointment_date, duration_minutes, status, location, created_by, created_at, updated_at)
                 VALUES
-                  (?, ?, ?, ?, 'SCHEDULED', ?, ?, now(), now())
+                  (?, ?, ?, ?, 'SCHEDULED'::appt_status, COALESCE(?, (SELECT room_number FROM doctors WHERE id=?)), ?, now(), now())
                 RETURNING id, doctor_id, patient_id, appointment_date, duration_minutes, status, location
             """;
 
@@ -2322,7 +2012,8 @@ public class ReceptionController {
                 ps.setObject(3, startAt);
                 ps.setInt(4, duration);
                 if (location != null) ps.setString(5, location); else ps.setNull(5, Types.VARCHAR);
-                ps.setLong(6, Session.get().getId());
+                ps.setLong(6, doctorId); // for COALESCE subselect
+                ps.setLong(7, Session.get().getId());
 
                 try (ResultSet rs = ps.executeQuery()) {
                     if (rs.next()) {
@@ -2367,6 +2058,10 @@ public class ReceptionController {
             showInfo("Insert", "Appointment created.");
             scheduleCoalescedRefresh();
         } catch (Exception e) {
+            if (e instanceof java.sql.SQLException se && "23505".equals(se.getSQLState())) {
+                showWarn("Insert Appointment", "Conflict: another appointment exists for the same doctor or room at this start time.");
+                return;
+            }
             showError("Insert Appointment", e);
         }
     }
@@ -2376,7 +2071,9 @@ public class ReceptionController {
         if (row == null) { showWarn("Update", "Select an appointment row first."); return; }
 
         try (Connection c = Database.get()) {
-            String sql = "UPDATE appointments SET doctor_id=?, appointment_date=?, duration_minutes=?, location=?, status=?::appt_status, updated_at=now() WHERE id=?";
+            String sql = "UPDATE appointments SET doctor_id=?, appointment_date=?, duration_minutes=?, " +
+                         "location = COALESCE(?, (SELECT room_number FROM doctors WHERE id=?)), " +
+                         "status=?::appt_status, updated_at=now() WHERE id=?";
             try (PreparedStatement ps = c.prepareStatement(sql)) {
                 java.time.OffsetDateTime startAt = (row.getDate() != null && row.getTime() != null)
                         ? toAppOffset(row.getDate(), row.getTime())
@@ -2384,18 +2081,22 @@ public class ReceptionController {
                 int duration = (row.getSessionTime() > 0) ? row.getSessionTime() : DEFAULT_SESSION_MIN;
 
                 ps.setLong(1, row.getDoctorId());
-                if (startAt != null) ps.setObject(2, startAt);
-                else ps.setNull(2, java.sql.Types.TIMESTAMP_WITH_TIMEZONE);
+                if (startAt != null) ps.setObject(2, startAt); else ps.setNull(2, java.sql.Types.TIMESTAMP_WITH_TIMEZONE);
                 ps.setInt(3, duration);
-                if (row.getRoomNumber() != null) ps.setString(4, row.getRoomNumber()); else ps.setNull(4, Types.VARCHAR);
 
-                if (row.getStatus() != null && !row.getStatus().isBlank()) {
-                    ps.setString(5, row.getStatus());
-                } else {
-                    ps.setNull(5, Types.OTHER); // ENUM
-                }
+                if (row.getRoomNumber() != null && !row.getRoomNumber().isBlank())
+                    ps.setString(4, row.getRoomNumber());
+                else
+                    ps.setNull(4, Types.VARCHAR);
 
-                ps.setLong(6, row.getId());
+                ps.setLong(5, row.getDoctorId()); // for COALESCE subselect
+
+                if (row.getStatus() != null && !row.getStatus().isBlank())
+                    ps.setString(6, row.getStatus());
+                else
+                    ps.setNull(6, Types.OTHER);
+
+                ps.setLong(7, row.getId());
                 ps.executeUpdate();
             }
             try (PreparedStatement n = c.prepareStatement("SELECT pg_notify('appointments_changed','update')")) {
@@ -2404,6 +2105,10 @@ public class ReceptionController {
             showInfo("Update", "Appointment updated.");
             scheduleCoalescedRefresh();
         } catch (Exception e) {
+            if (e instanceof java.sql.SQLException se && "23505".equals(se.getSQLState())) {
+                showWarn("Update Appointment", "Conflict: another appointment exists for the same doctor or room at this start time.");
+                return;
+            }
             showError("Update Appointment", e);
         }
     }
@@ -2411,7 +2116,7 @@ public class ReceptionController {
 
     private void wireDashboardAppointmentsSearch() { /* optional: implement filtering for dashboard table */ }
 
-    private void loadDoctorsBG() { /* optional: load doctors into doctorData if needed */ }
+//    private void loadDoctorsBG() { /* optional: load doctors into doctorData if needed */ }
 
     private void updatePatientDetailsChart() {
         if (appointmentStatusChart == null) return;

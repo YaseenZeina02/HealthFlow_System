@@ -541,3 +541,55 @@ CREATE EXTENSION IF NOT EXISTS btree_gist;
 ALTER TABLE appointments
     ADD CONSTRAINT no_overlap_per_doctor
     EXCLUDE USING gist (doctor_id WITH =, appt_range WITH &&);
+
+
+
+-- 1) أضف العمود للأطباء (لو مش موجود):
+ALTER TABLE doctors
+    ADD COLUMN IF NOT EXISTS room_number VARCHAR(100) UNIQUE;
+
+-- 2) تعبئة أولية لرقم الغرفة من آخر موعد معروف لكل دكتور (إن وُجدت غرف محفوظة سابقًا):
+WITH last_rooms AS (
+    SELECT a.doctor_id,
+           (ARRAY_AGG(a.location ORDER BY a.appointment_date DESC))[1] AS room
+FROM appointments a
+WHERE a.location IS NOT NULL
+GROUP BY a.doctor_id
+    )
+UPDATE doctors d
+SET room_number = lr.room
+    FROM last_rooms lr
+WHERE lr.doctor_id = d.id
+  AND d.room_number IS NULL;
+
+-- 3) احذف العمود من appointments:
+ALTER TABLE appointments DROP COLUMN IF EXISTS location;
+
+
+// رجعت location على جدول المواعيد
+ALTER TABLE appointments ADD COLUMN IF NOT EXISTS location varchar(100);
+-- افتراضيًا عند الإدخال: خذ غرفة الدكتور
+CREATE OR REPLACE FUNCTION appt_default_room()
+RETURNS trigger AS $$
+BEGIN
+  IF NEW.location IS NULL THEN
+SELECT room_number INTO NEW.location FROM doctors WHERE id = NEW.doctor_id;
+END IF;
+RETURN NEW;
+END; $$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_appt_default_room ON appointments;
+CREATE TRIGGER trg_appt_default_room
+    BEFORE INSERT ON appointments
+    FOR EACH ROW
+    EXECUTE FUNCTION appt_default_room();
+
+-- (اختياري) منع تعارضات دقيقة على نفس الغرفة ونفس الـ start:
+-- مبدئيًا على نفس لحظة البدء (بدون مدة/تداخل):
+CREATE UNIQUE INDEX IF NOT EXISTS uq_room_start
+    ON appointments (location, appointment_date)
+    WHERE location IS NOT NULL;
+
+-- (اختياري) منع تعارض الدكتور:
+CREATE UNIQUE INDEX IF NOT EXISTS uq_doctor_start
+    ON appointments (doctor_id, appointment_date);
