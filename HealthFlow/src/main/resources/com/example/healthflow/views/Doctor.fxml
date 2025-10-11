@@ -249,6 +249,7 @@
                                  <font><Font name="System Bold Italic" size="20.0" /></font>
                               </Label>
                               <TextField fx:id="search" layoutX="653.0" layoutY="10.0" prefHeight="26.0" prefWidth="197.0" promptText="search" AnchorPane.rightAnchor="15.000000000000028" />
+                              <Button fx:id="InsertButton21" layoutX="403.0" layoutY="12.0" mnemonicParsing="false" prefHeight="3.0" prefWidth="60.0" styleClass="btn-2" stylesheets="@../Design/ReceptionDesign.css" text="View" />
                            </children>
                         </AnchorPane>
                      </children>
@@ -281,7 +282,7 @@
                                  <font><Font name="System Bold Italic" size="20.0" /></font>
                               </Label>
                               <TextField fx:id="searchLabel" layoutX="654.0" layoutY="12.0" prefHeight="26.0" prefWidth="197.0" promptText="search" AnchorPane.rightAnchor="14.8" AnchorPane.topAnchor="12.0" />
-                              <Button fx:id="InsertButton2" layoutX="376.0" layoutY="11.0" mnemonicParsing="false" prefHeight="3.0" prefWidth="60.0" styleClass="btn-2" stylesheets="@../Design/ReceptionDesign.css" text="View" />
+                              <Button fx:id="InsertButton2" layoutX="376.0" layoutY="11.0" mnemonicParsing="false" prefHeight="20.0" prefWidth="90.0" styleClass="btn-2" stylesheets="@../Design/ReceptionDesign.css" text="Prescription" />
                            </children>
                            <styleClass>
                               <String fx:value="radius" />
