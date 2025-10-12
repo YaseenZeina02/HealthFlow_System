@@ -135,7 +135,7 @@
                             <children>
 
                                             <!-- ===== Dashboard ===== -->
-                                <AnchorPane fx:id="DashboardAnchorPane" prefHeight="558.4" prefWidth="889.6" visible="false" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+                                <AnchorPane fx:id="DashboardAnchorPane" prefHeight="558.4" prefWidth="889.6" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
                                     <children>
                                         <AnchorPane layoutX="11.0" layoutY="14.0" prefHeight="207.0" prefWidth="869.0" AnchorPane.leftAnchor="11.0" AnchorPane.rightAnchor="10.0" AnchorPane.topAnchor="8.0">
                                             <children>
@@ -268,8 +268,8 @@
                                                 </Label>
                                                 <TableView fx:id="TableAppInDashboard" layoutX="15.0" layoutY="49.0" prefHeight="290.0" prefWidth="576.0" stylesheets="@../Design/ReceptionDesign.css" AnchorPane.bottomAnchor="14.0" AnchorPane.leftAnchor="15.0" AnchorPane.rightAnchor="12.0" AnchorPane.topAnchor="49.0">
                                                     <columns>
-                                                        <TableColumn fx:id="colAppointmentID" prefWidth="113.0" text="Appointment ID" />
-                                                        <TableColumn fx:id="colPatientNameDash" prefWidth="79.0" text="Patient Name" />
+                                                        <TableColumn fx:id="colAppointmentID" prefWidth="38.0" text=" " />
+                                                        <TableColumn fx:id="colPatientNameDash" prefWidth="106.0" text="Patient Name" />
                                           <TableColumn fx:id="colSpecialtyDash" prefWidth="75.0" text="Specialty" />
                                                         <TableColumn fx:id="colDoctorNameDash" prefWidth="75.0" text="Doctor name" />
                                                         <TableColumn fx:id="colAppintementDateDash" prefWidth="114.0" text="Date" />
@@ -454,7 +454,7 @@
                                 </AnchorPane>
 
                                             <!-- ===== Appointments Pane ===== -->
-                                <AnchorPane fx:id="AppointmentsAnchorPane" layoutY="1.0" prefHeight="558.0" prefWidth="890.0" style="-fx-background-color: #ededed;" stylesheets="@../Design/ReceptionDesign.css" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="1.0">
+                                <AnchorPane fx:id="AppointmentsAnchorPane" layoutY="1.0" prefHeight="558.0" prefWidth="890.0" style="-fx-background-color: #ededed;" stylesheets="@../Design/ReceptionDesign.css" visible="false" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="1.0">
                                     <children>
                               <AnchorPane layoutX="16.0" layoutY="14.0" prefHeight="110.0" prefWidth="850.0" style="-fx-background-color: #ffffff; -fx-background-radius: 5;" styleClass="shadow" AnchorPane.leftAnchor="19.0" AnchorPane.rightAnchor="21.0">
                                  <children>

@@ -710,7 +710,7 @@ public class ReceptionController {
         applyDashboardFilters();
         if (clearSelectionDach != null) clearSelectionDach.setOnAction(e -> {
             if (TableAppInDashboard != null) TableAppInDashboard.getSelectionModel().clearSelection();
-            if (appointmentStatusChart != null) appointmentStatusChart.getData().clear();
+//            if (appointmentStatusChart != null) appointmentStatusChart.getData().clear();
             if (searchAppointmentDach != null) searchAppointmentDach.clear();
         });
 
@@ -2554,11 +2554,20 @@ public class ReceptionController {
     // ===== Dashboard table: columns & actions =====
     private void wireDashboardTable() {
         if (TableAppInDashboard == null) return;
+
+        // ✅ نستخدم UNCONSTRAINED_RESIZE_POLICY لتمكين الـ H-Scroll عند زيادة مجموع عرض الأعمدة
+        TableAppInDashboard.setColumnResizePolicy(TableView.UNCONSTRAINED_RESIZE_POLICY);
         TableAppInDashboard.setItems(sortedDash);
         sortedDash.comparatorProperty().bind(TableAppInDashboard.comparatorProperty());
 
-        // Row index starting from 1 (visual order number)
+        // -------- Appointment ID (index shown 1..n) --------
         if (colAppointmentID != null) {
+            colAppointmentID.setStyle("-fx-alignment: CENTER;");
+            colAppointmentID.setMinWidth(60);
+            colAppointmentID.setPrefWidth(70);   // صغير
+            colAppointmentID.setMaxWidth(120);
+            colAppointmentID.setResizable(true);
+
             colAppointmentID.setCellFactory(col -> new TableCell<DoctorDAO.AppointmentRow, Number>() {
                 @Override protected void updateItem(Number item, boolean empty) {
                     super.updateItem(item, empty);
@@ -2568,19 +2577,40 @@ public class ReceptionController {
             colAppointmentID.setCellValueFactory(cd -> new SimpleIntegerProperty(getSafeIndexOf(cd.getValue()) + 1));
         }
 
-        if (colPatientNameDash != null) colPatientNameDash.setCellValueFactory(cd -> new SimpleStringProperty(cd.getValue().patientName));
-        if (colDoctorNameDash != null) colDoctorNameDash.setCellValueFactory(cd -> new SimpleStringProperty(cd.getValue().doctorName));
-        if (colSpecialtyDash != null) colSpecialtyDash.setCellValueFactory(cd -> new SimpleStringProperty(cd.getValue().specialty));
-        if (colRoomDash != null) colRoomDash.setCellValueFactory(cd -> new SimpleStringProperty(cd.getValue().location));
+        // -------- Patient Name --------
+        if (colPatientNameDash != null) {
+            colPatientNameDash.setCellValueFactory(cd -> new SimpleStringProperty(cd.getValue().patientName));
+            colPatientNameDash.setMinWidth(140);
+            colPatientNameDash.setPrefWidth(200);
+        }
 
+        // -------- Doctor Name --------
+        if (colDoctorNameDash != null) {
+            colDoctorNameDash.setCellValueFactory(cd -> new SimpleStringProperty(cd.getValue().doctorName));
+            colDoctorNameDash.setMinWidth(140);
+            colDoctorNameDash.setPrefWidth(200);
+        }
+
+        // -------- Specialty --------
+        if (colSpecialtyDash != null) {
+            colSpecialtyDash.setCellValueFactory(cd -> new SimpleStringProperty(cd.getValue().specialty));
+            colSpecialtyDash.setMinWidth(120);
+            colSpecialtyDash.setPrefWidth(140);
+        }
+
+        // -------- Date --------
         if (colAppintementDateDash != null) {
             colAppintementDateDash.setCellValueFactory(cd -> {
                 LocalDateTime ldt = toLocal(cd.getValue().startAt);
                 return new SimpleObjectProperty<>(ldt == null ? null : ldt.toLocalDate());
             });
             colAppintementDateDash.setEditable(false);
+            colAppintementDateDash.setStyle("-fx-alignment: CENTER;");
+            colAppintementDateDash.setMinWidth(120);
+            colAppintementDateDash.setPrefWidth(130);
         }
 
+        // -------- Time --------
         if (colAppintementTimeDash != null) {
             colAppintementTimeDash.setCellValueFactory(cd -> {
                 LocalDateTime ldt = toLocal(cd.getValue().startAt);
@@ -2589,25 +2619,35 @@ public class ReceptionController {
                 LocalTime to = from.plusMinutes(DEFAULT_SESSION_MIN);
                 return new SimpleStringProperty(from.format(SLOT_FMT_12H) + " \u2192 " + to.format(SLOT_FMT_12H));
             });
+            colAppintementTimeDash.setStyle("-fx-alignment: CENTER;");
+            colAppintementTimeDash.setMinWidth(160);
+            colAppintementTimeDash.setPrefWidth(180);
         }
 
+        // -------- Room --------
+        if (colRoomDash != null) {
+            colRoomDash.setCellValueFactory(cd -> new SimpleStringProperty(cd.getValue().location));
+            colRoomDash.setStyle("-fx-alignment: CENTER;");
+            colRoomDash.setMinWidth(100);
+            colRoomDash.setPrefWidth(120);
+        }
+
+        // -------- Action (button) --------
         if (colActionDash != null) {
+            colActionDash.setStyle("-fx-alignment: CENTER;");
+            colActionDash.setMinWidth(100);
+            colActionDash.setPrefWidth(110);  // ثابت وصغير
+            colActionDash.setMaxWidth(150);
+            colActionDash.setResizable(true);
+
             colActionDash.setCellFactory(col -> new TableCell<DoctorDAO.AppointmentRow, Void>() {
-                private final Button btn = new Button("Open");{
-                    btn.getStyleClass().add("action-btn");
-//                    btn.getStyleClass().add("btn-complete");
+                private final Button btn = new Button("Open");
+                {   btn.getStyleClass().add("action-btn");
                     btn.setFocusTraversable(false);
-                    btn.setDisable(false);
                 }
-                @Override
-                protected void updateItem(Void item, boolean empty) {
+                @Override protected void updateItem(Void item, boolean empty) {
                     super.updateItem(item, empty);
-                    if (empty) {
-                        setGraphic(null);
-                        return;
-                    }
-                    // ensure button enabled and action points to the current row
-                    btn.setDisable(false);
+                    if (empty) { setGraphic(null); return; }
                     btn.setOnAction(e -> {
                         DoctorDAO.AppointmentRow r = getTableView().getItems().get(getIndex());
                         if (r == null) return;
@@ -2634,8 +2674,95 @@ public class ReceptionController {
             });
         }
 
+        // لا نطبق أي عمليات ثقيلة هنا
         applyDashboardFilters();
     }
+
+
+//    private void wireDashboardTable() {
+//        if (TableAppInDashboard == null) return;
+//        TableAppInDashboard.setItems(sortedDash);
+//        sortedDash.comparatorProperty().bind(TableAppInDashboard.comparatorProperty());
+//
+//        // Row index starting from 1 (visual order number)
+//        if (colAppointmentID != null) {
+//            colAppointmentID.setCellFactory(col -> new TableCell<DoctorDAO.AppointmentRow, Number>() {
+//                @Override protected void updateItem(Number item, boolean empty) {
+//                    super.updateItem(item, empty);
+//                    setText(empty ? null : String.valueOf(getIndex() + 1));
+//                }
+//            });
+//            colAppointmentID.setCellValueFactory(cd -> new SimpleIntegerProperty(getSafeIndexOf(cd.getValue()) + 1));
+//        }
+//
+//        if (colPatientNameDash != null) colPatientNameDash.setCellValueFactory(cd -> new SimpleStringProperty(cd.getValue().patientName));
+//        if (colDoctorNameDash != null) colDoctorNameDash.setCellValueFactory(cd -> new SimpleStringProperty(cd.getValue().doctorName));
+//        if (colSpecialtyDash != null) colSpecialtyDash.setCellValueFactory(cd -> new SimpleStringProperty(cd.getValue().specialty));
+//        if (colRoomDash != null) colRoomDash.setCellValueFactory(cd -> new SimpleStringProperty(cd.getValue().location));
+//
+//        if (colAppintementDateDash != null) {
+//            colAppintementDateDash.setCellValueFactory(cd -> {
+//                LocalDateTime ldt = toLocal(cd.getValue().startAt);
+//                return new SimpleObjectProperty<>(ldt == null ? null : ldt.toLocalDate());
+//            });
+//            colAppintementDateDash.setEditable(false);
+//        }
+//
+//        if (colAppintementTimeDash != null) {
+//            colAppintementTimeDash.setCellValueFactory(cd -> {
+//                LocalDateTime ldt = toLocal(cd.getValue().startAt);
+//                if (ldt == null) return new SimpleStringProperty("");
+//                LocalTime from = ldt.toLocalTime();
+//                LocalTime to = from.plusMinutes(DEFAULT_SESSION_MIN);
+//                return new SimpleStringProperty(from.format(SLOT_FMT_12H) + " \u2192 " + to.format(SLOT_FMT_12H));
+//            });
+//        }
+//
+//        if (colActionDash != null) {
+//            colActionDash.setCellFactory(col -> new TableCell<DoctorDAO.AppointmentRow, Void>() {
+//                private final Button btn = new Button("Open");{
+//                    btn.getStyleClass().add("action-btn");
+////                    btn.getStyleClass().add("btn-complete");
+//                    btn.setFocusTraversable(false);
+//                    btn.setDisable(false);
+//                }
+//                @Override
+//                protected void updateItem(Void item, boolean empty) {
+//                    super.updateItem(item, empty);
+//                    if (empty) {
+//                        setGraphic(null);
+//                        return;
+//                    }
+//                    // ensure button enabled and action points to the current row
+//                    btn.setDisable(false);
+//                    btn.setOnAction(e -> {
+//                        DoctorDAO.AppointmentRow r = getTableView().getItems().get(getIndex());
+//                        if (r == null) return;
+//                        showAppointmentPane();
+//                        if (TableINAppointment != null) {
+//                            ApptRow match = TableINAppointment.getItems().stream()
+//                                    .filter(a -> a.getId() == r.id)
+//                                    .findFirst().orElse(null);
+//                            if (match != null) {
+//                                TableINAppointment.getSelectionModel().select(match);
+//                                TableINAppointment.scrollTo(match);
+//                            } else {
+//                                TableINAppointment.getItems().stream()
+//                                        .filter(a -> java.util.Objects.equals(a.getPatientName(), r.patientName))
+//                                        .findFirst().ifPresent(a -> {
+//                                            TableINAppointment.getSelectionModel().select(a);
+//                                            TableINAppointment.scrollTo(a);
+//                                        });
+//                            }
+//                        }
+//                    });
+//                    setGraphic(btn);
+//                }
+//            });
+//        }
+//
+//        applyDashboardFilters();
+//    }
 
     private int getSafeIndexOf(DoctorDAO.AppointmentRow v) {
         if (v == null || TableAppInDashboard == null) return -1;

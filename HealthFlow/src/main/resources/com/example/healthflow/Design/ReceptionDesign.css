@@ -382,9 +382,12 @@
 .button.action-btn:hover {
     -fx-background-color: linear-gradient(to right, #40bd70, #0f8838);
 }
-.button.action-btn:armed {
-    -fx-background-color: #c7d6eb;            /* pressed */
-}
+/* On Clik */
+/*.button.action-btn:armed {*/
+/*    -fx-background-color: #c7d6eb;            !* pressed *!*/
+/*}*/
+
+
 .button.action-btn:disabled {
     -fx-opacity: 0.55;
 }
