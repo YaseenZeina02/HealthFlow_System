@@ -16,7 +16,7 @@
 <?import javafx.scene.text.Font?>
 <?import org.kordamp.ikonli.javafx.FontIcon?>
 
-<AnchorPane fx:id="rootPane" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="600.0" prefWidth="1100.0" xmlns="http://javafx.com/javafx/23.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.example.healthflow.controllers.DoctorController">
+<AnchorPane fx:id="rootPane" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="600.0" prefWidth="1100.0" xmlns="http://javafx.com/javafx/19" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.example.healthflow.controllers.DoctorController">
 
    <children>
       <BorderPane prefHeight="600.0" prefWidth="1100.0" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
@@ -107,7 +107,7 @@
                <children>
 
                   <!-- ===== Dashboard (with icons) ===== -->
-                  <AnchorPane fx:id="MyAppointmentsAnchorPane" visible="false" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+                  <AnchorPane fx:id="DashboardAnchorPane" visible="false" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
                      <children>
 
                         <!-- Stat cards -->
@@ -244,12 +244,8 @@
                                     <TableView fx:constant="CONSTRAINED_RESIZE_POLICY" />
                                  </columnResizePolicy>
                               </TableView>
-
-                              <Label alignment="CENTER" layoutX="568.0" layoutY="9.0" prefHeight="30.0" prefWidth="65.0" styleClass="text-gradient" stylesheets="@../Design/ReceptionDesign.css" text="Search" AnchorPane.rightAnchor="232.00000000000003">
-                                 <font><Font name="System Bold Italic" size="20.0" /></font>
-                              </Label>
                               <TextField fx:id="search" layoutX="653.0" layoutY="10.0" prefHeight="26.0" prefWidth="197.0" promptText="search" AnchorPane.rightAnchor="15.000000000000028" />
-                              <Button fx:id="InsertButton21" layoutX="403.0" layoutY="12.0" mnemonicParsing="false" prefHeight="3.0" prefWidth="60.0" styleClass="btn-2" stylesheets="@../Design/ReceptionDesign.css" text="View" />
+                              <Button fx:id="InsertButton21" layoutX="571.0" layoutY="11.0" mnemonicParsing="false" prefHeight="3.0" prefWidth="60.0" styleClass="btn-2" stylesheets="@../Design/ReceptionDesign.css" text="View" AnchorPane.rightAnchor="235.79999999999995" />
                            </children>
                         </AnchorPane>
                      </children>
@@ -306,7 +302,7 @@
                                     <Font name="System Bold Italic" size="20.0" />
                                  </font>
                               </Label>
-                              <Label layoutX="164.0" layoutY="44.0" prefHeight="30.0" prefWidth="300.0" styleClass="text-gradient" stylesheets="@../Design/ReceptionDesign.css" text="Patient name">
+                              <Label fx:id="PatientNameLabel" layoutX="164.0" layoutY="44.0" prefHeight="30.0" prefWidth="300.0" styleClass="text-gradient" stylesheets="@../Design/ReceptionDesign.css" text="Patient name">
                                  <font>
                                     <Font name="System Bold Italic" size="20.0" />
                                  </font>
@@ -316,7 +312,7 @@
                                     <Font name="System Bold Italic" size="20.0" />
                                  </font>
                               </Label>
-                              <Label layoutX="164.0" layoutY="82.0" prefHeight="30.0" prefWidth="300.0" styleClass="text-gradient" stylesheets="@../Design/ReceptionDesign.css" text="Doctor name">
+                              <Label fx:id="DoctorNameLabel" layoutX="164.0" layoutY="82.0" prefHeight="30.0" prefWidth="300.0" styleClass="text-gradient" stylesheets="@../Design/ReceptionDesign.css" text="Doctor name">
                                  <font>
                                     <Font name="System Bold Italic" size="20.0" />
                                  </font>
@@ -337,12 +333,22 @@
                                  </font>
                               </Label>
                               <TextArea fx:id="medicalHistory2" layoutX="512.0" layoutY="72.0" prefHeight="78.0" prefWidth="323.0" />
-                              <Label layoutX="235.0" layoutY="122.0" prefHeight="30.0" prefWidth="71.0" styleClass="text-gradient" stylesheets="@../Design/ReceptionDesign.css" text="• 04/10">
+                              <Label layoutX="247.0" layoutY="122.0" prefHeight="30.0" prefWidth="71.0" styleClass="text-gradient" stylesheets="@../Design/ReceptionDesign.css" text=" 04/10">
                                  <font>
                                     <Font name="System Bold Italic" size="20.0" />
                                  </font>
                               </Label>
-                              <Label layoutX="314.0" layoutY="122.0" prefHeight="30.0" prefWidth="71.0" styleClass="text-gradient" stylesheets="@../Design/ReceptionDesign.css" text="• 10:30">
+                              <Label layoutX="318.0" layoutY="122.0" prefHeight="30.0" prefWidth="8.0" styleClass="text-gradient" stylesheets="@../Design/ReceptionDesign.css" text="• ">
+                                 <font>
+                                    <Font name="System Bold Italic" size="20.0" />
+                                 </font>
+                              </Label>
+                              <Label layoutX="329.0" layoutY="122.0" prefHeight="30.0" prefWidth="71.0" styleClass="text-gradient" stylesheets="@../Design/ReceptionDesign.css" text=" 10:30">
+                                 <font>
+                                    <Font name="System Bold Italic" size="20.0" />
+                                 </font>
+                              </Label>
+                              <Label layoutX="236.0" layoutY="122.0" prefHeight="30.0" prefWidth="8.0" styleClass="text-gradient" stylesheets="@../Design/ReceptionDesign.css" text="• ">
                                  <font>
                                     <Font name="System Bold Italic" size="20.0" />
                                  </font>

@@ -61,9 +61,14 @@ public class DoctorController {
     @FXML private Button DachboardButton;
     @FXML private Button PatientsButton;
 
+
+    @FXML private Button InsertButton2;
+
     @FXML private AnchorPane CenterAnchorPane;
     @FXML private AnchorPane DashboardAnchorPane;
     @FXML private AnchorPane PatientAnchorPane;
+    @FXML private AnchorPane PrescriptionAnchorPane;
+
 
     @FXML private Label DateOfDay;
     @FXML private Label time;
@@ -148,6 +153,7 @@ public class DoctorController {
         wirePatientsTable();
         wireSearch();
 
+
         if (loadUserAndEnsureDoctorProfile()) {
             reloadAll();
         }
@@ -171,13 +177,25 @@ public class DoctorController {
     private void showDashboardPane() {
         DashboardAnchorPane.setVisible(true);
         PatientAnchorPane.setVisible(false);
+        PrescriptionAnchorPane.setVisible(false);
+
         markNavActive(DachboardButton);
     }
+
     private void showPatientsPane() {
         DashboardAnchorPane.setVisible(false);
         PatientAnchorPane.setVisible(true);
+        PrescriptionAnchorPane.setVisible(false);
         markNavActive(PatientsButton);
     }
+
+    private void showPrescriptionPane() {
+        DashboardAnchorPane.setVisible(false);
+        PatientAnchorPane.setVisible(false);
+        PrescriptionAnchorPane.setVisible(true);
+//        markNavActive(InsertButton2);     //
+    }
+
     private void goBackToLogin() {
         Stage stage = (Stage) BackButton.getScene().getWindow();
         try {
@@ -260,10 +278,10 @@ public class DoctorController {
             try {
                 Stats s = svc.loadTodayStats(u.getId(), LocalDate.now());
                 Platform.runLater(() -> {
-                    TotalAppointments.setText("Today's Appointments: " + s.total());
-                    TotalAppointments2.setText("Completed: " + s.completed());
-                    TotalAppointments22.setText("Remaining: " + s.remaining());
-                    TotalAppointments21.setText("Today's Patients: " + s.total());
+                    setTextSafe(TotalAppointments,  "Today's Appointments: " + s.total());
+                    setTextSafe(TotalAppointments2,  "Completed: " + s.completed());
+                    setTextSafe(TotalAppointments22, "Remaining: " + s.remaining());
+                    setTextSafe(TotalAppointments21, "Today's Patients: " + s.total());
                 });
             } catch (Exception e) {
                 Platform.runLater(() -> showWarn("Stats", "Failed to load today's stats. Please try again later."));
@@ -346,11 +364,12 @@ public class DoctorController {
             private final Button btnView  = new Button("View");
             private final Button btnDone  = new Button("Done");
             private final Button btnPresc = new Button("Prescription");
-            private final FlowPane pane   = new FlowPane();
+            private final HBox box = new HBox(8, btnPresc, btnDone); // مسافة 8مسافة px بين الأزرار
+//            private final FlowPane pane   = new FlowPane();
 
             {
                 // أبعاد الأزرار (عشان ما تنضغط لأحجام غريبة)
-                btnView.setMinWidth(80);   btnView.setMaxWidth(Region.USE_PREF_SIZE);
+//                btnView.setMinWidth(80);   btnView.setMaxWidth(Region.USE_PREF_SIZE);
                 btnDone.setMinWidth(80);   btnDone.setMaxWidth(Region.USE_PREF_SIZE);
                 btnPresc.setMinWidth(120); btnPresc.setMaxWidth(Region.USE_PREF_SIZE);
 
@@ -359,18 +378,30 @@ public class DoctorController {
                 btnPresc.disableProperty().bind(monitor.onlineProperty().not());
 
                 // الأحداث
-                btnView.setOnAction(e -> { var row = getItem(); if (row != null) showPatientDetails(row); });
+//                btnView.setOnAction(e -> { var row = getItem(); if (row != null) showPatientDetails(row); });
                 btnDone.setOnAction(e -> { var row = getItem(); if (row != null) completeAppointment(row); });
                 btnPresc.setOnAction(e -> { var row = getItem(); if (row != null) openPrescription(row); });
 
+
+                box.setAlignment(Pos.CENTER_LEFT);
+                // أمثلة للأحداث
+                btnPresc.setOnAction(e -> {
+                    var row = getItem();
+                    if (row != null) showPrescriptionPane();
+                });
+                btnDone.setOnAction(e -> {
+                    var row = getItem();
+                    if (row != null) completeAppointment(row);
+                });
+
                 // إعداد الـ FlowPane
-                pane.setHgap(10);
-                pane.setVgap(6);
-                pane.setRowValignment(VPos.CENTER);
-                pane.getChildren().addAll(btnView, btnDone, btnPresc);
+//                pane.setHgap(10);
+//                pane.setVgap(6);
+//                pane.setRowValignment(VPos.CENTER);
+//                pane.getChildren().addAll(btnView, btnDone, btnPresc);
 
                 // أهم نقطة: اربط عرض الحاوية بعرض عمود الأكشن - الهامش بسيط داخل الخلية
-                pane.prefWrapLengthProperty().bind(colAction.widthProperty().subtract(16));
+//                pane.prefWrapLengthProperty().bind(colAction.widthProperty().subtract(16));
             }
 
             @Override
@@ -378,7 +409,7 @@ public class DoctorController {
                 super.updateItem(row, empty);
                 setText(null);
                 setContentDisplay(ContentDisplay.GRAPHIC_ONLY);
-                setGraphic(empty ? null : pane);
+//                setGraphic(empty ? null : pane);
             }
         });
 
@@ -552,6 +583,10 @@ public class DoctorController {
         a.setHeaderText(null);
         a.setContentText(msg);
         a.showAndWait();
+    }
+
+    private static void setTextSafe(Label label, String text) {
+        if (label != null) label.setText(text);
     }
 
     /* ================= Row models ================= */
