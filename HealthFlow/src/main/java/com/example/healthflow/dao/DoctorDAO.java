@@ -626,6 +626,52 @@ public class DoctorDAO {
         throw new SQLException("Doctor not found: " + fullName);
     }
 
+    /**
+     * Resolve patient's user_id by national_id; returns null if not found.
+     */
+    public Long findPatientUserIdByNationalId(Connection c, String nationalId) throws SQLException {
+        String sql = """
+        SELECT p.user_id
+        FROM patients p
+        JOIN users u ON u.id = p.user_id
+        WHERE u.national_id = ?
+        """;
+        try (PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setString(1, nationalId);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) return rs.getLong("user_id");
+                return null;
+            }
+        }
+    }
+    /**
+     * Find patients.id (the primary key) by user's id.
+     * Returns null if no patient record exists for this user.
+     */
+    public Long findPatientIdByUserId(Connection c, long patientUserId) throws SQLException {
+        final String sql = "SELECT id FROM patients WHERE user_id = ?";
+        try (PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setLong(1, patientUserId);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getLong(1);
+                }
+                return null;
+            }
+        }
+    }
+
+    /** Find doctors.id by users.id (doctor's user id). Returns null if not found. */
+    public Long findDoctorIdByUserId(Connection c, long doctorUserId) throws SQLException {
+        final String sql = "SELECT id FROM doctors WHERE user_id = ?";
+        try (PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setLong(1, doctorUserId);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) return rs.getLong(1);
+                return null;
+            }
+        }
+    }
 
 
 }

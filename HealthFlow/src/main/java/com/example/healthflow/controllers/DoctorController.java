@@ -44,6 +44,7 @@ import javafx.scene.shape.Circle;
 import javafx.stage.Stage;
 import javafx.util.Duration;
 
+
 import java.io.IOException;
 import java.net.URL;
 import java.sql.Connection;
@@ -138,6 +139,12 @@ public class DoctorController {
     // Tracks whether we're editing an existing row from the table
     private PrescItemRow editingRow = null;
     private Long currentPrescriptionId = null;
+    // Current patient/doctor context for prescription
+    private Long selectedPatientUserId = null;
+    private String selectedPatientName = null;
+    private String selectedPatientNationalId = null;
+    private Long currentDoctorUserId = null;
+    private String currentDoctorFullName = null;
 
     @FXML private AnchorPane rootPane;
 
@@ -240,6 +247,13 @@ public class DoctorController {
         PatientsButton.setOnAction(e -> showPatientsPane());
         PrescriptionButton.setOnAction(e -> showPrescriptionPane());
         Add_Medication.setOnAction(e -> showPrescriptionPaneToAddMedication());
+
+        Add_Medication.setOnAction(e -> {
+            System.out.println("[ADD_MEDICATION BUTTON] Current patient context -> userId="
+                    + selectedPatientUserId + ", name=" + selectedPatientName
+                    + ", NID=" + selectedPatientNationalId);
+            showPrescriptionPaneToAddMedication();
+        });
         cancelAddMedication.setOnAction(e -> showPrescriptionPane());
 
 
@@ -264,7 +278,13 @@ public class DoctorController {
 
         // Add / Save in the Add-Medicine pane
         if (InsertMedicine != null) {
-            InsertMedicine.setOnAction(e -> addMedicineFromDialog());
+//            InsertMedicine.setOnAction(e -> addMedicineFromDialog());
+            InsertMedicine.setOnAction(e -> {
+                System.out.println("[INSERT_MEDICINE BUTTON] Before adding medicine -> userId="
+                        + selectedPatientUserId + ", name=" + selectedPatientName
+                        + ", NID=" + selectedPatientNationalId);
+                addMedicineFromDialog();
+            });
         }
             // Edit: open Add pane prefilled with selected row
         if (Update_Medication != null) {
@@ -373,6 +393,12 @@ public class DoctorController {
         UsernameLabel.setText(u.getFullName());
         UserIdLabel.setText(String.valueOf(u.getId()));
         welcomeUser.setText(firstName(u.getFullName()));
+        // Cache doctor info for prescription header
+        currentDoctorUserId = u.getId();
+        currentDoctorFullName = u.getFullName();
+        if (DoctorNameLabel != null) {
+            DoctorNameLabel.setText(currentDoctorFullName);
+        }
 
         if (u.getRole() != Role.DOCTOR) {
             showWarn("Role", "This user is not a doctor.");
@@ -454,13 +480,19 @@ public class DoctorController {
 
                 var rows = FXCollections.<PatientRow>observableArrayList();
                 for (var r : list) {
-                    rows.add(new PatientRow(
+                    PatientRow pr = new PatientRow(
                             r.nationalId,
                             r.patientName,
                             r.gender,
                             ageFromDob(r.dateOfBirth),
                             r.medicalHistory
-                    ));
+                    );
+                    // Try to infer patient user id from today's appointments (by national id or name)
+                    Long pid = fallbackResolvePatientIdFromAppointments(pr);
+                    if (pid != null) {
+                        pr.setUserId(pid);
+                    }
+                    rows.add(pr);
                 }
                 Platform.runLater(() -> patientData.setAll(rows));
             } catch (Exception e) {
@@ -498,16 +530,15 @@ public class DoctorController {
 
         // ✨ خلية الأكشن باستخدام FlowPane (يضمن ترتيب أفقي، ولو ضاق يلف بدون تكسير)
         colAction.setCellValueFactory(param -> new ReadOnlyObjectWrapper<>(param.getValue()));
+
+        colAction.setCellValueFactory(param -> new ReadOnlyObjectWrapper<>(param.getValue()));
         colAction.setCellFactory(tc -> new TableCell<AppointmentRow, AppointmentRow>() {
-//            private final Button btnView  = new Button("View");
             private final Button btnDone  = new Button("Done");
             private final Button btnPresc = new Button("Prescription");
-            private final HBox box = new HBox(8,btnDone, btnPresc); // مسافة 8مسافة px بين الأزرار
-//            private final FlowPane pane   = new FlowPane();
+            private final HBox box = new HBox(8, btnDone, btnPresc);
 
             {
-                // أبعاد الأزرار (عشان ما تنضغط لأحجام غريبة)
-//                btnView.setMinWidth(80);   btnView.setMaxWidth(Region.USE_PREF_SIZE);
+                // أحجام معقولة
                 btnDone.setMinWidth(80);   btnDone.setMaxWidth(Region.USE_PREF_SIZE);
                 btnPresc.setMinWidth(120); btnPresc.setMaxWidth(Region.USE_PREF_SIZE);
 
@@ -515,23 +546,48 @@ public class DoctorController {
                 btnDone.disableProperty().bind(monitor.onlineProperty().not());
                 btnPresc.disableProperty().bind(monitor.onlineProperty().not());
 
-                // الأحداث
-//                btnView.setOnAction(e -> { var row = getItem(); if (row != null) showPatientDetails(row); });
-                btnDone.setOnAction(e -> { var row = getItem(); if (row != null) completeAppointment(row); });
-                btnPresc.setOnAction(e -> { var row = getItem(); if (row != null) openPrescription(row); });
-
-
-                box.setAlignment(Pos.CENTER_LEFT);
-                // أمثلة للأحداث
-                btnPresc.setOnAction(e -> {
-                    var row = getItem();
-                    if (row != null) showPrescriptionPane();
-                });
+                // زر Done
                 btnDone.setOnAction(e -> {
-                    var row = getItem();
+                    AppointmentRow row = getItem();
                     if (row != null) completeAppointment(row);
                 });
 
+                // زر Prescription
+                btnPresc.setOnAction(e -> {
+                    AppointmentRow row = getItem();
+                    if (row == null) return;
+
+                    // خزن سياق المريض من سطر الموعد
+                    selectedPatientUserId     = (row.getPatientUserId() > 0) ? row.getPatientUserId() : null;
+                    selectedPatientName       = row.getPatientName();
+                    selectedPatientNationalId = row.getNationalId();
+
+                    // طباعة للتتبّع
+                    System.out.println("[APPT PRESCRIPTION BUTTON] Clicked for: "
+                            + selectedPatientName + " | NID=" + selectedPatientNationalId
+                            + " | userId=" + selectedPatientUserId);
+                    System.out.println("[APPT PRESCRIPTION BUTTON] Stored -> userId=" + selectedPatientUserId
+                            + ", name=" + selectedPatientName
+                            + ", NID=" + selectedPatientNationalId);
+
+                    // حدّث الهيدر
+                    if (PatientNameLabel != null) {
+                        String nid = (selectedPatientNationalId == null ? "" : (" • " + selectedPatientNationalId));
+                        PatientNameLabel.setText(selectedPatientName + nid);
+                    }
+                    if (DoctorNameLabel != null) {
+                        DoctorNameLabel.setText(currentDoctorFullName != null ? currentDoctorFullName
+                                : (Session.get() != null ? Session.get().getFullName() : ""));
+                    }
+
+                    // نبدأ مسودة جديدة لهذا المريض
+                    currentPrescriptionId = null;
+
+                    // افتح واجهة الوصفة
+                    showPrescriptionPane();
+                });
+
+                box.setAlignment(Pos.CENTER_LEFT);
             }
 
             @Override
@@ -539,9 +595,58 @@ public class DoctorController {
                 super.updateItem(row, empty);
                 setText(null);
                 setContentDisplay(ContentDisplay.GRAPHIC_ONLY);
-//                setGraphic(empty ? null : pane);
+                setGraphic(empty ? null : box);
             }
         });
+
+//        colAction.setCellFactory(tc -> new TableCell<AppointmentRow, AppointmentRow>() {
+////            private final Button btnView  = new Button("View");
+//            private final Button btnDone  = new Button("Done");
+//            private final Button btnPresc = new Button("Prescription");
+//            private final HBox box = new HBox(8,btnDone, btnPresc); // مسافة 8مسافة px بين الأزرار
+////            private final FlowPane pane   = new FlowPane();
+//
+//            {
+//                // أبعاد الأزرار (عشان ما تنضغط لأحجام غريبة)
+////                btnView.setMinWidth(80);   btnView.setMaxWidth(Region.USE_PREF_SIZE);
+//                btnDone.setMinWidth(80);   btnDone.setMaxWidth(Region.USE_PREF_SIZE);
+//                btnPresc.setMinWidth(120); btnPresc.setMaxWidth(Region.USE_PREF_SIZE);
+//
+//                // تعطيل عند الأوفلاين
+//                btnDone.disableProperty().bind(monitor.onlineProperty().not());
+//                btnPresc.disableProperty().bind(monitor.onlineProperty().not());
+//
+//                // الأحداث
+////                btnView.setOnAction(e -> { var row = getItem(); if (row != null) showPatientDetails(row); });
+//                btnDone.setOnAction(e -> { var row = getItem(); if (row != null) completeAppointment(row); });
+//                btnPresc.setOnAction(e -> { var row = getItem(); if (row != null) openPrescription(row); });
+//
+//
+//                box.setAlignment(Pos.CENTER_LEFT);
+//                // أمثلة للأحداث
+//                btnPresc.setOnAction(e -> {
+//                    var row = getItem();
+//                    if (row != null) showPrescriptionPane();
+//                });
+//
+//                System.out.println("[PRESCRIPTION BUTTON] Clicked on patient: "
+//                        + row.getFullName() + " | NID=" + row.getNationalId() + " | userId=" + row.getUserId());
+//
+//                btnDone.setOnAction(e -> {
+//                    var row = getItem();
+//                    if (row != null) completeAppointment(row);
+//                });
+//
+//            }
+//
+//            @Override
+//            protected void updateItem(AppointmentRow row, boolean empty) {
+//                super.updateItem(row, empty);
+//                setText(null);
+//                setContentDisplay(ContentDisplay.GRAPHIC_ONLY);
+////                setGraphic(empty ? null : pane);
+//            }
+//        });
 
         // سياسة القياس: توزيع مُقيد يملأ عرض الجدول ويُظهر سكرول تلقائياً عند الحاجة
         AppointmentsTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
@@ -563,44 +668,87 @@ public class DoctorController {
         if (colDob != null)            colDob.setCellValueFactory(new PropertyValueFactory<>("age"));
         if (colMedicalHistory != null) colMedicalHistory.setCellValueFactory(new PropertyValueFactory<>("medicalHistory"));
         if (colAction2 != null) {
+            colAction2.setCellValueFactory(param -> new ReadOnlyObjectWrapper<>(param.getValue()));
+            colAction2.setCellFactory(col -> new TableCell<PatientRow, PatientRow>() {
+//                private final Button btnView   = new Button("View");
+                private final Button btnDone  = new Button("Done");
+                private final Button btnPresc = new Button("Prescription");
+                private final HBox box = new HBox(8,btnDone, btnPresc);
 
-            if (colAction2 != null) {
-                colAction2.setCellValueFactory(param -> new ReadOnlyObjectWrapper<>(param.getValue()));
-                colAction2.setCellFactory(col -> new TableCell<PatientRow, PatientRow>() {
-//                    private final Button btnView   = new Button("View");
-                    private final Button btnDone  = new Button("Done");
-                    private final Button btnPresc = new Button("Prescription");
-                    private final HBox box = new HBox(8,btnDone, btnPresc);
+                {
+                    // classes للزرار – هنستعملها في الـ CSS
+//                    btnView.getStyleClass().addAll("btn", "btn--info");
+                    btnDone.getStyleClass().addAll("btn", "btn-complete");
+                    btnPresc.getStyleClass().addAll("btn", "btn-complete");
+                    box.getStyleClass().add("table-actions");
 
-                    {
-                        // classes للزرار – هنستعملها في الـ CSS
-//                        btnView.getStyleClass().addAll("btn", "btn--info");
-                        btnDone.getStyleClass().addAll("btn", "btn-complete");
-                        btnPresc.getStyleClass().addAll("btn", "btn-complete");
-                        box.getStyleClass().add("table-actions");
+                    // قياسات مريحة
+//                    btnView.setMinWidth(74);   btnView.setMaxWidth(Region.USE_PREF_SIZE);
+                    btnDone.setMinWidth(90); btnDone.setMaxWidth(Region.USE_PREF_SIZE);
+                    btnPresc.setMinWidth(78);   btnPresc.setMaxWidth(Region.USE_PREF_SIZE);
 
-                        // قياسات مريحة
-//                        btnView.setMinWidth(74);   btnView.setMaxWidth(Region.USE_PREF_SIZE);
-                        btnDone.setMinWidth(90); btnDone.setMaxWidth(Region.USE_PREF_SIZE);
-                        btnPresc.setMinWidth(78);   btnPresc.setMaxWidth(Region.USE_PREF_SIZE);
+                    // أفعال
+                    btnDone.setOnAction(e -> {
+                        PatientRow row = getItem();
+                        if (row != null) showPatientDetails(row.getFullName(), row.getMedicalHistory());
+                    });
 
-                        // أفعال
-                        btnDone.setOnAction(e -> {
-                            PatientRow row = getItem();
-                            if (row != null) showPatientDetails(row.getFullName(), row.getMedicalHistory());
-                        });
+                    btnPresc.setOnAction(e -> {
+                        PatientRow row = getItem();
+                        if (row == null) return;
+                        // persist selection
+                        Long pid = null;
+                        if (row.getUserId() > 0) {
+                            pid = Long.valueOf(row.getUserId());
+                        } else {
+                            pid = fallbackResolvePatientIdFromAppointments(row);
+                        }
+                        selectedPatientUserId = pid; // may be null -> handled later in ensureDraftPrescription()
+                        selectedPatientName = row.getFullName();
+                        selectedPatientNationalId = row.getNationalId();
 
-                        btnPresc.setOnAction(e -> showPrescriptionPane());
+                        System.out.println("[PRESCRIPTION BUTTON] Stored -> userId=" + selectedPatientUserId
+                                + ", name=" + selectedPatientName
+                                + ", NID=" + selectedPatientNationalId);
 
-                    }
+                        // If userId is still null, try DB lookup by national id immediately
+                        if (selectedPatientUserId == null && selectedPatientNationalId != null && !selectedPatientNationalId.isBlank()) {
+                            try (Connection c = Database.get()) {
+                                Long uid = doctorDAO.findPatientUserIdByNationalId(c, selectedPatientNationalId);
+                                if (uid != null && uid > 0) {
+                                    selectedPatientUserId = uid;
+                                    System.out.println("[PRESCRIPTION BUTTON] DB lookup by NID succeeded -> userId=" + selectedPatientUserId);
+                                } else {
+                                    System.out.println("[PRESCRIPTION BUTTON] DB lookup by NID failed (no match).");
+                                }
+                            } catch (Exception ex) {
+                                System.out.println("[PRESCRIPTION BUTTON] DB lookup by NID error: " + ex.getMessage());
+                            }
+                        }
 
-                    @Override protected void updateItem(PatientRow row, boolean empty) {
-                        super.updateItem(row, empty);
-                        setText(null);
-                        setGraphic(empty ? null : box);
-                    }
-                });
-            }
+                        // reset any previous draft so a new one is created for this patient
+                        currentPrescriptionId = null;
+                        // update header labels
+                        if (PatientNameLabel != null) {
+                            String nid = row.getNationalId() == null ? "" : (" • " + row.getNationalId());
+                            PatientNameLabel.setText(row.getFullName() + nid);
+                        }
+                        if (DoctorNameLabel != null) {
+                            DoctorNameLabel.setText(currentDoctorFullName != null ? currentDoctorFullName : (Session.get() != null ? Session.get().getFullName() : ""));
+                        }
+                        if (selectedPatientUserId == null) {
+                            toast("Patient selected (no ID). If add fails, choose from Appointments.", "warn");
+                        }
+                        showPrescriptionPane();
+                    });
+                }
+
+                @Override protected void updateItem(PatientRow row, boolean empty) {
+                    super.updateItem(row, empty);
+                    setText(null);
+                    setGraphic(empty ? null : box);
+                }
+            });
         }
         // توزيع أبعاد الأعمدة كنِسَب من عرض الجدول ليتكيّف مع الشاشة
 //        if (patientTable != null) {
@@ -661,11 +809,10 @@ public class DoctorController {
     private void wirePrescriptionItemsTable() {
         if (TablePrescriptionItems == null) return;
 
-
         TablePrescriptionItems.setItems(prescItemsEditable);
 //        TablePrescriptionItems.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
         TablePrescriptionItems.setColumnResizePolicy(TableView.UNCONSTRAINED_RESIZE_POLICY);
-            //  خلي آخر عمود (Action) ياكل الفراغ الفاضي بدون ما يلغيلك الـ H-Scroll
+        //  خلي آخر عمود (Action) ياكل الفراغ الفاضي بدون ما يلغيلك الـ H-Scroll
         final double actionBase = (colPresesAction == null) ? 0 : colPresesAction.getPrefWidth();
 
         Runnable fitLastColumn = () -> {
@@ -687,6 +834,8 @@ public class DoctorController {
 
             // لو الأعمدة أكبر من الجدول → remaining سالب/صفر → نخلي الـ Action على عرضه الأساسي
             double newW = Math.max(actionBase, remaining);
+            // ensure we are not bound before setting width
+            colPresesAction.prefWidthProperty().unbind();
             colPresesAction.setPrefWidth(newW);
         };
 
@@ -702,7 +851,7 @@ public class DoctorController {
         if (colDuration != null)      colDuration.setCellValueFactory(cd -> cd.getValue().durationDaysProperty().asObject());
         if (colQuantity != null)      colQuantity.setCellValueFactory(cd -> cd.getValue().quantityProperty().asObject());
         if (colDispensed != null)     colDispensed.setCellValueFactory(cd -> cd.getValue().qtyDispensedProperty().asObject());
-        if (colPresesStatus != null)  if (colPresesStatus != null) colPresesStatus.setCellValueFactory(cd -> cd.getValue().statusProperty());
+        if (colPresesStatus != null)  colPresesStatus.setCellValueFactory(cd -> cd.getValue().statusProperty());
 
         if (colPresesAction != null) {
             colPresesAction.setCellValueFactory(param -> new ReadOnlyObjectWrapper<>(param.getValue()));
@@ -725,29 +874,102 @@ public class DoctorController {
                     setGraphic(empty ? null : box);
                 }
             });
-
-
         }
-
-        // Optional: width percentages
-        var w = TablePrescriptionItems.widthProperty().subtract(15);
-        if (colIdx != null)          colIdx.prefWidthProperty().bind(w.multiply(0.07));
-        if (colMedicineName != null) colMedicineName.prefWidthProperty().bind(w.multiply(0.22));
-        if (colDosage != null)       colDosage.prefWidthProperty().bind(w.multiply(0.30));
-        if (colDuration != null)     colDuration.prefWidthProperty().bind(w.multiply(0.10));
-        if (colQuantity != null)     colQuantity.prefWidthProperty().bind(w.multiply(0.10));
-        if (colDispensed != null)    colDispensed.prefWidthProperty().bind(w.multiply(0.08));
-        if (colStatus != null)       colStatus.prefWidthProperty().bind(w.multiply(0.08));
-        if (colPresesAction != null) colPresesAction.prefWidthProperty().bind(w.multiply(0.05));
+        // Removed width percentage bindings to avoid runtime exception.
     }
 
-    /** Resolve patient id. الأفضل من جدول المواعيد لأنه يحوي patientUserId. */
+    /**
+     * Resolve patient id for the current prescription context.
+     *  Priority:
+     *   1) Cached selectedPatientUserId
+     *   2) Selected row from Appointments table
+     *   3) DB lookup by selectedPatientNationalId (set from Patients table action)
+     *   4) Extract national id from PatientNameLabel and lookup in DB
+     *   5) Scan today's appointments to match name/NID, then return user id or lookup by that NID
+     */
     private Long resolveCurrentPatientId() {
+        // 1) If we already cached it, return it
+        if (selectedPatientUserId != null) return selectedPatientUserId;
+
+        // 2) From currently selected appointment (fast path when doctor works from Appointments tab)
         if (AppointmentsTable != null) {
             AppointmentRow sel = AppointmentsTable.getSelectionModel().getSelectedItem();
             if (sel != null && sel.getPatientUserId() > 0) return sel.getPatientUserId();
         }
-        return null; // لو بدك، لاحقًا نجيب من patientTable عبر DAO
+
+        // Helper to query DB by national id and cache if found
+        java.util.function.Function<String, Long> findByNid = (nid) -> {
+            if (nid == null || nid.isBlank()) return null;
+            try (Connection c = Database.get()) {
+                Long uid = doctorDAO.findPatientUserIdByNationalId(c, nid);
+                if (uid != null && uid > 0) {
+                    selectedPatientUserId = uid; // cache
+                    return uid;
+                }
+            } catch (Exception ignored) {}
+            return null;
+        };
+
+        // 3) DB fallback using national id captured when clicking Prescription in Patients tab
+        Long viaSelectedNid = findByNid.apply(selectedPatientNationalId);
+        if (viaSelectedNid != null) return viaSelectedNid;
+
+        // 4) Try to parse national id from the header label "PatientNameLabel"
+        if (PatientNameLabel != null && PatientNameLabel.getText() != null) {
+            String txt = PatientNameLabel.getText();
+            // Expect format: "<name> • <nid>" → خُذ كل الأرقام المتتالية كهوية
+            String digits = txt.replaceAll("[^0-9]", "");
+            Long viaHeader = findByNid.apply(digits);
+            if (viaHeader != null) return viaHeader;
+        }
+
+        // 5) Last resort: scan today's appointments and try to match name/NID,
+        //    then use the user id directly or lookup by the matched NID.
+        if (!apptData.isEmpty()) {
+            String headerName = (PatientNameLabel != null) ? PatientNameLabel.getText() : null;
+            String headerNid = null;
+            if (headerName != null) {
+                String digits = headerName.replaceAll("[^0-9]", "");
+                headerNid = (digits == null || digits.isBlank()) ? null : digits;
+                // قص الاسم قبل "•" إن وجد
+                if (headerName.contains("•")) headerName = headerName.split("•")[0].trim();
+            }
+
+            for (AppointmentRow ar : apptData) {
+                // exact nid match
+                if (headerNid != null && headerNid.equals(ar.getNationalId())) {
+                    if (ar.getPatientUserId() > 0) return ar.getPatientUserId();
+                    Long viaApptNid = findByNid.apply(ar.getNationalId());
+                    if (viaApptNid != null) return viaApptNid;
+                }
+                // exact name match (case-insensitive)
+                if (headerName != null && headerName.equalsIgnoreCase(ar.getPatientName())) {
+                    if (ar.getPatientUserId() > 0) return ar.getPatientUserId();
+                    Long viaApptNid2 = findByNid.apply(ar.getNationalId());
+                    if (viaApptNid2 != null) return viaApptNid2;
+                }
+            }
+        }
+
+        // Not resolved
+        return null;
+    }
+
+    /** Try to infer patient user id from current appointments by matching national id or name. */
+    private Long fallbackResolvePatientIdFromAppointments(PatientRow row) {
+        if (row == null) return null;
+        // try by national id first
+        for (AppointmentRow ar : apptData) {
+            if (ar.getPatientUserId() > 0) {
+                if (row.getNationalId() != null && row.getNationalId().equals(ar.getNationalId())) {
+                    return ar.getPatientUserId();
+                }
+                if (row.getFullName() != null && row.getFullName().equalsIgnoreCase(ar.getPatientName())) {
+                    return ar.getPatientUserId();
+                }
+            }
+        }
+        return null;
     }
 
     /** Ensure draft prescription exists in DB and return its id (creates one if missing). */
@@ -757,20 +979,65 @@ public class DoctorController {
         var u = Session.get();
         if (u == null) throw new IllegalStateException("No logged-in user.");
         Long patientId = resolveCurrentPatientId();
-        if (patientId == null) {
-            toast("Select an appointment/patient first.", "warn");
-            throw new IllegalStateException("No patient selected.");
-        }
 
         try (Connection c = Database.get()) {
             c.setAutoCommit(true);
             PrescriptionDAO pDao = new PrescriptionDAO();
-            // appointment_id = NULL (بدون موعد)، الملاحظات من DiagnosisTF إن وُجدت
-            Prescription p = pDao.create(c, null, u.getId(), patientId, DiagnosisTF != null ? DiagnosisTF.getText() : null);
+            DoctorDAO dDao = new DoctorDAO();
+
+            // resolve doctors.id (NOT users.id). Create profile if missing.
+            Long doctorId = dDao.findDoctorIdByUserId(c, u.getId());
+            if (doctorId == null) {
+                dDao.ensureProfileForUser(c, u.getId());
+                doctorId = dDao.findDoctorIdByUserId(c, u.getId());
+            }
+            if (doctorId == null) {
+                throw new IllegalStateException("Doctor profile not found/created for user " + u.getId());
+            }
+
+            // translate patient user id -> patients.id
+            if (patientId == null) {
+                toast("Select a patient (from Patients tab) or an appointment first, then add medicine.", "warn");
+                throw new IllegalStateException("No patient selected.");
+            }
+            Long realPatientId = dDao.findPatientIdByUserId(c, patientId);
+            if (realPatientId == null) {
+                throw new IllegalStateException("Patient profile not found for userId=" + patientId + " (patients.id lookup failed)");
+            }
+
+            String diagnosisText = (DiagnosisTF != null) ? DiagnosisTF.getText() : null;
+
+            // pass doctors.id and patients.id (FK-safe)
+            var p = pDao.create(c, null, doctorId, realPatientId, diagnosisText);
             currentPrescriptionId = p.getId();
             toast("Draft prescription #" + currentPrescriptionId + " created.", "ok");
             return currentPrescriptionId;
         }
+
+//        var u = Session.get();
+//        if (u == null) throw new IllegalStateException("No logged-in user.");
+//
+//        System.out.println("[ENSURE_DRAFT] Context before resolve -> selectedPatientUserId=" + selectedPatientUserId
+//                + ", name=" + selectedPatientName + ", NID=" + selectedPatientNationalId);
+//
+//        Long patientId = resolveCurrentPatientId();
+//
+//        System.out.println("[ENSURE_DRAFT] Resolved patientId=" + patientId);
+//
+//        if (patientId == null) {
+//            toast("Select a patient (from Patients tab) or an appointment first, then add medicine.", "warn");
+//            throw new IllegalStateException("No patient selected.");
+//        }
+//
+//        try (Connection c = Database.get()) {
+//            c.setAutoCommit(true);
+//            PrescriptionDAO pDao = new PrescriptionDAO();
+//            // appointment_id = NULL (بدون موعد)، الملاحظات من DiagnosisTF إن وُجدت
+//            Prescription p = pDao.create(c, null, u.getId(), patientId, DiagnosisTF != null ? DiagnosisTF.getText() : null);
+//            currentPrescriptionId = p.getId();
+//            toast("Draft prescription #" + currentPrescriptionId + " created.", "ok");
+//            return currentPrescriptionId;
+//        }
     }
 
     /* ================= Add Medicine dialog -> add row into table ================= */
@@ -1105,6 +1372,7 @@ public class DoctorController {
         private final StringProperty gender = new SimpleStringProperty();
         private final IntegerProperty age = new SimpleIntegerProperty();
         private final StringProperty medicalHistory = new SimpleStringProperty();
+        private final LongProperty userId = new SimpleLongProperty(0);
 
         public PatientRow(String nid, String name, String gender, int age, String history) {
             setNationalId(nid);
@@ -1133,5 +1401,9 @@ public class DoctorController {
         public String getMedicalHistory() { return medicalHistory.get(); }
         public void setMedicalHistory(String v) { medicalHistory.set(v); }
         public StringProperty medicalHistoryProperty() { return medicalHistory; }
+
+        public long getUserId() { return userId.get(); }
+        public void setUserId(long v) { userId.set(v); }
+        public LongProperty userIdProperty() { return userId; }
     }
 }
