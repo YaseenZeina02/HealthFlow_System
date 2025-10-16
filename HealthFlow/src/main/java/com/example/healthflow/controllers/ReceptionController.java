@@ -663,34 +663,8 @@ public class ReceptionController {
 //        wireAppointmentDateFilter();      // لاستخدام datePiker مهم
         // === Dashboard table wiring ===
         wireDashboardTable();
-        // Ensure ReceptionDesign.css is applied (robust against wrong classpath mappings)
-        Platform.runLater(() -> {
-            var url = getClass().getResource(cssPath);
-            javafx.scene.Node hook = (TableAppInDashboard != null) ? TableAppInDashboard : TableINAppointment;
-            if (url != null && hook != null && hook.getScene() != null) {
-                // Remove any previously added absolute-path stylesheet (bad FXML entry)
-                var styles = hook.getScene().getStylesheets();
-                styles.removeIf(s -> {
-                    String lower = s == null ? "" : s.toLowerCase();
-                    // any local file path pointing to ReceptionDesign.css under resources
-                    return lower.startsWith("file:") && lower.replace('\\','/').endsWith("/com/example/healthflow/design/receptiondesign.css");
-                });
 
-                String css = url.toExternalForm();
-                if (!styles.contains(css)) {
-                    styles.add(css);
-                }
-            } else {
-                System.out.println("[CSS] ReceptionDesign.css not found at " + cssPath);
-            }
-        });
-        // Diagnostic: print all active stylesheets after CSS attach
-        Platform.runLater(() -> {
-            if (rootPane != null && rootPane.getScene() != null) {
-                System.out.println("[CSS] Active stylesheets:");
-                rootPane.getScene().getStylesheets().forEach(System.out::println);
-            }
-        });
+
         if (dataPickerDashboard != null && dataPickerDashboard.getValue() == null) {
             dataPickerDashboard.setValue(LocalDate.now());
         }
@@ -729,7 +703,31 @@ public class ReceptionController {
                     showWarn("Delete Row", "Please select a row to delete.");
                     return;
                 }
-                TableINAppointment.getItems().remove(selected);
+
+                // IMPORTANT:
+                // TableINAppointment.getItems() is a SortedList/FilteredList view (TransformationList),
+                // which is unmodifiable (remove throws UnsupportedOperationException).
+                // Always mutate the SOURCE list instead.
+                try {
+                    // Prefer removing from the backing source by index when possible
+                    int viewIndex = TableINAppointment.getSelectionModel().getSelectedIndex();
+                    boolean removed = false;
+                    if (viewIndex >= 0 && sortedAppt != null) {
+                        int modelIndex = sortedAppt.getSourceIndex(viewIndex);
+                        if (modelIndex >= 0 && modelIndex < apptEditable.size()) {
+                            apptEditable.remove(modelIndex);
+                            removed = true;
+                        }
+                    }
+                    // Fallback: remove by object identity from the source list
+                    if (!removed) {
+                        apptEditable.remove(selected);
+                    }
+
+                    showToast("success", "Row removed from draft appointments.");
+                } catch (Exception ex) {
+                    showError("Delete Row", ex);
+                }
             });
         }
         if (AppointmentDate != null)

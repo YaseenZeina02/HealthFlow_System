@@ -593,3 +593,94 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_room_start
 -- (اختياري) منع تعارض الدكتور:
 CREATE UNIQUE INDEX IF NOT EXISTS uq_doctor_start
     ON appointments (doctor_id, appointment_date);
+
+-- اخر تعديلات الداتابيز
+
+
+
+-- 0) إصلاح ازدواج قيود التداخل (اختر واحدًا فقط)
+-- إن كنت راضيًا عن الاسم الأول "no_doctor_overlap"، احذف الثاني:
+ALTER TABLE appointments
+DROP CONSTRAINT IF EXISTS no_overlap_per_doctor;
+
+-- 1) السماح بوصفة دون موعد (اختياري حسب رغبتك)
+-- اجعل appointment_id قابلاً لأن يكون NULL
+ALTER TABLE prescriptions
+    ALTER COLUMN appointment_id DROP NOT NULL;
+
+-- عدّل presc_match_appt ليعمل فقط إذا appointment_id ليس NULL
+CREATE OR REPLACE FUNCTION presc_match_appt()
+RETURNS TRIGGER LANGUAGE plpgsql AS $$
+DECLARE a_doctor BIGINT; a_patient BIGINT;
+BEGIN
+  IF NEW.appointment_id IS NOT NULL THEN
+SELECT doctor_id, patient_id INTO a_doctor, a_patient
+FROM appointments WHERE id = NEW.appointment_id;
+IF a_doctor IS NULL THEN
+      RAISE EXCEPTION 'Invalid appointment %', NEW.appointment_id;
+END IF;
+    IF NEW.doctor_id <> a_doctor OR NEW.patient_id <> a_patient THEN
+      RAISE EXCEPTION 'Prescription doctor/patient must match appointment';
+END IF;
+END IF;
+RETURN NEW;
+END $$;
+
+-- 2) قيود تكامل الدواء/الدفعة في عناصر الوصفة (بدون Subqueries داخل CHECK)
+-- PostgreSQL لا يسمح بـ subqueries داخل CHECK بشكل يعتمد عليه،
+-- لذلك نستبدلها بـ TRIGGER يفرض التكامل ويعاير الاسم تلقائياً.
+
+CREATE OR REPLACE FUNCTION enforce_item_med_integrity()
+RETURNS TRIGGER
+LANGUAGE plpgsql AS $$
+DECLARE
+v_med_name  VARCHAR(100);
+  v_batch_med BIGINT;
+BEGIN
+  -- لازم يتوفر على الأقل واحد: medicine_id أو medicine_name
+  IF (NEW.medicine_id IS NULL AND (NEW.medicine_name IS NULL OR btrim(NEW.medicine_name) = '')) THEN
+    RAISE EXCEPTION 'Either medicine_id or medicine_name must be provided';
+END IF;
+
+  -- لو medicine_id موجود، تحقّق من صحته وعدّل الاسم لاسم الدواء الرسمي
+  IF NEW.medicine_id IS NOT NULL THEN
+SELECT m.name INTO v_med_name FROM medicines m WHERE m.id = NEW.medicine_id;
+IF v_med_name IS NULL THEN
+      RAISE EXCEPTION 'Invalid medicine_id: %', NEW.medicine_id;
+END IF;
+    IF NEW.medicine_name IS DISTINCT FROM v_med_name THEN
+      NEW.medicine_name := v_med_name;
+END IF;
+END IF;
+
+  -- لو batch_id موجود، لازم ينتمي لنفس الدواء
+  IF NEW.batch_id IS NOT NULL THEN
+SELECT mb.medicine_id INTO v_batch_med FROM medicine_batches mb WHERE mb.id = NEW.batch_id;
+IF v_batch_med IS NULL THEN
+      RAISE EXCEPTION 'Invalid batch_id: %', NEW.batch_id;
+END IF;
+
+    -- لو medicine_id غير موجود، خد قيمته من الدفعة وسوّي الاسم
+    IF NEW.medicine_id IS NULL THEN
+      NEW.medicine_id := v_batch_med;
+SELECT m.name INTO v_med_name FROM medicines m WHERE m.id = NEW.medicine_id;
+IF NEW.medicine_name IS DISTINCT FROM v_med_name THEN
+        NEW.medicine_name := v_med_name;
+END IF;
+
+    -- لو موجود لكنه لا يطابق دواء الدفعة → خطأ
+    ELSIF v_batch_med IS DISTINCT FROM NEW.medicine_id THEN
+      RAISE EXCEPTION 'Batch % belongs to medicine %, but row has medicine_id %',
+                      NEW.batch_id, v_batch_med, NEW.medicine_id;
+END IF;
+END IF;
+
+RETURN NEW;
+END
+$$;
+
+DROP TRIGGER IF EXISTS tri_item_med_integrity ON prescription_items;
+CREATE TRIGGER tri_item_med_integrity
+    BEFORE INSERT OR UPDATE ON prescription_items
+                         FOR EACH ROW
+                         EXECUTE FUNCTION enforce_item_med_integrity();

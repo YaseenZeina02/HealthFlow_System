@@ -405,7 +405,7 @@
                                           <Font name="System Bold Italic" size="20.0" />
                                        </font>
                                                 </Label>
-                                                <TextArea fx:id="medicalHistory" layoutX="397.0" layoutY="132.0" prefHeight="94.0" prefWidth="223.0" style="-fx-background-color: #fffff;" />
+                                                <TextArea fx:id="medicalHistory" layoutX="397.0" layoutY="132.0" prefHeight="94.0" prefWidth="223.0" style="-fx-background-color: #ffffff;" />
 
                                                             <Label layoutX="14.0" layoutY="48.0" prefHeight="30.0" prefWidth="80.0" styleClass="text-gradient" stylesheets="@../Design/ReceptionDesign.css" text="National ID">
                                                     <font>
@@ -454,7 +454,7 @@
                                 </AnchorPane>
 
                                             <!-- ===== Appointments Pane ===== -->
-                                <AnchorPane fx:id="AppointmentsAnchorPane" layoutY="1.0" prefHeight="558.0" prefWidth="890.0" style="-fx-background-color: #ededed;" stylesheets="@../Design/ReceptionDesign.css" visible="false" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="1.0">
+                                <AnchorPane fx:id="AppointmentsAnchorPane" layoutY="1.0" prefHeight="558.0" prefWidth="890.0" style="-fx-background-color: #ededed;" stylesheets="@../Design/ReceptionDesign.css" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="1.0">
                                     <children>
                               <AnchorPane layoutX="16.0" layoutY="14.0" prefHeight="110.0" prefWidth="850.0" style="-fx-background-color: #ffffff; -fx-background-radius: 5;" styleClass="shadow" AnchorPane.leftAnchor="19.0" AnchorPane.rightAnchor="21.0">
                                  <children>
@@ -471,7 +471,7 @@
                                     <Label fx:id="AppointmentDateDetailes" layoutX="469.0" layoutY="6.0" prefHeight="44.0" prefWidth="367.0" text="." AnchorPane.rightAnchor="14.0" />
                                  </children>
                               </AnchorPane>
-                              <AnchorPane layoutX="18.0" layoutY="134.0" prefHeight="412.0" prefWidth="852.0" style="-fx-background-color: #ffffff; -fx-background-radius: 5;" styleClass="shadow" AnchorPane.bottomAnchor="12.0" AnchorPane.leftAnchor="18.0" AnchorPane.rightAnchor="20.0" AnchorPane.topAnchor="134.0">
+                              <AnchorPane layoutX="18.0" layoutY="134.0" prefHeight="412.0" prefWidth="852.0" style="-fx-background-color: #rf; -fx-background-radius: 5;" AnchorPane.bottomAnchor="12.0" AnchorPane.leftAnchor="18.0" AnchorPane.rightAnchor="20.0" AnchorPane.topAnchor="134.0">
                                  <children>
                                     <Label prefHeight="20.0" prefWidth="200.0" styleClass="header-top" stylesheets="@../Design/ReceptionDesign.css" text="Appointments  Information" AnchorPane.leftAnchor="11.0" AnchorPane.rightAnchor="658.0" AnchorPane.topAnchor="7.0">
                                        <font>
@@ -500,7 +500,7 @@
                                     <Button fx:id="clear_Appointments" layoutX="762.0" layoutY="292.0" mnemonicParsing="false" prefHeight="30.0" prefWidth="70.0" styleClass="btn-2" stylesheets="@../Design/ReceptionDesign.css" text="Clear" AnchorPane.bottomAnchor="49.0" AnchorPane.rightAnchor="20.0" />
                                     <Button fx:id="deleteAppointments" layoutX="762.0" layoutY="327.0" mnemonicParsing="false" prefHeight="30.0" prefWidth="70.0" styleClass="btn-2" stylesheets="@../Design/ReceptionDesign.css" text="Delete" AnchorPane.bottomAnchor="14.0" AnchorPane.rightAnchor="20.0" />
                                     <Button fx:id="deleteRowApptTable" layoutX="772.0" layoutY="15.0" mnemonicParsing="false" prefHeight="25.0" prefWidth="25.0" styleClass="btn-2" stylesheets="@../Design/ReceptionDesign.css" text="-" AnchorPane.rightAnchor="55.0" />
-                                    <DatePicker fx:id="dataPickerAppointment" cache="true" layoutX="712.0" layoutY="7.0" minHeight="-Infinity" prefHeight="40.0" prefWidth="25.0" styleClass="box" />
+                                    <DatePicker fx:id="dataPickerAppointment" cache="true" layoutX="712.0" layoutY="7.0" minHeight="-Infinity" prefHeight="40.0" prefWidth="25.0" styleClass="box" AnchorPane.rightAnchor="90.0" />
                                  </children>
                               </AnchorPane>
                                     </children>

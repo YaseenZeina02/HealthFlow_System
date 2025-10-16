@@ -19,7 +19,10 @@ public class PrescriptionItemDAO {
         try (PreparedStatement ps = c.prepareStatement(sql)) {
             ps.setLong(1, prescriptionId);
             if (medicineId == null) ps.setNull(2, Types.BIGINT); else ps.setLong(2, medicineId);
-            ps.setString(3, medicineName);
+
+            // allow DB trigger enforce_item_med_integrity() to backfill name from medicine_id
+            if (medicineName == null || medicineName.isBlank()) ps.setNull(3, Types.VARCHAR); else ps.setString(3, medicineName);
+
             ps.setString(4, dosage);
             ps.setInt(5, qty);
             try (ResultSet rs = ps.executeQuery()) {
@@ -68,5 +71,83 @@ public class PrescriptionItemDAO {
         it.setStatus(ItemStatus.fromString(rs.getString("status")));
         it.setBatchId((Long) rs.getObject("batch_id"));
         return it;
+    }
+    /** Insert many items (loops with RETURNING to preserve mapping). */
+    public List<PrescriptionItem> addItems(Connection c, Long prescriptionId, List<PrescriptionItem> items) throws SQLException {
+        List<PrescriptionItem> out = new ArrayList<>();
+        if (items == null || items.isEmpty()) return out;
+        for (PrescriptionItem it : items) {
+            out.add(addItem(c, prescriptionId,
+                    it.getMedicineId(),
+                    it.getMedicineName(),
+                    it.getDosage(),
+                    it.getQuantity()));
+        }
+        return out;
+    }
+
+    /** Delete one item by id. */
+    public boolean deleteById(Connection c, Long id) throws SQLException {
+        try (PreparedStatement ps = c.prepareStatement("DELETE FROM prescription_items WHERE id = ?")) {
+            ps.setLong(1, id);
+            return ps.executeUpdate() == 1;
+        }
+    }
+
+    /** Delete all items for a prescription (useful when doctor edits draft before sending). */
+    public int deleteByPrescription(Connection c, Long prescriptionId) throws SQLException {
+        try (PreparedStatement ps = c.prepareStatement("DELETE FROM prescription_items WHERE prescription_id = ?")) {
+            ps.setLong(1, prescriptionId);
+            return ps.executeUpdate();
+        }
+    }
+
+    /** Items + current stock (read-only helper for doctor view). */
+    public List<PrescriptionItem> listByPrescriptionWithStock(Connection c, Long prescriptionId) throws SQLException {
+        final String sql = """
+                SELECT i.*, m.available_quantity
+                FROM prescription_items i
+                LEFT JOIN medicines m ON m.id = i.medicine_id
+                WHERE i.prescription_id = ?
+                ORDER BY i.id
+                """;
+        try (PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setLong(1, prescriptionId);
+            try (ResultSet rs = ps.executeQuery()) {
+                List<PrescriptionItem> out = new ArrayList<>();
+                while (rs.next()) {
+                    PrescriptionItem it = map(rs);
+                    // if your model has a setter for stock, set it; otherwise ignore
+                    try {
+                        var fld = PrescriptionItem.class.getMethod("setStockAvailable", int.class);
+                        fld.invoke(it, rs.getInt("available_quantity"));
+                    } catch (Throwable ignore) {}
+                    out.add(it);
+                }
+                return out;
+            }
+        }
+    }
+
+    /** Update core editable fields of a prescription item and return the updated row. */
+    public PrescriptionItem updateItem(Connection c, long id, Long medicineId,
+                                       String medicineName, String dosage, int qty) throws SQLException {
+        final String sql = """
+        UPDATE prescription_items
+        SET medicine_id = ?, medicine_name = ?, dosage = ?, quantity = ?
+        WHERE id = ?
+        RETURNING *
+        """;
+        try (PreparedStatement ps = c.prepareStatement(sql)) {
+            if (medicineId == null) ps.setNull(1, Types.BIGINT); else ps.setLong(1, medicineId);
+            if (medicineName == null || medicineName.isBlank()) ps.setNull(2, Types.VARCHAR); else ps.setString(2, medicineName);
+            ps.setString(3, dosage);
+            ps.setInt(4, qty);
+            ps.setLong(5, id);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) return map(rs);
+            }
+        }
+        throw new SQLException("Failed to update prescription item id=" + id);
     }
 }

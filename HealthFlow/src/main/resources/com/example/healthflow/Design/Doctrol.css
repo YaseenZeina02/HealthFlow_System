@@ -1,0 +1,28 @@
+/* ====== Complete button (Reception Dashboard) ====== */
+.button.btn-complete {
+    -fx-background-color: linear-gradient(to right, #22c55e, #16a34a);
+    -fx-text-fill: white !important;
+    -fx-font-weight: bold;
+    -fx-background-radius: 8;
+    -fx-padding: 6 14;
+    -fx-cursor: hand;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.25), 8, 0.3, 0, 1);
+    /*-fx-font-size: 12.5px;*/
+}
+
+/* ثبّت لون النص أبيض سواء الصف محدد أو لا */
+.button.btn-complete .text {
+    -fx-fill: white !important;
+}
+/*.table-view .table-row-cell:filled .button.btn-complete .text,*/
+/*.table-view .table-row-cell:filled:selected .button.btn-complete .text {*/
+/*    -fx-fill: #302323;*/
+/*}*/
+
+.table-row-cell { -fx-cell-size: 38; }
+.button.btn-complete:hover {
+    -fx-background-color: linear-gradient(to right, #16a34a, #15803d);
+}
+.button.btn-complete:disabled {
+    -fx-opacity: 0.6;
+}

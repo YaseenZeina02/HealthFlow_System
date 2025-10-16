@@ -16,7 +16,7 @@ public class PrescriptionDAO {
             RETURNING *
             """;
         try (PreparedStatement ps = c.prepareStatement(sql)) {
-            ps.setLong(1, appointmentId);
+            if (appointmentId == null) ps.setNull(1, Types.BIGINT); else ps.setLong(1, appointmentId);
             ps.setLong(2, doctorId);
             ps.setLong(3, patientId);
             ps.setString(4, notes);
@@ -25,6 +25,28 @@ public class PrescriptionDAO {
             }
         }
         throw new SQLException("Failed to create prescription");
+    }
+
+    /** Create a prescription (optionally without appointment) and insert items in one transaction. */
+    public Prescription createAndItems(Connection c,
+                                       Long appointmentId, Long doctorId, Long patientId, String notes,
+                                       List<PrescriptionItem> items,
+                                       PrescriptionItemDAO itemDao) throws SQLException {
+        boolean oldAuto = c.getAutoCommit();
+        c.setAutoCommit(false);
+        try {
+            Prescription p = create(c, appointmentId, doctorId, patientId, notes);
+            if (items != null && !items.isEmpty()) {
+                itemDao.addItems(c, p.getId(), items);
+            }
+            c.commit();
+            return p;
+        } catch (SQLException ex) {
+            c.rollback();
+            throw ex;
+        } finally {
+            c.setAutoCommit(oldAuto);
+        }
     }
 
     public Prescription findById(Connection c, Long id) throws SQLException {
@@ -97,5 +119,19 @@ public class PrescriptionDAO {
         p.setApprovedBy((Long) rs.getObject("approved_by"));
         p.setDispensedBy((Long) rs.getObject("dispensed_by"));
         return p;
+    }
+
+    /** Prescriptions visible to pharmacy queue by status. */
+    public List<Prescription> listByStatus(Connection c, PrescriptionStatus status, int limit) throws SQLException {
+        final String sql = "SELECT * FROM prescriptions WHERE status = ?::prescription_status ORDER BY created_at DESC LIMIT ?";
+        try (PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setString(1, status.name());
+            ps.setInt(2, Math.max(1, limit));
+            try (ResultSet rs = ps.executeQuery()) {
+                List<Prescription> out = new ArrayList<>();
+                while (rs.next()) out.add(map(rs));
+                return out;
+            }
+        }
     }
 }
