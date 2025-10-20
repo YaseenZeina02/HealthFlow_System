@@ -10,21 +10,33 @@ import java.util.List;
 public class PrescriptionItemDAO {
 
     public PrescriptionItem addItem(Connection c, Long prescriptionId, Long medicineId,
-                                    String medicineName, String dosage, int qty) throws SQLException {
+                                    String medicineName, Integer dose, Integer freqPerDay,
+                                    Integer durationDays, String strength, String form,
+                                    String route, String notes, int qty) throws SQLException {
         final String sql = """
-            INSERT INTO prescription_items (prescription_id, medicine_id, medicine_name, dosage, quantity)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO prescription_items (
+                prescription_id, medicine_id, medicine_name,
+                quantity, dose, freq_per_day, duration_days,
+                strength, form, route, notes
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             RETURNING *
             """;
         try (PreparedStatement ps = c.prepareStatement(sql)) {
             ps.setLong(1, prescriptionId);
             if (medicineId == null) ps.setNull(2, Types.BIGINT); else ps.setLong(2, medicineId);
 
-            // allow DB trigger enforce_item_med_integrity() to backfill name from medicine_id
             if (medicineName == null || medicineName.isBlank()) ps.setNull(3, Types.VARCHAR); else ps.setString(3, medicineName);
 
-            ps.setString(4, dosage);
-            ps.setInt(5, qty);
+            ps.setInt(4, qty);
+
+            if (dose == null) ps.setNull(5, Types.INTEGER); else ps.setInt(5, dose);
+            if (freqPerDay == null) ps.setNull(6, Types.INTEGER); else ps.setInt(6, freqPerDay);
+            if (durationDays == null) ps.setNull(7, Types.INTEGER); else ps.setInt(7, durationDays);
+            if (strength == null || strength.isBlank()) ps.setNull(8, Types.VARCHAR); else ps.setString(8, strength);
+            if (form == null || form.isBlank()) ps.setNull(9, Types.VARCHAR); else ps.setString(9, form);
+            if (route == null || route.isBlank()) ps.setNull(10, Types.VARCHAR); else ps.setString(10, route);
+            if (notes == null || notes.isBlank()) ps.setNull(11, Types.VARCHAR); else ps.setString(11, notes);
+
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) return map(rs);
             }
@@ -48,7 +60,15 @@ public class PrescriptionItemDAO {
     }
 
     public List<PrescriptionItem> listByPrescription(Connection c, Long prescriptionId) throws SQLException {
-        final String sql = "SELECT * FROM prescription_items WHERE prescription_id = ? ORDER BY id";
+        final String sql = """
+            SELECT id, prescription_id, medicine_id, medicine_name,
+                   dosage,
+                   quantity, qty_dispensed, status, batch_id,
+                   dose, freq_per_day, duration_days, strength, form, route, notes, dosage_text
+            FROM prescription_items
+            WHERE prescription_id = ?
+            ORDER BY id
+            """;
         try (PreparedStatement ps = c.prepareStatement(sql)) {
             ps.setLong(1, prescriptionId);
             try (ResultSet rs = ps.executeQuery()) {
@@ -70,6 +90,14 @@ public class PrescriptionItemDAO {
         it.setQtyDispensed(rs.getInt("qty_dispensed"));
         it.setStatus(ItemStatus.fromString(rs.getString("status")));
         it.setBatchId((Long) rs.getObject("batch_id"));
+        it.setDose((Integer) rs.getObject("dose"));
+        it.setFreqPerDay((Integer) rs.getObject("freq_per_day"));
+        it.setDurationDays((Integer) rs.getObject("duration_days"));
+        it.setStrength(rs.getString("strength"));
+        it.setForm(rs.getString("form"));
+        it.setRoute(rs.getString("route"));
+        it.setNotes(rs.getString("notes"));
+        it.setDosageText(rs.getString("dosage_text"));
         return it;
     }
     /** Insert many items (loops with RETURNING to preserve mapping). */
@@ -80,8 +108,15 @@ public class PrescriptionItemDAO {
             out.add(addItem(c, prescriptionId,
                     it.getMedicineId(),
                     it.getMedicineName(),
-                    it.getDosage(),
-                    it.getQuantity()));
+                    it.getDose(),
+                    it.getFreqPerDay(),
+                    it.getDurationDays(),
+                    it.getStrength(),
+                    it.getForm(),
+                    it.getRoute(),
+                    it.getNotes(),
+                    it.getQuantity()
+            ));
         }
         return out;
     }
@@ -131,19 +166,29 @@ public class PrescriptionItemDAO {
 
     /** Update core editable fields of a prescription item and return the updated row. */
     public PrescriptionItem updateItem(Connection c, long id, Long medicineId,
-                                       String medicineName, String dosage, int qty) throws SQLException {
+                                       String medicineName, Integer dose, Integer freqPerDay,
+                                       Integer durationDays, String strength, String form,
+                                       String route, String notes, int qty) throws SQLException {
         final String sql = """
         UPDATE prescription_items
-        SET medicine_id = ?, medicine_name = ?, dosage = ?, quantity = ?
+        SET medicine_id = ?, medicine_name = ?,
+            dose = ?, freq_per_day = ?, duration_days = ?,
+            strength = ?, form = ?, route = ?, notes = ?, quantity = ?
         WHERE id = ?
         RETURNING *
         """;
         try (PreparedStatement ps = c.prepareStatement(sql)) {
             if (medicineId == null) ps.setNull(1, Types.BIGINT); else ps.setLong(1, medicineId);
             if (medicineName == null || medicineName.isBlank()) ps.setNull(2, Types.VARCHAR); else ps.setString(2, medicineName);
-            ps.setString(3, dosage);
-            ps.setInt(4, qty);
-            ps.setLong(5, id);
+            if (dose == null) ps.setNull(3, Types.INTEGER); else ps.setInt(3, dose);
+            if (freqPerDay == null) ps.setNull(4, Types.INTEGER); else ps.setInt(4, freqPerDay);
+            if (durationDays == null) ps.setNull(5, Types.INTEGER); else ps.setInt(5, durationDays);
+            if (strength == null || strength.isBlank()) ps.setNull(6, Types.VARCHAR); else ps.setString(6, strength);
+            if (form == null || form.isBlank()) ps.setNull(7, Types.VARCHAR); else ps.setString(7, form);
+            if (route == null || route.isBlank()) ps.setNull(8, Types.VARCHAR); else ps.setString(8, route);
+            if (notes == null || notes.isBlank()) ps.setNull(9, Types.VARCHAR); else ps.setString(9, notes);
+            ps.setInt(10, qty);
+            ps.setLong(11, id);
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) return map(rs);
             }

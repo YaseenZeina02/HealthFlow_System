@@ -684,3 +684,64 @@ CREATE TRIGGER tri_item_med_integrity
     BEFORE INSERT OR UPDATE ON prescription_items
                          FOR EACH ROW
                          EXECUTE FUNCTION enforce_item_med_integrity();
+
+
+ALTER TABLE prescription_items
+    ADD COLUMN IF NOT EXISTS dose INT,
+    ADD COLUMN IF NOT EXISTS freq_per_day INT,
+    ADD COLUMN IF NOT EXISTS duration_days INT,
+    ADD COLUMN IF NOT EXISTS strength VARCHAR(50),
+    ADD COLUMN IF NOT EXISTS form VARCHAR(30),
+    ADD COLUMN IF NOT EXISTS route VARCHAR(30),
+    ADD COLUMN IF NOT EXISTS notes TEXT;
+
+-- 2) لو بدك تغيّر dosage لنص عرض فقط
+ALTER TABLE prescription_items
+ALTER COLUMN dosage TYPE VARCHAR(255); -- أو TEXT
+
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_name = 'prescription_items'
+      AND column_name = 'dosage_text'
+  ) THEN
+ALTER TABLE prescription_items
+    ADD COLUMN dosage_text TEXT
+        GENERATED ALWAYS AS (
+            btrim(
+                /* نجمع بس العناصر غير الفارغة بأسلوب immutable بالكامل */
+                    regexp_replace(
+                        /* نُدخل الفواصل " • " يدويًا، ثم نحذف المكرّر/الزائد لاحقًا */
+                            COALESCE(NULLIF(strength,''), '') ||
+                            CASE WHEN strength IS NOT NULL AND btrim(strength) <> '' AND form IS NOT NULL AND btrim(form) <> '' THEN ' • ' ELSE '' END ||
+                            COALESCE(NULLIF(form,''), '') ||
+                            CASE WHEN ( (strength IS NOT NULL AND btrim(strength) <> '') OR (form IS NOT NULL AND btrim(form) <> '') )
+                                AND (dose IS NOT NULL OR (freq_per_day IS NOT NULL AND duration_days IS NOT NULL) OR (route IS NOT NULL AND btrim(route) <> '') OR (notes IS NOT NULL AND btrim(notes) <> '') )
+                                     THEN ' • ' ELSE '' END ||
+                            COALESCE(dose::text, '') ||
+                            CASE WHEN dose IS NOT NULL AND (freq_per_day IS NOT NULL AND duration_days IS NOT NULL) THEN ' • ' ELSE '' END ||
+                            COALESCE(
+                                    CASE WHEN freq_per_day IS NOT NULL AND duration_days IS NOT NULL
+                                             THEN (freq_per_day::text || 'x/day · ' || duration_days::text || 'd')
+                                        END, ''
+                            ) ||
+                            CASE WHEN ( (dose IS NOT NULL) OR (freq_per_day IS NOT NULL AND duration_days IS NOT NULL) )
+                                AND (route IS NOT NULL AND btrim(route) <> '') THEN ' • ' ELSE '' END ||
+                            COALESCE(NULLIF(route,''), '') ||
+                            CASE WHEN ( (dose IS NOT NULL) OR (freq_per_day IS NOT NULL AND duration_days IS NOT NULL) OR (route IS NOT NULL AND btrim(route) <> '') )
+                                AND (notes IS NOT NULL AND btrim(notes) <> '') THEN ' • ' ELSE '' END ||
+                            COALESCE(NULLIF(notes,''), ''),
+                            '(^(\s*•\s*)+)|(•\s*•)',  -- يشيل نقاط "•" البادئة أو المكرّرة
+                            'g'
+                    )
+            )
+            ) STORED;
+END IF;
+END $$;
+
+
+ALTER TABLE prescription_items
+    ALTER COLUMN dosage DROP NOT NULL;

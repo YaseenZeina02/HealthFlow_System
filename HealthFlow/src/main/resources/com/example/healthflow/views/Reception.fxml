@@ -464,7 +464,7 @@
                                        </font>
                                     </Label>
                                     <Label layoutX="20.0" layoutY="38.0" prefHeight="24.0" prefWidth="95.0" text="Patient Name :" />
-                                    <Label fx:id="getPatientName" layoutX="247.0" layoutY="62.0" prefHeight="24.0" prefWidth="112.0" />
+                                    <Label fx:id="getPatientName" layoutX="111.0" layoutY="38.0" prefHeight="24.0" prefWidth="112.0" />
                                     <Label layoutX="20.0" layoutY="62.0" prefHeight="24.0" prefWidth="70.0" text="Patient ID:" />
                                     <Label fx:id="getPatientID" layoutX="90.0" layoutY="62.0" prefHeight="24.0" prefWidth="132.0" />
                                     <Label fx:id="LabelToAlert" layoutX="421.0" layoutY="61.0" prefHeight="44.0" prefWidth="312.0" text="." AnchorPane.bottomAnchor="2.0" AnchorPane.rightAnchor="21.0" />

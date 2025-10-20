@@ -25,4 +25,8 @@ module com.example.healthflow {
     opens com.example.healthflow to javafx.fxml;
     exports com.example.healthflow;
     exports com.example.healthflow.controllers to javafx.fxml;
+
+    opens com.example.healthflow.model.dto to javafx.base;
+
+
 }

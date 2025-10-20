@@ -331,6 +331,8 @@ public class DoctorDAO {
         }
     }
 
+
+
     public java.util.List<PatientLite> listTodaysPatientsForDoctor(java.sql.Connection c, long doctorUserId) throws Exception {
         final String sql = """
             SELECT DISTINCT ON (u2.id)
@@ -674,4 +676,27 @@ public class DoctorDAO {
     }
 
 
+    /* ==================== Appointments status updates ==================== */
+    /**
+     * Update an appointment status in DB. Returns true if exactly one row was updated.
+     * Valid values depend on your ENUM (e.g., SCHEDULED, COMPLETED, CANCELLED).
+     */
+    public boolean setAppointmentStatus(long appointmentId, String newStatus) throws SQLException {
+        final String sql = "UPDATE appointments SET status = ?::appt_status, updated_at = NOW() WHERE id = ?";        try (Connection c = Database.get();
+             PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setString(1, newStatus);
+            ps.setLong(2, appointmentId);
+            return ps.executeUpdate() == 1;
+        }
+    }
+
+    /** Convenience: mark appointment as COMPLETED */
+    public boolean markAppointmentCompleted(long appointmentId) throws SQLException {
+        return setAppointmentStatus(appointmentId, "COMPLETED");
+    }
+
+    /** Convenience: mark appointment as CANCELLED */
+    public boolean cancelAppointment(long appointmentId) throws SQLException {
+        return setAppointmentStatus(appointmentId, "CANCELLED");
+    }
 }

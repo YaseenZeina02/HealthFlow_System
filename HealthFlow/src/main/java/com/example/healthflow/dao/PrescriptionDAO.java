@@ -1,5 +1,6 @@
 package com.example.healthflow.dao;
 
+import com.example.healthflow.db.Database;
 import com.example.healthflow.model.*;
 
 import java.sql.*;
@@ -132,6 +133,32 @@ public class PrescriptionDAO {
                 while (rs.next()) out.add(map(rs));
                 return out;
             }
+        }
+    }
+    /**
+     * Ensure there is a prescription linked to the given appointment. If one exists, return its id;
+     * otherwise create a new PENDING prescription and return the new id.
+     */
+    public long ensurePrescriptionForAppointment(Connection c, long appointmentId, long doctorId, long patientId) throws SQLException {
+        // 1) Try to find existing prescription for this appointment
+        final String q = "SELECT id FROM prescriptions WHERE appointment_id = ? ORDER BY id DESC LIMIT 1";
+        try (PreparedStatement ps = c.prepareStatement(q)) {
+            ps.setLong(1, appointmentId);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) return rs.getLong(1);
+            }
+        }
+        // 2) Create a new one (defaults to PENDING status per schema)
+        Prescription p = create(c, appointmentId, doctorId, patientId, null);
+        return p.getId();
+    }
+
+    /**
+     * Overload that manages its own connection.
+     */
+    public long ensurePrescriptionForAppointment(long appointmentId, long doctorId, long patientId) throws SQLException {
+        try (Connection c = Database.get()) {
+            return ensurePrescriptionForAppointment(c, appointmentId, doctorId, patientId);
         }
     }
 }

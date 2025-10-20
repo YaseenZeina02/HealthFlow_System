@@ -314,6 +314,7 @@ public class ReceptionController {
 
     private static final DateTimeFormatter DATE_FMT_HUMAN = DateTimeFormatter.ofPattern("EEE, MMM dd, yyyy");
     private static final java.time.ZoneId APP_ZONE = java.time.ZoneId.of("Asia/Gaza");
+    private static final java.time.ZoneId APP_TZ = java.time.ZoneId.of("Asia/Gaza");
 
     // Cache: appointment.id -> patient's national_id (or fallback patient id)
     private final java.util.concurrent.ConcurrentHashMap<Long, String> apptPatientIdCache
@@ -500,6 +501,9 @@ public class ReceptionController {
     private final DoctorDAO doctorDAO = new DoctorDAO();
     private final String cssPath = "/com/example/healthflow/Design/ReceptionDesign.css";
 
+    // When booking from patient, auto-pick nearest future slot once
+    private volatile boolean selectNearestSlotOnNextRefresh = false;
+
     /* ============ Connectivity ============ */
     private final ConnectivityMonitor monitor;
     private static volatile boolean listenerRegistered = false;
@@ -605,6 +609,7 @@ public class ReceptionController {
             }
             if (getPatientName != null) getPatientName.setText(row.getFullName());
             if (getPatientID != null) getPatientID.setText(row.getNationalId());
+            selectNearestSlotOnNextRefresh = true;
             showAppointmentPane();
             if (DoctorspecialtyApp != null && DoctorspecialtyApp.getItems().isEmpty()) loadSpecialtiesAsync();
             addOrFocusDraftForPatient(row);
@@ -1020,7 +1025,20 @@ public class ReceptionController {
                     return;
                 }
                 var data = FXCollections.observableArrayList(slots);
-                Platform.runLater(() -> cmbSlots.setItems(data));
+                Platform.runLater(() -> {
+                    cmbSlots.setItems(data);
+                    if (selectNearestSlotOnNextRefresh) {
+                        // Pick the earliest available (already filtered to future) = nearest to now
+                        if (!data.isEmpty()) {
+                            cmbSlots.getSelectionModel().select(0);
+                        }
+                        selectNearestSlotOnNextRefresh = false; // one-shot
+                    } else {
+                        // No default selection when not coming from BookAppointmentFromPateint
+                        cmbSlots.getSelectionModel().clearSelection();
+                        cmbSlots.setPromptText("Select time");
+                    }
+                });
             } catch (Exception e) {
                 e.printStackTrace();
                 Platform.runLater(() -> showWarn("Slots", "Failed to load free slots: " + e.getMessage()));
@@ -1301,6 +1319,7 @@ public class ReceptionController {
         }
     }
 
+
     private String safe(String s) {
         if (s == null) return null;
         String t = s.trim();
@@ -1309,6 +1328,14 @@ public class ReceptionController {
 
     private boolean contains(String v, String q) {
         return v != null && v.toLowerCase().contains(q);
+    }
+
+    // === Time validation (Asia/Gaza) ===
+    private boolean isPastStart(LocalDate d, LocalTime t) {
+        if (d == null || t == null) return false;
+        var now = java.time.ZonedDateTime.now(APP_TZ).withSecond(0).withNano(0);
+        var chosen = java.time.ZonedDateTime.of(d, t, APP_TZ);
+        return chosen.isBefore(now);
     }
 
 
@@ -1510,12 +1537,27 @@ public class ReceptionController {
                         var doc = avilabelDoctorApp.getValue();
                         var day = AppointmentDate.getValue();
                         var slots = doctorDAO.listFreeSlots(doc.doctorId, day, open, close, slotMin);
-                        if (day.equals(LocalDate.now())) {
-                            var now = LocalDateTime.now().withSecond(0).withNano(0);
+//                        if (day.equals(LocalDate.now())) {
+//                            var now = LocalDateTime.now().withSecond(0).withNano(0);
+//                            int mod = now.getMinute() % slotMin;
+//                            var cutoff = (mod == 0) ? now : now.plusMinutes(slotMin - mod);
+//                            slots.removeIf(s -> s.from().isBefore(cutoff));
+//                            if (now.toLocalTime().isAfter(close)) slots.clear();
+//                        }
+                        if (day.equals(LocalDate.now(APP_TZ))) {
+                            LocalDateTime now = java.time.ZonedDateTime.now(APP_TZ)
+                                    .toLocalDateTime().withSecond(0).withNano(0);
                             int mod = now.getMinute() % slotMin;
-                            var cutoff = (mod == 0) ? now : now.plusMinutes(slotMin - mod);
+                            LocalDateTime cutoff = (mod == 0) ? now : now.plusMinutes(slotMin - mod);
                             slots.removeIf(s -> s.from().isBefore(cutoff));
-                            if (now.toLocalTime().isAfter(close)) slots.clear();
+                            if (now.toLocalTime().isAfter(close)) {
+                                Platform.runLater(() -> {
+                                    cmbSlots.getItems().clear();
+                                    showInfo("Working Hours", "Clinic working hours are over for today.");
+                                    showToast("info", "Clinic working hours are over for today.");
+                                });
+                                return;
+                            }
                         }
                         Platform.runLater(() -> {
                             var selected = cmbSlots.getValue();
@@ -1791,24 +1833,33 @@ public class ReceptionController {
                     new javafx.beans.property.SimpleStringProperty(fmt12(cd.getValue().getTime()))
             );
 
-            // محرر ComboBox بأوقات العيادة (أنسب وأسهل وأضمن)
+            // محرر ComboBox يعرض فقط الفتحات الحرة للصف (doctor/date)
             colStartTime.setCellFactory(col -> new TableCell<ApptRow, String>() {
-                private final ComboBox<String> combo = new ComboBox<>();
+                private final ComboBox<DoctorDAO.Slot> combo = new ComboBox<>();
 
                 {
                     combo.setVisibleRowCount(10);
                     combo.setPromptText("Select time");
 
-                    // افتح المحرر على نقرة واحدة والصف محدد
-//                    setOnMouseClicked(e -> {
-//                        if (!isEmpty() && getTableRow() != null && getTableRow().isSelected()) {
-//                            startEdit();
-//                            combo.show();
-//                        }
-//                    });
+                    // Render slots as 12h start-time text
+                    combo.setCellFactory(list -> new ListCell<>() {
+                        @Override
+                        protected void updateItem(DoctorDAO.Slot item, boolean empty) {
+                            super.updateItem(item, empty);
+                            setText(empty || item == null ? null : fmt12(item.from().toLocalTime()));
+                        }
+                    });
+                    combo.setButtonCell(new ListCell<>() {
+                        @Override
+                        protected void updateItem(DoctorDAO.Slot item, boolean empty) {
+                            super.updateItem(item, empty);
+                            setText(empty || item == null ? null : fmt12(item.from().toLocalTime()));
+                        }
+                    });
+
                     setOnMouseClicked(e -> {
                         if (!isEmpty() && getTableRow() != null && getTableRow().isSelected()) {
-                            var rowItem = (getTableRow() == null) ? null : getTableRow().getItem();
+                            var rowItem = (getTableRow() == null) ? null : (ApptRow) getTableRow().getItem();
                             if (rowItem != null && isPastDate(rowItem.getDate())) {
                                 showToast("error", "You cannot select a time for a past date.");
                                 return;
@@ -1818,43 +1869,173 @@ public class ReceptionController {
                         }
                     });
 
-                    // املأ الخيارات عند فتح القائمة بناءً على تاريخ الصف
+                    // Populate only FREE slots for the row's doctor/date
                     combo.setOnShown(e -> {
-                        var rowItem = (getTableRow() == null) ? null : getTableRow().getItem();
+                        var rowItem = (getTableRow() == null) ? null : (ApptRow) getTableRow().getItem();
                         if (rowItem == null) return;
-                        var choices = FXCollections.observableArrayList(
-                                generateClinicTimes(rowItem.getDate())
-                        );
-                        combo.setItems(choices);
-                        if (rowItem.getTime() != null) {
-                            String cur = rowItem.getTime().format(SLOT_FMT_12H);
-                            combo.getSelectionModel().select(cur);
+
+                        LocalDate day = rowItem.getDate();
+                        long docId = rowItem.getDoctorId();
+                        if (day == null) { showToast("warn", "Select a date first."); combo.hide(); return; }
+                        if (docId <= 0) { showToast("warn", "Select a doctor first."); combo.hide(); return; }
+
+                        final LocalTime open = LocalTime.of(9, 0);
+                        final LocalTime close = LocalTime.of(15, 0);
+                        final int step = DEFAULT_SESSION_MIN; // 20 min
+
+                        java.util.List<DoctorDAO.Slot> slots;
+                        try {
+                            slots = doctorDAO.listFreeSlots(docId, day, open, close, step);
+                        } catch (Exception ex) {
+                            showWarn("Slots", "Failed to load free slots: " + ex.getMessage());
+                            return;
                         }
-                        if (isPastDate(rowItem.getDate())) {
-                            combo.hide();
-                            showToast("error", "The selected date is in the past. Please update the date first.");                            return;
+
+                        // For today: drop past slots and anything after close
+//                        if (day.equals(LocalDate.now())) {
+//                            LocalDateTime now = LocalDateTime.now().withSecond(0).withNano(0);
+//                            int mod = now.getMinute() % step;
+//                            LocalDateTime cutoff = (mod == 0) ? now : now.plusMinutes(step - mod);
+//                            slots.removeIf(s -> s.from().isBefore(cutoff));
+//                            if (now.toLocalTime().isAfter(close)) slots.clear();
+//                        }
+                        // Final prune (Asia/Gaza): never show past times for today
+                        if (day.equals(LocalDate.now(APP_TZ))) {
+                            int stepMin = (rowItem.getSessionTime() > 0) ? rowItem.getSessionTime() : DEFAULT_SESSION_MIN;
+                            LocalDateTime now = java.time.ZonedDateTime.now(APP_TZ)
+                                    .toLocalDateTime().withSecond(0).withNano(0);
+                            int mod = now.getMinute() % stepMin;
+                            LocalTime cutoffT = (mod == 0) ? now.toLocalTime() : now.toLocalTime().plusMinutes(stepMin - mod);
+                            slots.removeIf(s -> s.from().toLocalTime().isBefore(cutoffT));
+                        }
+                        slots.removeIf(s -> !s.from().toLocalTime().isBefore(close));
+
+                        // Extra guard: filter out busy slots by looking at current table rows
+                        if (TableINAppointment != null && apptEditable != null) {
+                            final int sess = (rowItem.getSessionTime() > 0) ? rowItem.getSessionTime() : DEFAULT_SESSION_MIN;
+                            // Build a list of busy intervals from table rows (excluding the current editing row)
+                            java.util.List<java.time.LocalTime[]> busy = new java.util.ArrayList<>();
+                            for (ApptRow r : apptEditable) {
+                                if (r == null) continue;
+                                if (r == rowItem) continue; // don't block the row's own current time
+                                if (r.getDoctorId() != docId) continue;
+                                if (day.equals(r.getDate()) && r.getTime() != null) {
+                                    java.time.LocalTime st = r.getTime();
+                                    int dur = (r.getSessionTime() > 0) ? r.getSessionTime() : DEFAULT_SESSION_MIN;
+                                    java.time.LocalTime et = st.plusMinutes(dur);
+                                    busy.add(new java.time.LocalTime[]{st, et});
+                                }
+                            }
+                            // Remove any slot that overlaps any busy interval
+                            slots.removeIf(s -> {
+                                java.time.LocalTime st = s.from().toLocalTime();
+                                java.time.LocalTime et = st.plusMinutes(sess);
+                                for (java.time.LocalTime[] b : busy) {
+                                    java.time.LocalTime bst = b[0], bet = b[1];
+                                    boolean overlap = !et.isBefore(bst) && !st.isAfter(bet.minusNanos(1));
+                                    if (overlap) return true;
+                                }
+                                return false;
+                            });
+                        }
+
+                        // Final prune: never show past times for today (defensive)
+                        if (day.equals(LocalDate.now())) {
+                            int stepMin = (rowItem.getSessionTime() > 0) ? rowItem.getSessionTime() : DEFAULT_SESSION_MIN;
+                            LocalDateTime now = LocalDateTime.now().withSecond(0).withNano(0);
+                            int mod = now.getMinute() % stepMin;
+                            LocalTime cutoffT = (mod == 0) ? now.toLocalTime() : now.toLocalTime().plusMinutes(stepMin - mod);
+                            slots.removeIf(s -> s.from().toLocalTime().isBefore(cutoffT));
+                        }
+
+                        // If the row already has a time selected, ensure it stays selectable even if "busy"
+                        if (rowItem.getTime() != null) {
+                            boolean present = false;
+                            for (DoctorDAO.Slot s : slots) {
+                                if (s.from().toLocalTime().equals(rowItem.getTime())) { present = true; break; }
+                            }
+                            if (!present) {
+                                java.time.LocalDateTime from = java.time.LocalDateTime.of(day, rowItem.getTime());
+                                java.time.LocalDateTime to = from.plusMinutes((rowItem.getSessionTime() > 0) ? rowItem.getSessionTime() : DEFAULT_SESSION_MIN);
+                                slots.add(new DoctorDAO.Slot(from, to));
+                                // keep ordering
+                                slots.sort(java.util.Comparator.comparing(a -> a.from()));
+                            }
+                        }
+
+                        combo.setItems(FXCollections.observableArrayList(slots));
+
+
+//                        // Preselect the current start time if it matches a free slot
+//                        if (rowItem.getTime() != null) {
+//                            for (DoctorDAO.Slot s : slots) {
+//                                if (s.from().toLocalTime().equals(rowItem.getTime())) {
+//                                    combo.getSelectionModel().select(s);
+//                                    break;
+//                                }
+//                            }
+//                        } else {
+//                            combo.getSelectionModel().clearSelection();
+//                        }
+                        // لا تختار أول عنصر تلقائيًا، إلا إذا جاي من BookAppointmentFromPateint
+                        if (selectNearestSlotOnNextRefresh) {
+                            if (!slots.isEmpty()) {
+                                // بعد تصفية الماضي، العنصر 0 هو الأقرب للآن
+                                combo.getSelectionModel().select(0);
+                            }
+                            selectNearestSlotOnNextRefresh = false; // one-shot
+                        } else {
+                            // لو الصف ما عنده وقت محفوظ، اتركه بدون تحديد
+                            if (rowItem.getTime() == null) {
+                                combo.getSelectionModel().clearSelection();
+                                combo.setValue(null); // يمنع اختيار index 0 تلقائيًا
+                            }
                         }
                     });
 
-                    // عند الاختيار: حدّث الموديل والداتابيز
+                    // Commit selection → update row & DB
+
                     combo.setOnAction(e -> {
-                        var rowItem = (getTableRow() == null) ? null : getTableRow().getItem();
-                        String sel = combo.getValue();
-                        if (rowItem == null || sel == null || sel.isBlank()) return;
+                        var rowItem = (getTableRow() == null) ? null : (ApptRow) getTableRow().getItem();
+                        DoctorDAO.Slot sel = combo.getValue();
+                        if (rowItem == null || sel == null) return;
                         try {
-                            LocalTime nt = LocalTime.parse(sel, SLOT_FMT_12H);
+                            LocalTime nt = sel.from().toLocalTime();
+                            // 🚫 لا تسمح بوقت ماضي
+                            if (isPastStart(rowItem.getDate(), nt)) {
+                                showToast("error", "Selected time is in the past. Choose a future time.");
+                                combo.getSelectionModel().clearSelection();
+                                cancelEdit();
+                                return;
+                            }
                             rowItem.setTime(nt);
                             rowItem.setDirty(true);
                             if (rowItem.getId() > 0 && rowItem.getDate() != null) {
                                 updateAppointmentStartAt(rowItem.getId(), rowItem.getDate(), nt);
                             }
-                            commitEdit(sel);
+                            commitEdit(fmt12(nt));
                             if (TableINAppointment != null) TableINAppointment.refresh();
-//                            updateDirtyAlert();
                         } catch (Exception ex) {
-                            showError("Invalid time", new RuntimeException("Unexpected time format"));
+                            showError("Invalid time", new RuntimeException("Unexpected time selection"));
                         }
                     });
+//                    combo.setOnAction(e -> {
+//                        var rowItem = (getTableRow() == null) ? null : (ApptRow) getTableRow().getItem();
+//                        DoctorDAO.Slot sel = combo.getValue();
+//                        if (rowItem == null || sel == null) return;
+//                        try {
+//                            LocalTime nt = sel.from().toLocalTime();
+//                            rowItem.setTime(nt);
+//                            rowItem.setDirty(true);
+//                            if (rowItem.getId() > 0 && rowItem.getDate() != null) {
+//                                updateAppointmentStartAt(rowItem.getId(), rowItem.getDate(), nt);
+//                            }
+//                            commitEdit(fmt12(nt));
+//                            if (TableINAppointment != null) TableINAppointment.refresh();
+//                        } catch (Exception ex) {
+//                            showError("Invalid time", new RuntimeException("Unexpected time selection"));
+//                        }
+//                    });
                 }
 
                 @Override
@@ -1862,6 +2043,11 @@ public class ReceptionController {
                     super.startEdit();
                     setGraphic(combo);
                     setText(null);
+                    var rowItem = (getTableRow() == null) ? null : (ApptRow) getTableRow().getItem();
+                    if (rowItem != null && rowItem.getTime() == null && !selectNearestSlotOnNextRefresh) {
+                        combo.getSelectionModel().clearSelection();
+                        combo.setValue(null);
+                    }
                 }
 
                 @Override
@@ -1985,9 +2171,19 @@ public class ReceptionController {
             res.add(t.format(SLOT_FMT_12H));
         }
 
-        // إن كان التاريخ هو اليوم: لا تعرض أوقات مضت
-        if (date != null && date.equals(java.time.LocalDate.now())) {
-            java.time.LocalDateTime now = java.time.LocalDateTime.now().withSecond(0).withNano(0);
+//        // إن كان التاريخ هو اليوم: لا تعرض أوقات مضت
+//        if (date != null && date.equals(java.time.LocalDate.now())) {
+//            java.time.LocalDateTime now = java.time.LocalDateTime.now().withSecond(0).withNano(0);
+//            int mod = now.getMinute() % step;
+//            java.time.LocalTime cutoff = (mod == 0)
+//                    ? now.toLocalTime()
+//                    : now.toLocalTime().plusMinutes(step - mod);
+//            res.removeIf(s -> java.time.LocalTime.parse(s, SLOT_FMT_12H).isBefore(cutoff));
+//            res.removeIf(s -> java.time.LocalTime.parse(s, SLOT_FMT_12H).compareTo(close) >= 0);
+//        }
+        if (date != null && date.equals(java.time.LocalDate.now(APP_TZ))) {
+            java.time.LocalDateTime now = java.time.ZonedDateTime.now(APP_TZ)
+                    .toLocalDateTime().withSecond(0).withNano(0);
             int mod = now.getMinute() % step;
             java.time.LocalTime cutoff = (mod == 0)
                     ? now.toLocalTime()
@@ -1995,6 +2191,7 @@ public class ReceptionController {
             res.removeIf(s -> java.time.LocalTime.parse(s, SLOT_FMT_12H).isBefore(cutoff));
             res.removeIf(s -> java.time.LocalTime.parse(s, SLOT_FMT_12H).compareTo(close) >= 0);
         }
+
         return res;
     }
 
@@ -2203,6 +2400,10 @@ public class ReceptionController {
 
     // Update start_at field for an appointment
     private void updateAppointmentStartAt(long id, LocalDate d, LocalTime t) {
+        if (isPastStart(d, t)) {
+            throw new IllegalArgumentException("Past time not allowed for today's date");
+        }
+
         if (id <= 0 || d == null || t == null) return;
         final String sql = "UPDATE appointments SET appointment_date = ?, updated_at = now() WHERE id = ?";
         try (Connection c = Database.get(); PreparedStatement ps = c.prepareStatement(sql)) {
@@ -2283,6 +2484,12 @@ public class ReceptionController {
                 return;
             }
 
+            // 🚫 منع إدخال موعد بوقت ماضي
+            if (isPastStart(day, time)) {
+                showToast("error", "Cannot insert an appointment in the past. Choose a future time.");
+                return;
+            }
+
             if (duration == null || duration <= 0) duration = DEFAULT_SESSION_MIN;
             java.time.OffsetDateTime startAt = toAppOffset(day, time);
 
@@ -2353,6 +2560,7 @@ public class ReceptionController {
             }
             showError("Insert Appointment", e);
         }
+
     }
 
     private void doUpdateAppointment() {
@@ -2364,8 +2572,15 @@ public class ReceptionController {
                          "location = COALESCE(?, (SELECT room_number FROM doctors WHERE id=?)), " +
                          "status=?::appt_status, updated_at=now() WHERE id=?";
             try (PreparedStatement ps = c.prepareStatement(sql)) {
-                java.time.OffsetDateTime startAt = (row.getDate() != null && row.getTime() != null)
-                        ? toAppOffset(row.getDate(), row.getTime())
+                LocalDate date = row.getDate();
+                LocalTime time = row.getTime();
+                // 🚫 منع تحديث موعد لوقت ماضي
+                if (date != null && time != null && isPastStart(date, time)) {
+                    showToast("error", "Cannot update appointment to a past time.");
+                    return;
+                }
+                java.time.OffsetDateTime startAt = (date != null && time != null)
+                        ? toAppOffset(date, time)
                         : null;
                 int duration = (row.getSessionTime() > 0) ? row.getSessionTime() : DEFAULT_SESSION_MIN;
 
@@ -2676,91 +2891,6 @@ public class ReceptionController {
         applyDashboardFilters();
     }
 
-
-//    private void wireDashboardTable() {
-//        if (TableAppInDashboard == null) return;
-//        TableAppInDashboard.setItems(sortedDash);
-//        sortedDash.comparatorProperty().bind(TableAppInDashboard.comparatorProperty());
-//
-//        // Row index starting from 1 (visual order number)
-//        if (colAppointmentID != null) {
-//            colAppointmentID.setCellFactory(col -> new TableCell<DoctorDAO.AppointmentRow, Number>() {
-//                @Override protected void updateItem(Number item, boolean empty) {
-//                    super.updateItem(item, empty);
-//                    setText(empty ? null : String.valueOf(getIndex() + 1));
-//                }
-//            });
-//            colAppointmentID.setCellValueFactory(cd -> new SimpleIntegerProperty(getSafeIndexOf(cd.getValue()) + 1));
-//        }
-//
-//        if (colPatientNameDash != null) colPatientNameDash.setCellValueFactory(cd -> new SimpleStringProperty(cd.getValue().patientName));
-//        if (colDoctorNameDash != null) colDoctorNameDash.setCellValueFactory(cd -> new SimpleStringProperty(cd.getValue().doctorName));
-//        if (colSpecialtyDash != null) colSpecialtyDash.setCellValueFactory(cd -> new SimpleStringProperty(cd.getValue().specialty));
-//        if (colRoomDash != null) colRoomDash.setCellValueFactory(cd -> new SimpleStringProperty(cd.getValue().location));
-//
-//        if (colAppintementDateDash != null) {
-//            colAppintementDateDash.setCellValueFactory(cd -> {
-//                LocalDateTime ldt = toLocal(cd.getValue().startAt);
-//                return new SimpleObjectProperty<>(ldt == null ? null : ldt.toLocalDate());
-//            });
-//            colAppintementDateDash.setEditable(false);
-//        }
-//
-//        if (colAppintementTimeDash != null) {
-//            colAppintementTimeDash.setCellValueFactory(cd -> {
-//                LocalDateTime ldt = toLocal(cd.getValue().startAt);
-//                if (ldt == null) return new SimpleStringProperty("");
-//                LocalTime from = ldt.toLocalTime();
-//                LocalTime to = from.plusMinutes(DEFAULT_SESSION_MIN);
-//                return new SimpleStringProperty(from.format(SLOT_FMT_12H) + " \u2192 " + to.format(SLOT_FMT_12H));
-//            });
-//        }
-//
-//        if (colActionDash != null) {
-//            colActionDash.setCellFactory(col -> new TableCell<DoctorDAO.AppointmentRow, Void>() {
-//                private final Button btn = new Button("Open");{
-//                    btn.getStyleClass().add("action-btn");
-////                    btn.getStyleClass().add("btn-complete");
-//                    btn.setFocusTraversable(false);
-//                    btn.setDisable(false);
-//                }
-//                @Override
-//                protected void updateItem(Void item, boolean empty) {
-//                    super.updateItem(item, empty);
-//                    if (empty) {
-//                        setGraphic(null);
-//                        return;
-//                    }
-//                    // ensure button enabled and action points to the current row
-//                    btn.setDisable(false);
-//                    btn.setOnAction(e -> {
-//                        DoctorDAO.AppointmentRow r = getTableView().getItems().get(getIndex());
-//                        if (r == null) return;
-//                        showAppointmentPane();
-//                        if (TableINAppointment != null) {
-//                            ApptRow match = TableINAppointment.getItems().stream()
-//                                    .filter(a -> a.getId() == r.id)
-//                                    .findFirst().orElse(null);
-//                            if (match != null) {
-//                                TableINAppointment.getSelectionModel().select(match);
-//                                TableINAppointment.scrollTo(match);
-//                            } else {
-//                                TableINAppointment.getItems().stream()
-//                                        .filter(a -> java.util.Objects.equals(a.getPatientName(), r.patientName))
-//                                        .findFirst().ifPresent(a -> {
-//                                            TableINAppointment.getSelectionModel().select(a);
-//                                            TableINAppointment.scrollTo(a);
-//                                        });
-//                            }
-//                        }
-//                    });
-//                    setGraphic(btn);
-//                }
-//            });
-//        }
-//
-//        applyDashboardFilters();
-//    }
 
     private int getSafeIndexOf(DoctorDAO.AppointmentRow v) {
         if (v == null || TableAppInDashboard == null) return -1;
