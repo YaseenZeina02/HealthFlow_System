@@ -3,6 +3,7 @@
 <?import java.lang.String?>
 <?import javafx.scene.control.Button?>
 <?import javafx.scene.control.ComboBox?>
+<?import javafx.scene.control.DatePicker?>
 <?import javafx.scene.control.Label?>
 <?import javafx.scene.control.ScrollPane?>
 <?import javafx.scene.control.TableColumn?>
@@ -112,7 +113,7 @@
                <children>
 
                   <!-- ===== Dashboard (with icons) ===== -->
-                  <AnchorPane fx:id="DashboardAnchorPane" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+                  <AnchorPane fx:id="DashboardAnchorPane" visible="false" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
                      <children>
 
                         <!-- Stat cards -->
@@ -161,7 +162,7 @@
                                                       <FontIcon iconColor="#66ccff" iconLiteral="fas-user" iconSize="16" />
                                                    </graphic>
                                                 </Label>
-                                                <Label fx:id="TotalAppointmentsNum1" alignment="CENTER" layoutX="55.0" layoutY="50.0" prefHeight="40.0" prefWidth="140.0" text="0" textAlignment="CENTER" textFill="WHITE">
+                                                <Label fx:id="PatientsNumberWithSpecificDoctor" alignment="CENTER" layoutX="55.0" layoutY="50.0" prefHeight="40.0" prefWidth="140.0" text="0" textAlignment="CENTER" textFill="WHITE">
                                                    <font>
                                                       <Font size="18.0" />
                                                    </font>
@@ -183,7 +184,7 @@
                                                       <FontIcon iconColor="#4caf50" iconLiteral="fas-check-circle" iconSize="16" />
                                                    </graphic>
                                                 </Label>
-                                                <Label alignment="CENTER" layoutX="55.0" layoutY="50.0" prefHeight="40.0" prefWidth="140.0" text="0" textAlignment="CENTER" textFill="WHITE">
+                                                <Label fx:id="AppointmentCompletedWithSpecificDoctor" alignment="CENTER" layoutX="55.0" layoutY="50.0" prefHeight="40.0" prefWidth="140.0" text="0" textAlignment="CENTER" textFill="WHITE">
                                                    <font>
                                                       <Font size="18.0" />
                                                    </font>
@@ -205,7 +206,7 @@
                                                       <FontIcon iconColor="GOLD" iconLiteral="fas-hourglass-half" iconSize="16" />
                                                    </graphic>
                                                 </Label>
-                                                <Label fx:id="TotalAppointmentsNum111" alignment="CENTER" layoutX="55.0" layoutY="50.0" prefHeight="40.0" prefWidth="140.0" text="0" textAlignment="CENTER" textFill="WHITE">
+                                                <Label fx:id="AppointmentRemainingWithSpecificDoctor" alignment="CENTER" layoutX="55.0" layoutY="50.0" prefHeight="40.0" prefWidth="140.0" text="0" textAlignment="CENTER" textFill="WHITE">
                                                    <font>
                                                       <Font size="18.0" />
                                                    </font>
@@ -258,7 +259,7 @@
                   </AnchorPane>
 
                   <!-- ===== Patients pane (unchanged functionally) ===== -->
-                  <AnchorPane fx:id="PatientAnchorPane" visible="false" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+                  <AnchorPane fx:id="PatientAnchorPane" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
                      <children>
                         <AnchorPane prefHeight="533.0" prefWidth="866.0" stylesheets="@../Design/ReceptionDesign.css" AnchorPane.bottomAnchor="11.0" AnchorPane.leftAnchor="11.0" AnchorPane.rightAnchor="12.0" AnchorPane.topAnchor="14.0">
                            <children>
@@ -279,12 +280,8 @@
                                     <TableView fx:constant="CONSTRAINED_RESIZE_POLICY" />
                                  </columnResizePolicy>
                               </TableView>
-
-                              <Label alignment="CENTER" layoutX="569.0" layoutY="11.0" prefHeight="30.0" prefWidth="65.0" styleClass="text-gradient" stylesheets="@../Design/ReceptionDesign.css" text="Search" AnchorPane.rightAnchor="231.8" AnchorPane.topAnchor="11.0">
-                                 <font><Font name="System Bold Italic" size="20.0" /></font>
-                              </Label>
-                              <TextField fx:id="searchLabel" layoutX="654.0" layoutY="12.0" prefHeight="26.0" prefWidth="197.0" promptText="search" AnchorPane.rightAnchor="14.8" AnchorPane.topAnchor="12.0" />
-                              <Button fx:id="InsertButton2" layoutX="376.0" layoutY="11.0" mnemonicParsing="false" prefHeight="20.0" prefWidth="90.0" styleClass="btn-2" stylesheets="@../Design/ReceptionDesign.css" text="Prescription" />
+                              <TextField fx:id="searchLabel" layoutX="593.0" layoutY="12.0" prefHeight="26.0" prefWidth="197.0" promptText="search" AnchorPane.rightAnchor="77.0" AnchorPane.topAnchor="12.0" />
+                              <DatePicker fx:id="datePickerPatientsWithDoctor" cache="true" layoutX="801.0" layoutY="5.0" minHeight="-Infinity" prefHeight="40.0" prefWidth="25.0" styleClass="box" />
                            </children>
                            <styleClass>
                               <String fx:value="radius" />

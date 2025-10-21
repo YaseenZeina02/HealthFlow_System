@@ -17,10 +17,51 @@ public class DoctorDashboardService {
 
     private final AppointmentJdbcDAO apptDAO = new AppointmentJdbcDAO();
     private final PatientDAO patientDAO = new PatientJdbcDAO();
+    private static final java.time.ZoneId APP_TZ = java.time.ZoneId.of("Asia/Gaza");
 
     public Stats loadTodayStats(long doctorId, LocalDate now) throws Exception {
-        var c = apptDAO.todayCounts(doctorId);
-        return new Stats(c.totalToday(), c.completedToday(), c.remainingToday());
+        var rows = apptDAO.listTodayByDoctor(doctorId);
+        int total = 0;
+        int completed = 0;
+        int remaining = 0;
+        java.util.HashSet<Long> distinctPatients = new java.util.HashSet<>();
+
+        for (com.example.healthflow.model.dto.DoctorApptRow r : rows) {
+            total++;
+            if (r.getUserId() != 0) distinctPatients.add(r.getUserId());
+            String st = r.getStatus();
+            if (st != null && st.equalsIgnoreCase("COMPLETED")) {
+                completed++;
+            } else if (st == null || st.equalsIgnoreCase("SCHEDULED") || st.equalsIgnoreCase("PENDING") || st.equalsIgnoreCase("CONFIRMED")) {
+                remaining++;
+            }
+        }
+        if (total == 0) {
+            try (var c = com.example.healthflow.db.Database.get();
+                 var ps = c.prepareStatement(
+                         "SELECT count(*) AS total,\n" +
+                         "       count(*) FILTER (WHERE status = 'COMPLETED') AS completed,\n" +
+                         "       count(*) FILTER (WHERE status IS NULL OR status IN ('SCHEDULED','PENDING','CONFIRMED')) AS remaining,\n" +
+                         "       count(DISTINCT p.user_id) AS patients_today\n" +
+                         "FROM appointments a\n" +
+                         "JOIN doctors d  ON d.id = a.doctor_id\n" +
+                         "JOIN users   du ON du.id = d.user_id\n" +
+                         "JOIN patients p ON p.id = a.patient_id\n" +
+                         "WHERE du.id = ? AND a.appointment_date::date = CURRENT_DATE") ) {
+                ps.setLong(1, doctorId);
+                try (var rs = ps.executeQuery()) {
+                    if (rs.next()) {
+                        total = rs.getInt("total");
+                        completed = rs.getInt("completed");
+                        remaining = rs.getInt("remaining");
+                        distinctPatients.clear();
+                        int patientsToday = rs.getInt("patients_today");
+                        return new Stats(total, completed, remaining, patientsToday);
+                    }
+                }
+            } catch (Exception ignored) {}
+        }
+        return new Stats(total, completed, remaining, distinctPatients.size());
     }
 
     public List<Appt> listTodayAppointments(long doctorId, LocalDate now) throws Exception {
@@ -33,8 +74,10 @@ public class DoctorDashboardService {
             a.patientName = r.getPatientName();
             a.patientNationalId = r.getNationalId();
             if (r.getApptAt() != null) {
-                a.date = r.getApptAt().toLocalDate();
-                a.time = r.getApptAt().toLocalTime();
+                var ldt = r.getApptAt();
+                var zdt = ldt.atZoneSameInstant(APP_TZ);
+                a.date = zdt.toLocalDate();
+                a.time = zdt.toLocalTime();
             }
             a.status = r.getStatus();
             a.medicalHistory = r.getMedicalHistory();
@@ -51,7 +94,7 @@ public class DoctorDashboardService {
         return patientDAO.findAll(); // simple version for now
     }
 
-    public record Stats(int total, int completed, int remaining) {}
+    public record Stats(int total, int completed, int remaining, int patientsToday) {}
 
     public static final class Appt {
         public long id;

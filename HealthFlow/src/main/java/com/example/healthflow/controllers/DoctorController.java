@@ -8,7 +8,6 @@ import com.example.healthflow.model.dto.MedicineRow;
 import com.example.healthflow.model.dto.PrescItemRow;
 import com.example.healthflow.dao.PrescriptionItemDAO;
 import com.example.healthflow.dao.PrescriptionDAO;
-import com.example.healthflow.model.Prescription;
 import com.example.healthflow.model.PrescriptionItem;
 import com.example.healthflow.net.ConnectivityMonitor;
 import com.example.healthflow.service.AuthService.Session;
@@ -19,7 +18,6 @@ import com.example.healthflow.ui.ConnectivityBanner;
 import com.example.healthflow.ui.OnlineBindings;
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
-import javafx.animation.KeyValue;
 import javafx.application.Platform;
 import javafx.beans.property.*;
 import javafx.beans.value.ChangeListener;
@@ -27,19 +25,13 @@ import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.collections.transformation.FilteredList;
 import javafx.collections.transformation.SortedList;
-import javafx.event.EventHandler;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
-import javafx.geometry.Insets;
 import javafx.geometry.Pos;
-import javafx.geometry.VPos;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.control.cell.PropertyValueFactory;
-import javafx.scene.input.Clipboard;
-import javafx.scene.input.ClipboardContent;
-import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.*;
 import javafx.scene.shape.Circle;
 import javafx.stage.Stage;
@@ -48,7 +40,6 @@ import org.kordamp.ikonli.javafx.FontIcon;
 
 
 import java.io.IOException;
-import java.net.URL;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.time.LocalDate;
@@ -59,16 +50,16 @@ public class DoctorController {
 
     /* ====== Cards / header / nav ====== */
     @FXML private AnchorPane Appointments;
-    @FXML private Label TotalAppointments;
+    @FXML private Label TotalAppointmentsNum;
 
-    @FXML private AnchorPane Appointments21;
-    @FXML private Label TotalAppointments21;
+//    @FXML private AnchorPane Appointments21;
+    @FXML private Label PatientsNumberWithSpecificDoctor;
 
-    @FXML private AnchorPane Appointments2;
-    @FXML private Label TotalAppointments2;
+//    @FXML private AnchorPane Appointments2;
+    @FXML private Label AppointmentCompletedWithSpecificDoctor;
 
-    @FXML private AnchorPane Appointments22;
-    @FXML private Label TotalAppointments22;
+//    @FXML private AnchorPane Appointments22;
+    @FXML private Label AppointmentRemainingWithSpecificDoctor;
 
     @FXML private Button BackButton;
     @FXML private Button DachboardButton;
@@ -123,8 +114,10 @@ public class DoctorController {
     @FXML private TableColumn<PatientRow, PatientRow> colAction2;
     @FXML private TextField search;      // patients search (future)
     @FXML private TextField searchLabel; // appointments search (future)
+    @FXML private DatePicker datePickerPatientsWithDoctor;
     private FilteredList<PatientRow> filtered;
     private SortedList<PatientRow> sorted;
+
 
     /* ====== Medicine tab ====== */
     @FXML private TableView<PrescItemRow> TablePrescriptionItems;
@@ -293,6 +286,16 @@ public class DoctorController {
 
         wirePrescriptionItemsTable();
 
+        // === Patients-by-date filter ===
+        if (datePickerPatientsWithDoctor != null) {
+            var todayGaza = java.time.ZonedDateTime.now(APP_TZ).toLocalDate();
+            datePickerPatientsWithDoctor.setValue(todayGaza);
+            datePickerPatientsWithDoctor.valueProperty().addListener((obs, ov, nv) -> {
+                if (nv != null) loadPatientsForDateAsync(nv);
+            });
+            loadPatientsForDateAsync(todayGaza);
+        }
+
 
         populateMedicineCombos();
         loadMedicinesIntoCombo();
@@ -345,17 +348,19 @@ public class DoctorController {
     }
 
     /* ================= Header time & date (12h) ================= */
+    private static final java.time.ZoneId APP_TZ = java.time.ZoneId.of("Asia/Gaza");
     private void startClock() {
         DateTimeFormatter tf = DateTimeFormatter.ofPattern("hh:mm:ss a");
         Timeline tl = new Timeline(
-                new KeyFrame(Duration.ZERO, e -> time.setText(java.time.LocalTime.now().format(tf))),
+                new KeyFrame(Duration.ZERO, e -> time.setText(java.time.ZonedDateTime.now(APP_TZ).format(tf))),
                 new KeyFrame(Duration.seconds(1))
         );
         tl.setCycleCount(Timeline.INDEFINITE);
         tl.play();
 
         DateTimeFormatter df = DateTimeFormatter.ofPattern("MM/dd/yyyy");
-        DateOfDay.setText(LocalDate.now().format(df));
+        var todayGaza = java.time.ZonedDateTime.now(APP_TZ).toLocalDate();
+        DateOfDay.setText(todayGaza.format(df));
     }
 
     /* ================= Navigation ================= */
@@ -511,19 +516,23 @@ public class DoctorController {
     private void reloadAll() {
         loadTodayStatsAsync();
         loadTodayAppointmentsAsync();
-        loadPatientsAsync(); // الآن تُحمِّل فقط مرضى هذا الدكتور (اليوم)
+        var d = (datePickerPatientsWithDoctor != null && datePickerPatientsWithDoctor.getValue() != null)
+                ? datePickerPatientsWithDoctor.getValue()
+                : java.time.ZonedDateTime.now(APP_TZ).toLocalDate();
+        loadPatientsForDateAsync(d);
     }
 
     private void loadTodayStatsAsync() {
-        var u = Session.get(); if (u == null) return;
+        var u = Session.get();
+        if (u == null) return;
         new Thread(() -> {
             try {
                 Stats s = svc.loadTodayStats(u.getId(), LocalDate.now());
                 Platform.runLater(() -> {
-                    setTextSafe(TotalAppointments,  "Today's Appointments: " + s.total());
-                    setTextSafe(TotalAppointments2,  "Completed: " + s.completed());
-                    setTextSafe(TotalAppointments22, "Remaining: " + s.remaining());
-                    setTextSafe(TotalAppointments21, "Today's Patients: " + s.total());
+                    setTextSafe(TotalAppointmentsNum, String.valueOf(s.total()));
+                    setTextSafe(AppointmentCompletedWithSpecificDoctor, String.valueOf(s.completed()));
+                    setTextSafe(AppointmentRemainingWithSpecificDoctor, String.valueOf(s.remaining()));
+                    setTextSafe(PatientsNumberWithSpecificDoctor, String.valueOf(s.patientsToday()));
                 });
             } catch (Exception e) {
                 Platform.runLater(() -> showWarn("Stats", "Failed to load today's stats. Please try again later."));
@@ -532,7 +541,8 @@ public class DoctorController {
     }
 
     private void loadTodayAppointmentsAsync() {
-        var u = Session.get(); if (u == null) return;
+        var u = Session.get();
+        if (u == null) return;
         new Thread(() -> {
             List<Appt> list = null;
             Exception lastErr = null;
@@ -553,8 +563,7 @@ public class DoctorController {
                             SELECT a.id,
                                    pu.full_name              AS patient_name,
                                    pu.national_id            AS patient_nid,
-                                   a.appointment_date::date  AS date,
-                                   a.appointment_date::time  AS time,
+                                   a.appointment_date        AS ts,
                                    a.status,
                                    p.user_id                 AS patient_user_id,
                                    p.medical_history         AS medical_history
@@ -575,10 +584,12 @@ public class DoctorController {
                                 a.id = rs.getLong("id");
                                 a.patientName = rs.getString("patient_name");
                                 a.patientNationalId = rs.getString("patient_nid");
-                                var d = rs.getDate("date");
-                                a.date = (d == null) ? null : d.toLocalDate();
-                                var t = rs.getTime("time");
-                                a.time = (t == null) ? null : t.toLocalTime();
+                                java.sql.Timestamp ts = rs.getTimestamp("ts");
+                                if (ts != null) {
+                                    var zdt = ts.toInstant().atZone(APP_TZ);
+                                    a.date = zdt.toLocalDate();
+                                    a.time = zdt.toLocalTime();
+                                }
                                 a.status = rs.getString("status");
                                 a.patientUserId = rs.getLong("patient_user_id");
                                 a.medicalHistory = rs.getString("medical_history");
@@ -615,41 +626,103 @@ public class DoctorController {
         }, "doc-appts").start();
     }
 
-    /**
-     * Loads all patients who have any appointment with the currently logged-in doctor (no date filter).
-     * Computes the age from patients.date_of_birth.
-     */
-    private void loadPatientsAsync() {
+    private void loadPatientsAsync() { // kept for compatibility in other calls
+        var d = (datePickerPatientsWithDoctor != null && datePickerPatientsWithDoctor.getValue() != null)
+                ? datePickerPatientsWithDoctor.getValue()
+                : java.time.ZonedDateTime.now(APP_TZ).toLocalDate();
+        loadPatientsForDateAsync(d);
+    }
+
+    /** Load patients who have an appointment with the logged-in doctor on the given date. */
+    private void loadPatientsForDateAsync(java.time.LocalDate date) {
         var u = Session.get();
-        if (u == null) return;
+        if (u == null || date == null) return;
 
         new Thread(() -> {
-            try {
-                // اجلب كل مرضى هذا الطبيب (حسب user_id) من الـ DAO
-                java.util.List<com.example.healthflow.dao.DoctorDAO.PatientWithAppt> list =
-                        doctorDAO.listPatientsWithAppointmentsForDoctor(u.getId());
-
-                var rows = FXCollections.<PatientRow>observableArrayList();
-                for (var r : list) {
-                    PatientRow pr = new PatientRow(
-                            r.nationalId,
-                            r.patientName,
-                            r.gender,
-                            ageFromDob(r.dateOfBirth),
-                            r.medicalHistory
-                    );
-                    // Try to infer patient user id from today's appointments (by national id or name)
-                    Long pid = fallbackResolvePatientIdFromAppointments(pr);
-                    if (pid != null) {
-                        pr.setUserId(pid);
+            try (Connection c = Database.get()) {
+                String sql = """
+                        SELECT DISTINCT
+                             pu.national_id,
+                             pu.full_name AS patient_name,
+                             pu.gender,            -- من users
+                             p.date_of_birth,      -- من patients
+                             p.medical_history,
+                             p.user_id AS patient_user_id
+                         FROM appointments a
+                         JOIN doctors d  ON d.id = a.doctor_id
+                         JOIN users   du ON du.id = d.user_id          -- doctor user
+                         JOIN patients p ON p.id = a.patient_id
+                         JOIN users   pu ON pu.id = p.user_id          -- patient user
+                         WHERE du.id = ?                                -- (user_id للدكتور المسجّل)
+                           AND a.appointment_date::date = ?            -- التاريخ المختار من الـ DatePicker
+                         ORDER BY patient_name;
+                        """;
+                java.util.ArrayList<PatientRow> rows = new java.util.ArrayList<>();
+                try (var ps = c.prepareStatement(sql)) {
+                    ps.setLong(1, u.getId());
+                    ps.setDate(2, java.sql.Date.valueOf(date));
+                    try (var rs = ps.executeQuery()) {
+                        while (rs.next()) {
+                            String nid = rs.getString("national_id");
+                            String name = rs.getString("patient_name");
+                            String gender = rs.getString("gender");
+                            java.sql.Date dob = rs.getDate("date_of_birth");
+                            String mh = rs.getString("medical_history");
+                            int age = (dob == null) ? 0 : ageFromDob(dob.toLocalDate());
+                            PatientRow pr = new PatientRow(nid, name, gender, age, mh);
+                            long uid = rs.getLong("patient_user_id");
+                            if (uid > 0) pr.setUserId(uid);
+                            rows.add(pr);
+                        }
                     }
-                    rows.add(pr);
                 }
                 Platform.runLater(() -> patientData.setAll(rows));
-            } catch (Exception e) {
-                Platform.runLater(() -> showWarn("Patients", "Failed to load patients for this doctor."));
+            } catch (Exception ex) {
+                System.out.println("[PatientsByDate] primary query failed: " + ex.getMessage());
+                // Fallback by doctor email
+                try (Connection c2 = Database.get()) {
+                    String email = (u.getEmail() == null) ? "" : u.getEmail().trim().toLowerCase();
+                    String sql2 = """
+                            SELECT DISTINCT pu.national_id,
+                                            pu.full_name          AS patient_name,
+                                            pu.gender,
+                                            pu.date_of_birth,
+                                            p.medical_history,
+                                            p.user_id             AS patient_user_id
+                            FROM appointments a
+                            JOIN doctors d  ON d.id = a.doctor_id
+                            JOIN users   du ON du.id = d.user_id   -- doctor user
+                            JOIN patients p ON p.id = a.patient_id
+                            JOIN users   pu ON pu.id = p.user_id   -- patient user
+                            WHERE lower(du.email) = ? AND a.appointment_date::date = ?
+                            ORDER BY patient_name
+                            """;
+                    java.util.ArrayList<PatientRow> rows2 = new java.util.ArrayList<>();
+                    try (var ps = c2.prepareStatement(sql2)) {
+                        ps.setString(1, email);
+                        ps.setDate(2, java.sql.Date.valueOf(date));
+                        try (var rs = ps.executeQuery()) {
+                            while (rs.next()) {
+                                String nid = rs.getString("national_id");
+                                String name = rs.getString("patient_name");
+                                String gender = rs.getString("gender");
+                                java.sql.Date dob = rs.getDate("date_of_birth");
+                                String mh = rs.getString("medical_history");
+                                int age = (dob == null) ? 0 : ageFromDob(dob.toLocalDate());
+                                PatientRow pr = new PatientRow(nid, name, gender, age, mh);
+                                long uid = rs.getLong("patient_user_id");
+                                if (uid > 0) pr.setUserId(uid);
+                                rows2.add(pr);
+                            }
+                        }
+                    }
+                    Platform.runLater(() -> patientData.setAll(rows2));
+                } catch (Exception ex2) {
+                    System.out.println("[PatientsByDate] email fallback failed: " + ex2.getMessage());
+                    Platform.runLater(() -> showWarn("Patients", "Failed to load patients for the selected date."));
+                }
             }
-        }, "doc-patients").start();
+        }, "doc-patients-by-date").start();
     }
 
     /* ================= Tables wiring ================= */
