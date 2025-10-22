@@ -745,3 +745,35 @@ END $$;
 
 ALTER TABLE prescription_items
     ALTER COLUMN dosage DROP NOT NULL;
+
+// to make it easiy to get the data in fast way
+CREATE TRIGGER inv_tx_after_upd
+    AFTER UPDATE ON inventory_transactions
+    FOR EACH ROW EXECUTE FUNCTION inv_tx_after_change();
+
+CREATE TRIGGER inv_tx_after_del
+    AFTER DELETE ON inventory_transactions
+    FOR EACH ROW EXECUTE FUNCTION inv_tx_after_change();
+
+
+
+SELECT b.id, b.medicine_id AS batch_med, 1 AS tx_med
+FROM medicine_batches b
+WHERE b.id = 55;
+
+WITH bal AS (
+    SELECT b.id AS batch_id,
+           b.medicine_id,
+           b.expiry_date,
+           COALESCE(SUM(t.qty_change),0) AS balance
+    FROM medicine_batches b
+             LEFT JOIN inventory_transactions t ON t.batch_id = b.id
+    WHERE b.medicine_id = 1
+    GROUP BY b.id, b.medicine_id, b.expiry_date
+)
+SELECT batch_id
+FROM bal
+WHERE balance >= 30                 -- يكفي للصرف
+  AND expiry_date >= CURRENT_DATE   -- غير منتهية
+ORDER BY expiry_date ASC
+    LIMIT 1;
