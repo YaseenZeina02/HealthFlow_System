@@ -17,7 +17,7 @@
 <?import javafx.scene.text.Font?>
 <?import org.kordamp.ikonli.javafx.FontIcon?>
 
-<AnchorPane fx:id="rootPane" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="600.0" prefWidth="1100.0" stylesheets="@../Design/Doctrol.css" xmlns="http://javafx.com/javafx/19" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.example.healthflow.controllers.DoctorController">
+<AnchorPane fx:id="rootPane" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="600.0" prefWidth="1100.0" stylesheets="@../Design/Doctrol.css" xmlns="http://javafx.com/javafx/23.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.example.healthflow.controllers.DoctorController">
 
    <children>
       <BorderPane prefHeight="600.0" prefWidth="1100.0" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
@@ -240,16 +240,16 @@
 
                               <TableView fx:id="AppointmentsTable" layoutX="14.0" layoutY="48.8" prefHeight="321.0" prefWidth="837.0" stylesheets="@../Design/ReceptionDesign.css" AnchorPane.bottomAnchor="10.0" AnchorPane.leftAnchor="14.0" AnchorPane.rightAnchor="15.0" AnchorPane.topAnchor="49.0">
                                  <columns>
-                                    <TableColumn fx:id="colSerialNumber" maxWidth="1200.0" prefWidth="100.0" text="#" />
-                                    <TableColumn fx:id="colDoctorName" prefWidth="100.0" text="Doctor Name" />
-                                    <TableColumn fx:id="colPatientName" prefWidth="100.0" text="Patient Name" />
+                                    <TableColumn fx:id="colSerialNumber" maxWidth="1200.0" prefWidth="50.0" text="#" />
+                                    <TableColumn fx:id="colDoctorName" prefWidth="200.0" text="Doctor Name" />
+                                    <TableColumn fx:id="colPatientName" prefWidth="200.0" text="Patient Name" />
                                     <TableColumn fx:id="colDate" prefWidth="100.0" text="Date" />
                                     <TableColumn fx:id="colTime" prefWidth="100.0" text="Time" />
-                                    <TableColumn fx:id="colStatus" prefWidth="100.0" text="Status" />
-                                    <TableColumn fx:id="colAction" prefWidth="100.0" text="Action" />
+                                    <TableColumn fx:id="colStatus" prefWidth="75.0" text="Status" />
+                                    <TableColumn fx:id="colAction" prefWidth="75.0" text="Action" />
                                  </columns>
                                  <columnResizePolicy>
-                                    <TableView fx:constant="UNCONSTRAINED_RESIZE_POLICY" />
+                                    <TableView fx:constant="CONSTRAINED_RESIZE_POLICY" />
                                  </columnResizePolicy>
                               </TableView>
                               <TextField fx:id="search" layoutX="653.0" layoutY="10.0" prefHeight="26.0" prefWidth="197.0" promptText="search" AnchorPane.rightAnchor="15.000000000000028" />
@@ -259,7 +259,7 @@
                   </AnchorPane>
 
                   <!-- ===== Patients pane (unchanged functionally) ===== -->
-                  <AnchorPane fx:id="PatientAnchorPane" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+                  <AnchorPane fx:id="PatientAnchorPane" visible="false" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
                      <children>
                         <AnchorPane prefHeight="533.0" prefWidth="866.0" stylesheets="@../Design/ReceptionDesign.css" AnchorPane.bottomAnchor="11.0" AnchorPane.leftAnchor="11.0" AnchorPane.rightAnchor="12.0" AnchorPane.topAnchor="14.0">
                            <children>
@@ -291,7 +291,7 @@
                         </AnchorPane>
                      </children>
                   </AnchorPane>
-                  <AnchorPane fx:id="PrescriptionAnchorPane" stylesheets="@../Design/ReceptionDesign.css" visible="false" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+                  <AnchorPane fx:id="PrescriptionAnchorPane" stylesheets="@../Design/ReceptionDesign.css" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
                      <children>
                         <AnchorPane layoutX="10.0" layoutY="14.0" prefHeight="180.0" prefWidth="1080.0" AnchorPane.leftAnchor="9.599999999999909" AnchorPane.rightAnchor="10.0" AnchorPane.topAnchor="14.0">
                            <children>
@@ -353,19 +353,19 @@
                                  </font>
                               </Label>
                               <Button fx:id="Add_Medication" layoutX="602.0" layoutY="305.0" mnemonicParsing="false" prefHeight="25.0" prefWidth="113.0" styleClass="btn-2" stylesheets="@../Design/ReceptionDesign.css" text="Add Medication" AnchorPane.bottomAnchor="15.0" AnchorPane.rightAnchor="161.0" />
-                              <TableView fx:id="TablePrescriptionItems" layoutX="13.0" layoutY="66.0" prefHeight="229.0" prefWidth="844.0" stylesheets="@../Design/ReceptionDesign.css" AnchorPane.bottomAnchor="51.0" AnchorPane.leftAnchor="13.0" AnchorPane.rightAnchor="19.0" AnchorPane.topAnchor="66.0">
+                              <TableView fx:id="TablePrescriptionItems" layoutX="16.0" layoutY="66.0" prefHeight="229.0" prefWidth="844.0" stylesheets="@../Design/ReceptionDesign.css" AnchorPane.bottomAnchor="51.60000000000002" AnchorPane.leftAnchor="16.0" AnchorPane.rightAnchor="16.0" AnchorPane.topAnchor="66.0">
                                  <columns>
-                                    <TableColumn fx:id="colIdx" maxWidth="2000.0" prefWidth="38.0" text="#" />
-                                    <TableColumn fx:id="colMedicineName" prefWidth="172.0" text="Medicine" />
+                                    <TableColumn fx:id="colIdx" maxWidth="2000.0" prefWidth="50.0" text="#" />
+                                    <TableColumn fx:id="colMedicineName" prefWidth="100.0" text="Medicine" />
                                     <TableColumn fx:id="colStrength" prefWidth="75.0" text="Strength" />
                                     <TableColumn fx:id="colForm" prefWidth="75.0" text="Form" />
                                     <TableColumn fx:id="colDose" prefWidth="75.0" text="Dose" />
-                                    <TableColumn fx:id="colFreqPerDay" prefWidth="75.0" text="Freq/day " />
+                                    <TableColumn fx:id="colFreqPerDay" prefWidth="100.0" text="Freq/day " />
                                     <TableColumn fx:id="colDuration" prefWidth="75.0" text="Duration" />
                                     <TableColumn fx:id="colRoute" prefWidth="75.0" text="Route" />
-                                    <TableColumn fx:id="colDosage" prefWidth="141.97744750976562" text="Dosage" />
+                                    <TableColumn fx:id="colDosage" prefWidth="75.0" text="Dosage" />
                                     <TableColumn fx:id="colQuantity" prefWidth="75.0" text="Quantity" />
-                                    <TableColumn fx:id="colDiagnosis" prefWidth="75.0" text="Diagnosis" />
+                                    <TableColumn fx:id="colDiagnosis" prefWidth="100.0" text="Diagnosis" />
                                     <TableColumn fx:id="colPresesAction" prefWidth="75.0" text="Action" />
                                  </columns>
                                  <columnResizePolicy>
