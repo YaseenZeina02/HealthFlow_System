@@ -5,7 +5,6 @@
 <?import javafx.scene.control.Label?>
 <?import javafx.scene.control.TableColumn?>
 <?import javafx.scene.control.TableView?>
-<?import javafx.scene.control.TextArea?>
 <?import javafx.scene.control.TextField?>
 <?import javafx.scene.layout.AnchorPane?>
 <?import javafx.scene.layout.BorderPane?>
@@ -217,7 +216,7 @@
                               <Font size="14.0" />
                            </font>
                         </Label>
-                        <Button fx:id="Add_Medication" layoutX="634.0" layoutY="307.0" mnemonicParsing="false" prefHeight="25.0" prefWidth="113.0" styleClass="btn-2" stylesheets="@../Design/ReceptionDesign.css" text="Done" AnchorPane.bottomAnchor="13.799999999999955" AnchorPane.rightAnchor="127.60000000000002" />
+                        <Button fx:id="Add_Medication" layoutX="634.0" layoutY="307.0" mnemonicParsing="false" prefHeight="25.0" prefWidth="150.0" styleClass="btn-2" stylesheets="@../Design/ReceptionDesign.css" text="Finalize Prescription" AnchorPane.bottomAnchor="13.799999999999955" AnchorPane.rightAnchor="127.60000000000002" />
                         <TableView fx:id="TablePrescriptionItems" layoutX="16.0" layoutY="49.0" prefHeight="229.0" prefWidth="844.0" stylesheets="@../Design/ReceptionDesign.css" AnchorPane.bottomAnchor="69.39999999999998" AnchorPane.leftAnchor="16.0" AnchorPane.rightAnchor="16.0" AnchorPane.topAnchor="49.0">
                            <columns>
                               <TableColumn fx:id="colIdx" maxWidth="2000.0" prefWidth="50.0" text="#" />
@@ -287,7 +286,6 @@
                               <Font name="System Bold Italic" size="20.0" />
                            </font>
                         </Label>
-                        <TextArea fx:id="DiagnosisTF" layoutX="512.0" layoutY="57.0" prefHeight="78.0" prefWidth="323.0" AnchorPane.bottomAnchor="45.0" AnchorPane.rightAnchor="35.40000000000009" />
                         <Label fx:id="dateWithTimePres" layoutX="148.0" layoutY="145.0" prefHeight="15.0" prefWidth="71.0" styleClass="text-gradient" stylesheets="@../Design/ReceptionDesign.css" text=" 10:30">
                            <font>
                               <Font name="System Bold Italic" size="20.0" />
@@ -305,6 +303,11 @@
                            </font>
                         </Label>
                         <Label fx:id="DoctorNameLabel1" layoutX="148.0" layoutY="115.0" prefHeight="15.0" prefWidth="300.0" styleClass="text-gradient" stylesheets="@../Design/ReceptionDesign.css" text="Pharmacist name">
+                           <font>
+                              <Font name="System Bold Italic" size="20.0" />
+                           </font>
+                        </Label>
+                        <Label fx:id="DoctorNameLabel2" layoutX="518.0" layoutY="60.0" prefHeight="80.0" prefWidth="320.0" styleClass="text-gradient" stylesheets="@../Design/ReceptionDesign.css" text="Diagnosis View">
                            <font>
                               <Font name="System Bold Italic" size="20.0" />
                            </font>
