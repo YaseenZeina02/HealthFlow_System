@@ -16,6 +16,7 @@ module com.example.healthflow {
     requires javafx.base;
     requires org.jetbrains.annotations;
     requires org.controlsfx.controls;
+
 //    requires jdk.internal.md;
 
     opens com.example.healthflow.model to javafx.base;

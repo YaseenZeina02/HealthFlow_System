@@ -47,7 +47,96 @@
     -fx-font-family: "Arial";
     -fx-cursor: hand;
 }
-.btn-2:hover { -fx-background-color: #306090; }
+.btn-2:hover { -fx-background-color: #5c98d3; }
+
+
+
+/*.toggle-button.btn-2 {*/
+/*    -fx-background-color: linear-gradient(to bottom right, #188ba7, #306090);*/
+/*    -fx-text-fill: #c63131;*/
+/*    -fx-font-size: 13px;*/
+/*    -fx-font-family: "Arial";*/
+/*    -fx-cursor: hand;*/
+/*}*/
+/*.toggle-button.btn-2:hover { -fx-background-color: #306090; }*/
+/*.toggle-button.btn-2:selected {*/
+/*    -fx-background-color: #0a69ca;*/
+/*    -fx-text-fill: #e1a421;*/
+
+/*}*/
+
+/* ==== الأسلوب الأساسي للأزرار ==== */
+.toggle-button.btn-2 {
+    -fx-background-color: linear-gradient(to bottom right, #1aa3b8, #2f5fa7); /* أزرق تيفاني أنيق */
+    -fx-text-fill: #ffffff;
+    -fx-font-size: 13px;
+    -fx-font-family: "Segoe UI Semibold";
+    -fx-padding: 6 16 6 16;
+    -fx-background-radius: 8;
+    -fx-border-radius: 8;
+    -fx-cursor: hand;
+    -fx-border-color: transparent;
+    -fx-border-width: 1;
+    -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.15), 3, 0, 0, 1);
+    -fx-opacity: 0.9;
+    -fx-transition: all 0.3s ease-in-out;
+}
+
+/* ==== عند المرور Hover ==== */
+.toggle-button.btn-2:hover {
+    -fx-background-color: linear-gradient(to bottom right, #2196b3, #3a68b0);
+    -fx-opacity: 1;
+}
+
+/* ==== عند التفعيل Selected ==== */
+.toggle-button.btn-2:selected {
+    -fx-background-color: linear-gradient(to bottom right, #0a78c9, #144b8b);
+    -fx-text-fill: #ffe38b; /* لون ذهبي خفيف للنص */
+    -fx-border-color: #ffe38b;
+    -fx-border-width: 1.2;
+    -fx-effect: dropshadow(three-pass-box, rgba(10, 120, 201, 0.4), 6, 0, 0, 2);
+    -fx-opacity: 1;
+}
+
+/* ==== عند الضغط Click ==== */
+.toggle-button.btn-2:pressed {
+    -fx-background-color: linear-gradient(to bottom right, #0a69ca, #144b8b);
+    -fx-translate-y: 1;
+}
+
+/* ==== لمسة ناعمة بين الأزرار ==== */
+/* زر اليسار */
+.toggle-button.btn-2.left {
+    -fx-background-radius: 8 0 0 8;
+}
+
+/* زر اليمين */
+.toggle-button.btn-2.right {
+    -fx-background-radius: 0 8 8 0;
+}
+
+/* حبوب SegmentedButton – ControlsFX */
+.segmented-button .toggle-button {
+    -fx-background-radius: 10;         /* شكل كبسولة */
+    -fx-background-color: #e7eef5;
+    -fx-text-fill: #2b3a4a;
+    -fx-padding: 6 14 6 14;
+    -fx-cursor: hand;
+    -fx-opacity: 0.95;
+}
+.segmented-button .toggle-button:hover {
+    -fx-background-color: #dbe7f2;
+    -fx-opacity: 1;
+}
+.segmented-button .toggle-button:selected {
+    -fx-background-color: linear-gradient(to bottom right, #1aa3b8, #2f5fa7);
+    -fx-text-fill: white;
+    -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.18), 6, 0, 0, 2);
+}
+
+/* زوايا منفصلة للطرفين */
+.segpill-left  { -fx-background-radius: 10 0 0 10; }
+.segpill-right { -fx-background-radius: 0 10 10 0; }
 
 
 /* gradient text (use with Text nodes, not Label) */
