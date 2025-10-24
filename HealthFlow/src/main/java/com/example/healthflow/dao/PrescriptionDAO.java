@@ -11,6 +11,18 @@ import java.util.List;
 
 public class PrescriptionDAO {
 
+    // -------- DTO for pharmacy dashboard table --------
+    public static class DashboardRow {
+        public long prescriptionId;
+        public Long appointmentId;      // may be null
+        public String patientName;
+        public String patientNid;       // may be null
+        public String doctorName;
+        public java.time.OffsetDateTime createdAt;
+        public java.time.OffsetDateTime appointmentDateTime; // from appointments.appointment_date
+        public PrescriptionStatus status;
+        public String diagnosisNote;    // from prescriptions.notes
+    }
     public Prescription create(Connection c, Long appointmentId, Long doctorId, Long patientId, String notes) throws SQLException {
         final String sql = """
             INSERT INTO prescriptions (appointment_id, doctor_id, patient_id, notes)
@@ -94,6 +106,56 @@ public class PrescriptionDAO {
         } finally {
             c.setAutoCommit(oldAuto);
         }
+    }
+
+    /**
+     * Rows for Pharmacy Dashboard table for a given calendar date (by prescriptions.created_at::date).
+     * Includes patient & doctor names, appointment datetime, status and notes (diagnosis).
+     */
+    public List<DashboardRow> listDashboardRowsByDate(Connection c, LocalDate day) throws SQLException {
+        final String sql = """
+            SELECT p.id AS prescription_id,
+                   p.appointment_id,
+                   p.created_at,
+                   p.status,
+                   p.notes,
+                   a.appointment_date,
+                   udoc.full_name AS doctor_name,
+                   upat.full_name AS patient_name,
+                   upat.national_id AS patient_nid
+            FROM prescriptions p
+            LEFT JOIN appointments a ON a.id = p.appointment_id
+            JOIN doctors d   ON d.id  = p.doctor_id
+            JOIN users  udoc ON udoc.id = d.user_id
+            JOIN patients pat ON pat.id = p.patient_id
+            JOIN users  upat ON upat.id = pat.user_id
+            WHERE p.created_at::date = ?
+            ORDER BY p.created_at DESC
+            """;
+        try (PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setObject(1, day);
+            try (ResultSet rs = ps.executeQuery()) {
+                List<DashboardRow> out = new ArrayList<>();
+                while (rs.next()) {
+                    DashboardRow r = new DashboardRow();
+                    r.prescriptionId = rs.getLong("prescription_id");
+                    r.appointmentId  = (Long) rs.getObject("appointment_id");
+                    r.createdAt      = rs.getObject("created_at", OffsetDateTime.class);
+                    r.status         = PrescriptionStatus.fromString(rs.getString("status"));
+                    r.diagnosisNote  = rs.getString("notes");
+                    r.appointmentDateTime = rs.getObject("appointment_date", OffsetDateTime.class);
+                    r.doctorName     = rs.getString("doctor_name");
+                    r.patientName    = rs.getString("patient_name");
+                    r.patientNid     = rs.getString("patient_nid");
+                    out.add(r);
+                }
+                return out;
+            }
+        }
+    }
+
+    public List<DashboardRow> listDashboardRowsByDate(LocalDate day) throws SQLException {
+        try (Connection c = Database.get()) { return listDashboardRowsByDate(c, day); }
     }
 
     public Prescription findById(Connection c, Long id) throws SQLException {

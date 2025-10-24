@@ -19,9 +19,9 @@
 <?import org.controlsfx.control.SegmentedButton?>
 <?import org.kordamp.ikonli.javafx.FontIcon?>
 
-<VBox fx:id="rootPane" fillWidth="true" spacing="0" xmlns="http://javafx.com/javafx/19" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.example.healthflow.controllers.PharmacyController">
+<VBox fx:id="rootPane" fillWidth="true" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" spacing="0" xmlns="http://javafx.com/javafx/19" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.example.healthflow.controllers.PharmacyController">
    <children>
-      <BorderPane prefHeight="600.0" prefWidth="1100.0" stylesheets="@../Design/ReceptionDesign.css" xmlns="http://javafx.com/javafx/19" xmlns:fx="http://javafx.com/fxml/1">
+      <BorderPane prefHeight="600.0" prefWidth="1100.0" stylesheets="@../Design/ReceptionDesign.css" VBox.vgrow="ALWAYS">
          <top>
             <AnchorPane prefHeight="40.0" prefWidth="1100.0" stylesheets="@../Design/ReceptionDesign.css" BorderPane.alignment="CENTER">
                <children>
@@ -32,7 +32,7 @@
                               <Font size="15.0" />
                            </font>
                         </Label>
-                        <Button fx:id="BackButton" layoutX="4.0" layoutY="8.0" minWidth="38.0" mnemonicParsing="false" prefHeight="22.0" prefWidth="28.0" styleClass="btn-1" stylesheets="@../Design/ReceptionDesign.css">
+                        <Button fx:id="BackButton" layoutX="4.0" layoutY="8.0" minWidth="38.0" mnemonicParsing="false" prefHeight="22.0" prefWidth="36.0" styleClass="btn-1" stylesheets="@../Design/ReceptionDesign.css">
                            <graphic>
                               <FontIcon fx:id="back" iconColor="TURQUOISE" iconLiteral="fas-arrow-left" iconSize="18" />
                            </graphic>
@@ -111,9 +111,9 @@
          <center>
             <AnchorPane fx:id="CenterAnchorPane" stylesheets="@../Design/ReceptionDesign.css" BorderPane.alignment="CENTER">
                <children>
-                  <AnchorPane fx:id="pharmacyDashboardAnchorPane" layoutX="-14.0" stylesheets="@../Design/ReceptionDesign.css" visible="false" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="-14.0" AnchorPane.rightAnchor="14.0" AnchorPane.topAnchor="0.0">
+                  <AnchorPane fx:id="pharmacyDashboardAnchorPane" style="-fx-background-color: #ededed;" stylesheets="@../Design/ReceptionDesign.css" visible="false" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
                      <children>
-                        <AnchorPane prefHeight="135.0" prefWidth="870.0" AnchorPane.leftAnchor="10.0" AnchorPane.rightAnchor="12.4" AnchorPane.topAnchor="14.0">
+                        <AnchorPane layoutX="14.0" layoutY="14.0" prefHeight="135.0" prefWidth="870.0" AnchorPane.leftAnchor="14.0" AnchorPane.rightAnchor="8.399999999999977" AnchorPane.topAnchor="14.0">
                            <styleClass>
                               <String fx:value="radius" />
                               <String fx:value="shadow" />
@@ -204,21 +204,21 @@
                                  <styleClass>
                                     <String fx:value="combo-box" />
                                     <String fx:value="box" />
-                                 </styleClass></TextField>
+                                 </styleClass>
+                              </TextField>
                               <TableView fx:id="PresciptionsTable" layoutX="7.0" layoutY="54.0" prefHeight="313.0" prefWidth="852.0" stylesheets="@../Design/ReceptionDesign.css" AnchorPane.bottomAnchor="13.0" AnchorPane.leftAnchor="7.0" AnchorPane.rightAnchor="8.0" AnchorPane.topAnchor="54.0">
                                  <columns>
                                     <TableColumn fx:id="colSerialPhDashboard" maxWidth="900.0" prefWidth="50.0" text="#" />
                                     <TableColumn fx:id="colPatientName" prefWidth="200.0" text="Patient Name" />
                                     <TableColumn fx:id="colDoctorName" prefWidth="200.0" text="Doctor Name" />
                                     <TableColumn fx:id="colDate_Time" prefWidth="181.0" text="Date / Time" />
-                                    <TableColumn fx:id="colprescriptionStutus" maxWidth="4000.0" prefWidth="125.0" text="Status" />
-                                    <TableColumn fx:id="colActionPhDashbord" prefWidth="156.0" text="Action" />
+                                    <TableColumn fx:id="colprescriptionStutus" maxWidth="4000.0" prefWidth="119.74444580078125" text="Status" />
+                                    <TableColumn fx:id="colActionPhDashbord" prefWidth="185.25555419921875" text="Action" />
                                  </columns>
                                  <columnResizePolicy>
-                                    <TableView fx:constant="CONSTRAINED_RESIZE_POLICY" />
+                                    <TableView fx:constant="UNCONSTRAINED_RESIZE_POLICY" />
                                  </columnResizePolicy>
                               </TableView>
-                              <Button layoutX="299.0" layoutY="10.0" mnemonicParsing="false" prefHeight="29.0" prefWidth="60.0" styleClass="btn-2" stylesheets="@../Design/ReceptionDesign.css" text="View" />
                               <DatePicker fx:id="PrescriptionDatePicker" layoutX="577.0" layoutY="4.0" prefHeight="48.0" prefWidth="48.0" styleClass="box" stylesheets="@../Design/ReceptionDesign.css" />
                            </children>
                         </AnchorPane>
@@ -276,7 +276,7 @@
                                           <Font name="System Bold Italic" size="22.0" />
                                        </font>
                                     </Label>
-                                    <Label layoutX="17.0" layoutY="85.0" prefHeight="25.0" prefWidth="95.0" styleClass="text-gradient" stylesheets="@../Design/ReceptionDesign.css" text="Approved : ">
+                                    <Label layoutX="7.0" layoutY="85.0" prefHeight="25.0" prefWidth="95.0" styleClass="text-gradient" stylesheets="@../Design/ReceptionDesign.css" text="Completed : ">
                                        <font>
                                           <Font name="System Bold Italic" size="22.0" />
                                        </font>
@@ -348,15 +348,24 @@
                                     <Font name="System Bold Italic" size="20.0" />
                                  </font>
                               </Label>
+                              <Label fx:id="AppointmentDate" layoutX="170.0" layoutY="145.0" prefHeight="20.0" prefWidth="184.0" styleClass="text-gradient" stylesheets="@../Design/ReceptionDesign.css" text=" 10:30">
+                                 <font>
+                                    <Font name="System Bold Italic" size="20.0" />
+                                 </font>
+                              </Label>
                               <Label layoutX="516.0" layoutY="33.0" prefHeight="15.0" prefWidth="100.0" styleClass="text-gradient" stylesheets="@../Design/ReceptionDesign.css" text="Diagnosis:" AnchorPane.bottomAnchor="127.0" AnchorPane.rightAnchor="259.20000000000005">
                                  <font>
                                     <Font name="System Bold Italic" size="20.0" />
                                  </font>
                               </Label>
-                              <Label fx:id="AppointmentDate" layoutX="170.0" layoutY="145.0" prefHeight="20.0" prefWidth="184.0" styleClass="text-gradient" stylesheets="@../Design/ReceptionDesign.css" text=" 10:30">
+                              <Label fx:id="DiagnosisView" layoutX="518.0" layoutY="60.0" prefHeight="59.0" prefWidth="320.0" stylesheets="@../Design/ReceptionDesign.css" text="Diagnosis View" AnchorPane.rightAnchor="37.40000000000009">
                                  <font>
                                     <Font name="System Bold Italic" size="20.0" />
                                  </font>
+                                 <styleClass>
+                                    <String fx:value="text-gradient" />
+                                    <String fx:value="box" />
+                                 </styleClass>
                               </Label>
                               <Label fx:id="alertLabel" layoutX="516.0" layoutY="107.0" prefHeight="56.0" prefWidth="324.0" styleClass="text-gradient" stylesheets="@../Design/ReceptionDesign.css" AnchorPane.bottomAnchor="17.0" AnchorPane.rightAnchor="35.0">
                                  <font>
@@ -369,12 +378,17 @@
                                     <Font name="System Bold Italic" size="20.0" />
                                  </font>
                               </Label>
-                              <Label fx:id="PharmacistNameLabel" layoutX="148.0" layoutY="113.0" prefHeight="20.0" prefWidth="265.0" styleClass="text-gradient" stylesheets="@../Design/ReceptionDesign.css" text="Pharmacist name">
+                              <Label fx:id="PharmacistNameLabel" layoutX="148.0" layoutY="113.0" prefHeight="20.0" prefWidth="143.0" styleClass="text-gradient" stylesheets="@../Design/ReceptionDesign.css" text="Pharmacist name">
                                  <font>
                                     <Font name="System Bold Italic" size="20.0" />
                                  </font>
                               </Label>
-                              <Label fx:id="DiagnosisView" layoutX="518.0" layoutY="60.0" prefHeight="59.0" prefWidth="320.0" styleClass="text-gradient" stylesheets="@../Design/ReceptionDesign.css" text="Diagnosis View" AnchorPane.rightAnchor="37.40000000000009">
+                              <Label layoutX="317.0" layoutY="145.0" prefHeight="20.0" prefWidth="169.0" styleClass="text-gradient" stylesheets="@../Design/ReceptionDesign.css" text="Prescription number:">
+                                 <font>
+                                    <Font name="System Bold Italic" size="20.0" />
+                                 </font>
+                              </Label>
+                              <Label fx:id="Prescription_number" layoutX="473.0" layoutY="145.0" prefHeight="20.0" prefWidth="54.0" styleClass="text-gradient" stylesheets="@../Design/ReceptionDesign.css" text="....">
                                  <font>
                                     <Font name="System Bold Italic" size="20.0" />
                                  </font>
@@ -457,17 +471,15 @@
                               <String fx:value="shadow" />
                            </styleClass>
                         </AnchorPane>
-      <!--                  <ToggleButton fx:id="btnReceive1" layoutX="14.0" layoutY="302.0" selected="true" styleClass="btn-2 left" text="Receive" />-->
-      <!--                  <ToggleButton fx:id="btnDeduct1" layoutX="78.0" layoutY="301.0" styleClass="btn-2 right" text="Deduct" />-->
-      <!--                  <SegmentedButton fx:id="segInv" layoutX="159.0" layoutY="302.0" prefHeight="34.0" prefWidth="125.0" />-->
-
                         <HBox alignment="CENTER_LEFT" layoutX="14.0" layoutY="296.0" spacing="8" stylesheets="@../Design/ReceptionDesign.css">
-                           <SegmentedButton fx:id="segInv">
-                              <buttons>
-                                 <ToggleButton fx:id="btnReceive" selected="true" styleClass="segpill-left" text="Receive" />
-                                 <ToggleButton fx:id="btnDeduct" styleClass="segpill-right" text="Deduct" />
-                              </buttons>
-                           </SegmentedButton>
+                           <children>
+                              <SegmentedButton fx:id="segInv">
+                                 <buttons>
+                                    <ToggleButton fx:id="btnReceive" selected="true" styleClass="segpill-left" text="Receive" />
+                                    <ToggleButton fx:id="btnDeduct" styleClass="segpill-right" text="Deduct" />
+                                 </buttons>
+                              </SegmentedButton>
+                           </children>
                         </HBox>
                         <AnchorPane fx:id="ReceivePane" layoutX="14.0" layoutY="338.0" prefHeight="208.0" prefWidth="865.0" stylesheets="@../Design/ReceptionDesign.css" visible="false" AnchorPane.bottomAnchor="12.0" AnchorPane.leftAnchor="13.0" AnchorPane.rightAnchor="12.0">
                            <children>
@@ -566,7 +578,6 @@
                               <String fx:value="radius" />
                            </styleClass>
                         </AnchorPane>
-
                      </children>
                   </AnchorPane>
                </children>

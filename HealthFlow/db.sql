@@ -11,7 +11,7 @@ CREATE EXTENSION IF NOT EXISTS pg_trgm;
 CREATE TYPE role_type AS ENUM ('ADMIN','DOCTOR','RECEPTIONIST','PHARMACIST','PATIENT');
 CREATE TYPE appt_status AS ENUM ('PENDING','SCHEDULED','COMPLETED','CANCELLED','NO_SHOW');
 CREATE TYPE prescription_status AS ENUM ('PENDING','APPROVED','REJECTED','DISPENSED');
-CREATE TYPE item_status2 AS ENUM ('PENDING','PARTIAL','DISPENSED','CANCELLED');
+CREATE TYPE item_status2 AS ENUM ('PENDING','PARTIAL','DISPENSED','CANCELLED');  -- عدلت عليها بحيث بدلنا PARTIAL بCOMPLETED التعديل في السيرفر وفي اسف الملف للتنبيه فقط
 CREATE TYPE gender_type AS ENUM ('MALE','FEMALE');
 
 -- =========================
@@ -777,3 +777,9 @@ WHERE balance >= 30                 -- يكفي للصرف
   AND expiry_date >= CURRENT_DATE   -- غير منتهية
 ORDER BY expiry_date ASC
     LIMIT 1;
+
+
+ALTER TYPE item_status2 RENAME VALUE 'PARTIAL' TO 'COMPLETED';
+
+ALTER TYPE item_status2 RENAME VALUE 'DISPENSED' TO 'APPROVED';
+

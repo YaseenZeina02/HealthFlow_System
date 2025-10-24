@@ -46,10 +46,10 @@ public class PrescriptionItemDAO {
 
     public boolean updateDispensed(Connection c, Long itemId, int qtyDispensed, ItemStatus status, Long batchId) throws SQLException {
         final String sql = """
-            UPDATE prescription_items
-               SET qty_dispensed = ?, status = ?::item_status2, batch_id = ?
-             WHERE id = ?
-            """;
+        UPDATE prescription_items
+           SET qty_dispensed = ?, status = ?::item_status2, batch_id = ?
+         WHERE id = ?
+        """;
         try (PreparedStatement ps = c.prepareStatement(sql)) {
             ps.setInt(1, qtyDispensed);
             ps.setString(2, status.name());
@@ -58,7 +58,6 @@ public class PrescriptionItemDAO {
             return ps.executeUpdate() == 1;
         }
     }
-
     public List<PrescriptionItem> listByPrescription(Connection c, Long prescriptionId) throws SQLException {
         final String sql = """
             SELECT id, prescription_id, medicine_id, medicine_name,

@@ -476,3 +476,20 @@
 }
 
 
+/* ===== Pharmacy tweaks: deeper primary + compact size (scoped via extra classes) ===== */
+.btn.btn-primary.btn--deep {
+    -fx-background-color: linear-gradient(to bottom, #1f6fe2, #1657b8);
+    -fx-text-fill: white;
+    -fx-background-radius: 8;
+}
+.btn.btn-primary.btn--deep:hover {
+    -fx-background-color: linear-gradient(to bottom, #2a7cf0, #1b61ca);
+}
+
+/* compact size utility (reduces visual size via padding & font-size) */
+.btn.btn--compact {
+    -fx-padding: 4 12 4 12;     /* top right bottom left */
+    -fx-font-size: 12px;
+    -fx-background-insets: 0, 1 0 0 0; /* subtle pressed effect */
+}
+
