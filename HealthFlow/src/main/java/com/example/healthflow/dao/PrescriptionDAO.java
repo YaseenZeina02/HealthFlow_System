@@ -5,6 +5,7 @@ import com.example.healthflow.model.*;
 
 import java.sql.*;
 import java.time.OffsetDateTime;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -26,6 +27,51 @@ public class PrescriptionDAO {
             }
         }
         throw new SQLException("Failed to create prescription");
+    }
+
+    /** Count all prescriptions created on a specific calendar date (by created_at::date). */
+    public int countTotalOnDate(Connection c, LocalDate day) throws SQLException {
+        final String sql = "SELECT COUNT(*) FROM prescriptions WHERE created_at::date = ?";
+        try (PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setObject(1, day);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next() ? rs.getInt(1) : 0;
+            }
+        }
+    }
+
+    /** Count PENDING prescriptions (waiting review) created on a given date. */
+    public int countPendingOnDate(Connection c, LocalDate day) throws SQLException {
+        final String sql = "SELECT COUNT(*) FROM prescriptions WHERE created_at::date = ? AND status = 'PENDING'::prescription_status";
+        try (PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setObject(1, day);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next() ? rs.getInt(1) : 0;
+            }
+        }
+    }
+
+    /** Count completed (processed by pharmacist) prescriptions created on a given date.
+     * Completed = any status other than PENDING (APPROVED/REJECTED/DISPENSED). */
+    public int countCompletedOnDate(Connection c, LocalDate day) throws SQLException {
+        final String sql = "SELECT COUNT(*) FROM prescriptions WHERE created_at::date = ? AND status <> 'PENDING'::prescription_status";
+        try (PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setObject(1, day);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next() ? rs.getInt(1) : 0;
+            }
+        }
+    }
+
+    // Convenience overloads that manage their own connection
+    public int countTotalOnDate(LocalDate day) throws SQLException {
+        try (Connection c = Database.get()) { return countTotalOnDate(c, day); }
+    }
+    public int countPendingOnDate(LocalDate day) throws SQLException {
+        try (Connection c = Database.get()) { return countPendingOnDate(c, day); }
+    }
+    public int countCompletedOnDate(LocalDate day) throws SQLException {
+        try (Connection c = Database.get()) { return countCompletedOnDate(c, day); }
     }
 
     /** Create a prescription (optionally without appointment) and insert items in one transaction. */

@@ -1,5 +1,10 @@
 package com.example.healthflow.controllers;
 
+import com.example.healthflow.dao.PrescriptionDAO;
+import com.example.healthflow.db.Database;
+import java.sql.Connection;
+import java.time.LocalDate;
+
 import com.example.healthflow.net.ConnectivityMonitor;
 import com.example.healthflow.ui.ConnectivityBanner;
 import com.example.healthflow.ui.OnlineBindings;
@@ -125,6 +130,10 @@ public class PharmacyController {
     private TableView<?> TablePrescriptionItems;
 
     @FXML
+    private DatePicker PrescriptionDatePicker;
+
+
+    @FXML
     private TableView<?> TableToShowMedicineByBatchNumber;
 
     @FXML
@@ -173,10 +182,10 @@ public class PharmacyController {
     private TableColumn<?, ?> colDate_Time;
 
     @FXML
-    private TableColumn<?, ?> colDiagnosis;
+    private TableColumn<?, ?> colStock;
 
     @FXML
-    private TableColumn<?, ?> colDiagnosis1;
+    private TableColumn<?, ?> colItemStatus;
 
     @FXML
     private TableColumn<?, ?> colDiagnosisInentory;
@@ -215,7 +224,7 @@ public class PharmacyController {
     private TableColumn<?, ?> colPatientName;
 
     @FXML
-    private TableColumn<?, ?> colPresesAction1;
+    private TableColumn<?, ?> colPresesItemAction;
 
     @FXML
     private TableColumn<?, ?> colPresesActionInentory;
@@ -321,6 +330,32 @@ public class PharmacyController {
         }
     }
 
+    // Helper to get selected date or today (Asia/Gaza)
+    private LocalDate getSelectedDateOrToday() {
+        try {
+            LocalDate picked = (PrescriptionDatePicker != null) ? PrescriptionDatePicker.getValue() : null;
+            if (picked != null) return picked;
+        } catch (Throwable ignored) {}
+        return java.time.ZonedDateTime.now(APP_TZ).toLocalDate();
+    }
+
+    private void refreshPharmacyDashboardCounts() {
+        if (PrescriptionsTodayTotal == null && PrescriptionsWatingNum == null && PrescriptionsCompleteNum == null) return;
+        LocalDate day = getSelectedDateOrToday();
+        try (Connection c = Database.get()) {
+            PrescriptionDAO dao = new PrescriptionDAO();
+            int total = dao.countTotalOnDate(c, day);
+            int waiting = dao.countPendingOnDate(c, day);
+            int completed = dao.countCompletedOnDate(c, day);
+            if (PrescriptionsTodayTotal != null) PrescriptionsTodayTotal.setText(String.valueOf(total));
+            if (PrescriptionsWatingNum != null) PrescriptionsWatingNum.setText(String.valueOf(waiting));
+            if (PrescriptionsCompleteNum != null) PrescriptionsCompleteNum.setText(String.valueOf(completed));
+        } catch (Exception ex) {
+            if (alertLabel != null) alertLabel.setText("Failed to load counts: " + ex.getMessage());
+            System.err.println("[PharmacyController] refresh counts error: " + ex);
+        }
+    }
+
     /* ====== Diagnostics for FXML wiring ====== */
     private boolean warnIfMissing() {
         StringBuilder sb = new StringBuilder();
@@ -351,6 +386,7 @@ public class PharmacyController {
         setVisibleManaged(PrescriptionAnchorPane, false);
         setVisibleManaged(InventoryAnchorPane, false);
         if (DashboardButton != null) markNavActive(DashboardButton);
+        refreshPharmacyDashboardCounts();
     }
 
     private void showPrescriptionsPane() {
@@ -475,6 +511,12 @@ public class PharmacyController {
         // Start header clock & date (12h, Asia/Gaza)
         startClock();
 
+        // Default the date picker to today (Asia/Gaza) and listen for changes
+        if (PrescriptionDatePicker != null) {
+            PrescriptionDatePicker.setValue(java.time.ZonedDateTime.now(APP_TZ).toLocalDate());
+            PrescriptionDatePicker.valueProperty().addListener((obs, oldV, newV) -> refreshPharmacyDashboardCounts());
+        }
+
         // ===== Top navigation buttons =====
         if (DashboardButton != null) {
             DashboardButton.setOnAction(e -> showDashboardPane());
@@ -511,5 +553,6 @@ public class PharmacyController {
                 setVisibleManaged(pharmacyDashboardAnchorPane, true);
             }
         }
+        refreshPharmacyDashboardCounts();
     }
 }
