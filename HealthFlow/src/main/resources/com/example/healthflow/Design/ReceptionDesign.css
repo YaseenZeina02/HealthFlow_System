@@ -44,26 +44,18 @@
     -fx-background-color: linear-gradient(to bottom right, #188ba7, #306090);
     -fx-text-fill: #ffffff;
     -fx-font-size: 13px;
-    -fx-font-family: "Arial";
+    /*-fx-font-family: "Arial";*/
     -fx-cursor: hand;
+    -fx-font-family: "Segoe UI Semibold";
+    /*-fx-padding: 6 16 6 16;*/
+    -fx-background-radius: 5;
+    -fx-border-radius: 5;
+
+
 }
-.btn-2:hover { -fx-background-color: #5c98d3; }
+.btn-2:hover { -fx-background-color: #308ee8; }
 
 
-
-/*.toggle-button.btn-2 {*/
-/*    -fx-background-color: linear-gradient(to bottom right, #188ba7, #306090);*/
-/*    -fx-text-fill: #c63131;*/
-/*    -fx-font-size: 13px;*/
-/*    -fx-font-family: "Arial";*/
-/*    -fx-cursor: hand;*/
-/*}*/
-/*.toggle-button.btn-2:hover { -fx-background-color: #306090; }*/
-/*.toggle-button.btn-2:selected {*/
-/*    -fx-background-color: #0a69ca;*/
-/*    -fx-text-fill: #e1a421;*/
-
-/*}*/
 
 /* ==== الأسلوب الأساسي للأزرار ==== */
 .toggle-button.btn-2 {
@@ -80,6 +72,7 @@
     -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.15), 3, 0, 0, 1);
     -fx-opacity: 0.9;
     -fx-transition: all 0.3s ease-in-out;
+
 }
 
 /* ==== عند المرور Hover ==== */
@@ -301,7 +294,31 @@
 /* ====== TextField كصندوق ====== */
 .text-field.box {
     -fx-background-color: white;
+    -fx-border-color: #1aa3a8;
 }
+
+/* ====== TextField Area كصندوق ====== */
+.boxTFA{
+    -fx-background-color: white;
+    -fx-background-radius: 5;
+    -fx-border-color: #1aa3a8;
+    -fx-border-width: 1;
+    -fx-border-radius: 10;
+    -fx-padding: 2 5;
+    -fx-font-size: 14px;
+    -fx-text-fill: #222;
+}
+
+.text-field.boxTFA {
+    -fx-background-color: white;
+    -fx-border-color: #bbcecf;
+    -fx-padding: 0 0;
+    -fx-border-radius: 1;
+
+
+}
+
+
 
 /* ====== ComboBox كصندوق ====== */
 .combo-box.box,
