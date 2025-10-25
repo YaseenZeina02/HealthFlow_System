@@ -94,6 +94,8 @@ public class DoctorController {
 
     @FXML private Circle ActiveStatus;
 
+    @FXML private DatePicker datePickerPatientsWithDoctorDash;
+
     /* ====== Dashboard table (appointments) ====== */
     @FXML private TableView<AppointmentRow> AppointmentsTable;
     @FXML private TableColumn<AppointmentRow, String> colSerialNumber;
@@ -285,6 +287,24 @@ public class DoctorController {
         wireSearch();
 
         wirePrescriptionItemsTable();
+        // === Dashboard-by-date: bind DatePicker to table + counters (no extra filtering) ===
+        if (datePickerPatientsWithDoctorDash != null) {
+            var todayGazaDash = java.time.ZonedDateTime.now(APP_TZ).toLocalDate();
+            datePickerPatientsWithDoctorDash.setValue(todayGazaDash);
+
+            // Initial load (today)
+            loadStatsForDateAsync(todayGazaDash);
+            loadAppointmentsForDateAsync(todayGazaDash);
+
+            // Reload whenever the date changes
+            datePickerPatientsWithDoctorDash.valueProperty().addListener((obs, ov, nv) -> {
+                if (nv != null) {
+                    loadStatsForDateAsync(nv);
+                    loadAppointmentsForDateAsync(nv);
+                }
+            });
+        }
+
 
         // === Patients-by-date filter ===
         if (datePickerPatientsWithDoctor != null) {
@@ -514,117 +534,77 @@ public class DoctorController {
         }, "load-meds-combo").start();
     }
     private void reloadAll() {
-        loadTodayStatsAsync();
-        loadTodayAppointmentsAsync();
+        var _dashDate = (datePickerPatientsWithDoctorDash != null && datePickerPatientsWithDoctorDash.getValue() != null)
+                ? datePickerPatientsWithDoctorDash.getValue()
+                : java.time.ZonedDateTime.now(APP_TZ).toLocalDate();
+        loadStatsForDateAsync(_dashDate);
+        loadAppointmentsForDateAsync(_dashDate);
+
         var d = (datePickerPatientsWithDoctor != null && datePickerPatientsWithDoctor.getValue() != null)
                 ? datePickerPatientsWithDoctor.getValue()
                 : java.time.ZonedDateTime.now(APP_TZ).toLocalDate();
         loadPatientsForDateAsync(d);
     }
 
-    private void loadTodayStatsAsync() {
+    /** Load dashboard counters (total/completed/remaining/unique patients) for the logged-in doctor on a specific date. */
+    private void loadStatsForDateAsync(LocalDate date) {
         var u = Session.get();
-        if (u == null) return;
-        new Thread(() -> {
-            try {
-                Stats s = svc.loadTodayStats(u.getId(), LocalDate.now());
-                Platform.runLater(() -> {
-                    setTextSafe(TotalAppointmentsNum, String.valueOf(s.total()));
-                    setTextSafe(AppointmentCompletedWithSpecificDoctor, String.valueOf(s.completed()));
-                    setTextSafe(AppointmentRemainingWithSpecificDoctor, String.valueOf(s.remaining()));
-                    setTextSafe(PatientsNumberWithSpecificDoctor, String.valueOf(s.patientsToday()));
-                });
-            } catch (Exception e) {
-                Platform.runLater(() -> showWarn("Stats", "Failed to load today's stats. Please try again later."));
-            }
-        }, "doc-stats").start();
-    }
+        if (u == null || date == null) return;
 
-    private void loadTodayAppointmentsAsync() {
-        var u = Session.get();
-        if (u == null) return;
         new Thread(() -> {
-            List<Appt> list = null;
-            Exception lastErr = null;
-            try {
-                // محاولة عبر الخدمة بالـ userId
-                list = svc.listTodayAppointments(u.getId(), LocalDate.now());
+            int total = 0, completed = 0, remaining = 0, patientsToday = 0;
+            Exception err = null;
+            try (Connection c = Database.get()) {
+                String sql = """
+                        SELECT
+                            COUNT(*)                                                              AS total,
+                            COUNT(*) FILTER (WHERE a.status = 'COMPLETED')                        AS completed,
+                            COUNT(DISTINCT p.user_id)                                             AS patients_today,
+                            COUNT(*) FILTER (WHERE a.status NOT IN ('COMPLETED','CANCELLED','NO_SHOW')) AS remaining
+                        FROM appointments a
+                        JOIN doctors d  ON d.id = a.doctor_id
+                        JOIN patients p ON p.id = a.patient_id
+                        WHERE d.user_id = ? AND a.appointment_date::date = ?
+                        """;
+                try (var ps = c.prepareStatement(sql)) {
+                    ps.setLong(1, u.getId());
+                    ps.setDate(2, java.sql.Date.valueOf(date));
+                    try (var rs = ps.executeQuery()) {
+                        if (rs.next()) {
+                            total         = rs.getInt("total");
+                            completed     = rs.getInt("completed");
+                            patientsToday = rs.getInt("patients_today");
+                            remaining     = rs.getInt("remaining");
+                        }
+                    }
+                }
             } catch (Exception ex) {
-                lastErr = ex;
-                System.out.println("[Appointments] service call failed: " + ex.getMessage());
-                ex.printStackTrace();
+                err = ex;
             }
 
-            // لو النتيجة فاضية/فشلت، جرّب Fallback عبر Email
-            if (list == null || list.isEmpty()) {
-                String email = (u.getEmail() == null) ? "" : u.getEmail().trim().toLowerCase();
-                try (Connection c = Database.get()) {
-                    String sql = """
-                            SELECT a.id,
-                                   pu.full_name              AS patient_name,
-                                   pu.national_id            AS patient_nid,
-                                   a.appointment_date        AS ts,
-                                   a.status,
-                                   p.user_id                 AS patient_user_id,
-                                   p.medical_history         AS medical_history
-                            FROM appointments a
-                            JOIN doctors d  ON d.id = a.doctor_id
-                            JOIN users   du ON du.id = d.user_id        -- doctor user
-                            JOIN patients p ON p.id = a.patient_id
-                            JOIN users   pu ON pu.id = p.user_id        -- patient user
-                            WHERE du.email = ? AND a.appointment_date::date = CURRENT_DATE
-                            ORDER BY a.appointment_date
-                            """;
-                    try (var ps = c.prepareStatement(sql)) {
-                        ps.setString(1, email);
-                        try (var rs = ps.executeQuery()) {
-                            java.util.ArrayList<Appt> fb = new java.util.ArrayList<>();
-                            while (rs.next()) {
-                                Appt a = new Appt();
-                                a.id = rs.getLong("id");
-                                a.patientName = rs.getString("patient_name");
-                                a.patientNationalId = rs.getString("patient_nid");
-                                java.sql.Timestamp ts = rs.getTimestamp("ts");
-                                if (ts != null) {
-                                    var zdt = ts.toInstant().atZone(APP_TZ);
-                                    a.date = zdt.toLocalDate();
-                                    a.time = zdt.toLocalTime();
-                                }
-                                a.status = rs.getString("status");
-                                a.patientUserId = rs.getLong("patient_user_id");
-                                a.medicalHistory = rs.getString("medical_history");
-                                fb.add(a);
-                            }
-                            System.out.println("[Appointments] email fallback succeeded using appointment_date casts.");
-                            list = fb;
-                        }
-                    }
-                } catch (SQLException e) {
+            final int fTotal = total;
+            final int fCompleted = completed;
+            final int fRemaining = remaining;
+            final int fPatients = patientsToday;
+            final Exception fErr = err;
 
-                }
-            }
+            System.out.printf("[Stats] date=%s userId=%d -> total=%d completed=%d remaining=%d patients=%d\n",
+                    String.valueOf(date), u.getId(), fTotal, fCompleted, fRemaining, fPatients);
 
-            // حدّث الجدول على JavaFX Thread
-            List<Appt> finalList = list;
-            Exception finalErr = lastErr;
             Platform.runLater(() -> {
-                apptData.clear();
-                if (finalList != null && !finalList.isEmpty()) {
-                    for (Appt a : finalList) apptData.add(AppointmentRow.of(a));
-                } else {
-                    // If there was an error, show it; if not, just show empty table silently
-                    if (finalErr != null) {
-                        String msg = "Failed to load today's appointments.";
-                        if (finalErr.getMessage() != null && !finalErr.getMessage().isBlank()) {
-                            msg += " (" + finalErr.getMessage() + ")";
-                        }
-                        showWarn("Appointments", msg);
-                    }
+                setTextSafe(TotalAppointmentsNum, String.valueOf(fTotal));
+                setTextSafe(AppointmentCompletedWithSpecificDoctor, String.valueOf(fCompleted));
+                setTextSafe(AppointmentRemainingWithSpecificDoctor, String.valueOf(fRemaining));
+                setTextSafe(PatientsNumberWithSpecificDoctor, String.valueOf(fPatients));
+
+                if (fErr != null) {
+                    showWarn("Stats", "Failed to load stats from DB: " + fErr.getMessage());
                 }
-                refitAppointmentsColumnsLater();
             });
-        }, "doc-appts").start();
+        }, "doc-stats-by-date").start();
     }
+
+
 
     private void loadPatientsAsync() { // kept for compatibility in other calls
         var d = (datePickerPatientsWithDoctor != null && datePickerPatientsWithDoctor.getValue() != null)
@@ -726,6 +706,102 @@ public class DoctorController {
     }
 
     /* ================= Tables wiring ================= */
+
+    /**
+     * Backward-compatible wrapper: loads appointments for the date selected in
+     * datePickerPatientsWithDoctorDash (defaults to today in APP_TZ).
+     */
+    private void loadTodayAppointmentsAsync() {
+        LocalDate date = (datePickerPatientsWithDoctorDash != null && datePickerPatientsWithDoctorDash.getValue() != null)
+                ? datePickerPatientsWithDoctorDash.getValue()
+                : java.time.ZonedDateTime.now(APP_TZ).toLocalDate();
+        loadAppointmentsForDateAsync(date);
+    }
+
+    /** Load appointments for the dashboard table for a specific date (bound to datePickerPatientsWithDoctorDash). */
+    private void loadAppointmentsForDateAsync(LocalDate date) {
+        var u = Session.get();
+        if (u == null || date == null) return;
+        new Thread(() -> {
+            List<Appt> list = null;
+            Exception lastErr = null;
+            try {
+                // Preferred service call with explicit date
+                list = svc.listTodayAppointments(u.getId(), date);
+            } catch (Exception ex) {
+                lastErr = ex;
+                System.out.println("[Appointments] service call failed: " + ex.getMessage());
+                ex.printStackTrace();
+            }
+
+            // Fallback: query by doctor email + specific date
+            if (list == null || list.isEmpty()) {
+                String email = (u.getEmail() == null) ? "" : u.getEmail().trim().toLowerCase();
+                try (Connection c = Database.get()) {
+                    String sql = """
+                            SELECT a.id,
+                                   pu.full_name              AS patient_name,
+                                   pu.national_id            AS patient_nid,
+                                   a.appointment_date        AS ts,
+                                   a.status,
+                                   p.user_id                 AS patient_user_id,
+                                   p.medical_history         AS medical_history
+                            FROM appointments a
+                            JOIN doctors d  ON d.id = a.doctor_id
+                            JOIN users   du ON du.id = d.user_id        -- doctor user
+                            JOIN patients p ON p.id = a.patient_id
+                            JOIN users   pu ON pu.id = p.user_id        -- patient user
+                            WHERE lower(du.email) = ? AND a.appointment_date::date = ?
+                            ORDER BY a.appointment_date
+                            """;
+                    try (var ps = c.prepareStatement(sql)) {
+                        ps.setString(1, email);
+                        ps.setDate(2, java.sql.Date.valueOf(date));
+                        try (var rs = ps.executeQuery()) {
+                            java.util.ArrayList<Appt> fb = new java.util.ArrayList<>();
+                            while (rs.next()) {
+                                Appt a = new Appt();
+                                a.id = rs.getLong("id");
+                                a.patientName = rs.getString("patient_name");
+                                a.patientNationalId = rs.getString("patient_nid");
+                                java.sql.Timestamp ts = rs.getTimestamp("ts");
+                                if (ts != null) {
+                                    var zdt = ts.toInstant().atZone(APP_TZ);
+                                    a.date = zdt.toLocalDate();
+                                    a.time = zdt.toLocalTime();
+                                }
+                                a.status = rs.getString("status");
+                                a.patientUserId = rs.getLong("patient_user_id");
+                                a.medicalHistory = rs.getString("medical_history");
+                                fb.add(a);
+                            }
+                            System.out.println("[Appointments] email fallback succeeded using appointment_date casts.");
+                            list = fb;
+                        }
+                    }
+                } catch (SQLException e) {
+                    lastErr = (lastErr == null) ? e : lastErr;
+                }
+            }
+
+            // Update UI on FX thread
+            List<Appt> finalList = list;
+            Exception finalErr = lastErr;
+            Platform.runLater(() -> {
+                apptData.clear();
+                if (finalList != null && !finalList.isEmpty()) {
+                    for (Appt a : finalList) apptData.add(AppointmentRow.of(a));
+                } else if (finalErr != null) {
+                    String msg = "Failed to load appointments for the selected date.";
+                    if (finalErr.getMessage() != null && !finalErr.getMessage().isBlank()) {
+                        msg += " (" + finalErr.getMessage() + ")";
+                    }
+                    showWarn("Appointments", msg);
+                }
+                refitAppointmentsColumnsLater();
+            });
+        }, "doc-appts-by-date").start();
+    }
 
     private void wireAppointmentsTable() {
         if (AppointmentsTable == null) return;
@@ -866,9 +942,14 @@ public class DoctorController {
             boolean ok = doctorDAO.markAppointmentCompleted(row.getId());
             if (ok) {
                 row.setStatus("COMPLETED");
+                // Reload table for the currently selected dashboard date
+                loadTodayAppointmentsAsync();
                 if (AppointmentsTable != null) AppointmentsTable.refresh();
                 toast("Appointment COMPLETED.", "ok");
-                loadTodayStatsAsync();
+                var _dashDate = (datePickerPatientsWithDoctorDash != null && datePickerPatientsWithDoctorDash.getValue() != null)
+                        ? datePickerPatientsWithDoctorDash.getValue()
+                        : java.time.ZonedDateTime.now(APP_TZ).toLocalDate();
+                loadStatsForDateAsync(_dashDate);
             } else {
                 showWarn("Complete", "Could not mark as COMPLETED.");
             }
@@ -884,9 +965,14 @@ public class DoctorController {
             if (ok) {
                 // remove from UI list entirely as requested
                 apptData.remove(row);
+                // Reload table for the currently selected dashboard date
+                loadTodayAppointmentsAsync();
                 if (AppointmentsTable != null) AppointmentsTable.refresh();
                 toast("Appointment cancelled.", "ok");
-                loadTodayStatsAsync();
+                var _dashDate = (datePickerPatientsWithDoctorDash != null && datePickerPatientsWithDoctorDash.getValue() != null)
+                        ? datePickerPatientsWithDoctorDash.getValue()
+                        : java.time.ZonedDateTime.now(APP_TZ).toLocalDate();
+                loadStatsForDateAsync(_dashDate);
             } else {
                 showWarn("Cancel", "Could not cancel appointment.");
             }
@@ -1075,8 +1161,10 @@ public class DoctorController {
                                     if (ok) {
                                         toast("Appointment marked COMPLETED.", "ok");
                                         loadTodayAppointmentsAsync();
-                                        loadTodayStatsAsync();
-                                    } else {
+                                        var _dashDate = (datePickerPatientsWithDoctorDash != null && datePickerPatientsWithDoctorDash.getValue() != null)
+                                                ? datePickerPatientsWithDoctorDash.getValue()
+                                                : java.time.ZonedDateTime.now(APP_TZ).toLocalDate();
+                                        loadStatsForDateAsync(_dashDate);                                    } else {
                                         toast("Could not mark appointment as COMPLETED.", "warn");
                                     }
                                 } else {
@@ -2034,7 +2122,10 @@ public class DoctorController {
                 Platform.runLater(() -> {
                     row.setStatus("COMPLETED");
                     if (AppointmentsTable != null) AppointmentsTable.refresh();
-                    loadTodayStatsAsync();
+                    var _dashDate = (datePickerPatientsWithDoctorDash != null && datePickerPatientsWithDoctorDash.getValue() != null)
+                            ? datePickerPatientsWithDoctorDash.getValue()
+                            : java.time.ZonedDateTime.now(APP_TZ).toLocalDate();
+                    loadStatsForDateAsync(_dashDate);
                 });
             } catch (Exception e) {
                 Platform.runLater(() -> showWarn("Update", "Could not mark as completed. Please try again later."));
