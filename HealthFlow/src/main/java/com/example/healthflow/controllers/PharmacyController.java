@@ -121,6 +121,8 @@ public class PharmacyController {
 
     @FXML
     private Label PrescriptionsWatingNum;
+    @FXML
+    private Label Prescription_number;
 
     @FXML
     private TextArea ReasonOfDeduct;
@@ -424,6 +426,58 @@ public class PharmacyController {
         return java.time.ZonedDateTime.now(APP_TZ).toLocalDate();
     }
 
+    // Helper: is the currently opened prescription read-only (completed)?
+    private boolean isCurrentPrescriptionReadOnly() {
+        return selectedRow != null && selectedRow.status != null && "DISPENSED".equalsIgnoreCase(selectedRow.status.name());
+    }
+
+    /** Resolve pharmacist_id strictly (no auto-create). */
+    private Long requireCurrentPharmacistId() {
+        Long userId = null; String email = null; String role = null;
+        try { var u = Session.get(); if (u != null) { userId = u.getId(); email = u.getEmail(); } } catch (Throwable ignored) {}
+        if (userId == null) {
+            new javafx.scene.control.Alert(javafx.scene.control.Alert.AlertType.ERROR, "No logged-in user. Please re-login.").showAndWait();
+            return null;
+        }
+        try (Connection c = Database.get()) {
+            // role + email
+            try (PreparedStatement ps = c.prepareStatement("SELECT role, email FROM users WHERE id = ?")) {
+                ps.setLong(1, userId);
+                try (ResultSet rs = ps.executeQuery()) { if (rs.next()) { role = rs.getString(1); if (email == null) email = rs.getString(2); } }
+            }
+            if (role == null || !"PHARMACIST".equalsIgnoreCase(role)) {
+                new javafx.scene.control.Alert(javafx.scene.control.Alert.AlertType.ERROR,
+                        "You are not authorized as a pharmacist (role='" + String.valueOf(role) + "').").showAndWait();
+                return null;
+            }
+            // by user_id
+            Long pharmId = null;
+            try (PreparedStatement ps = c.prepareStatement("SELECT id FROM pharmacists WHERE user_id = ?")) {
+                ps.setLong(1, userId);
+                try (ResultSet rs = ps.executeQuery()) { if (rs.next()) pharmId = rs.getLong(1); }
+            }
+            if (pharmId != null) return pharmId;
+
+            // by email join (handles migrated data)
+            if (email != null && !email.isBlank()) {
+                try (PreparedStatement ps = c.prepareStatement(
+                        "SELECT p.id FROM pharmacists p JOIN users u ON u.id = p.user_id WHERE LOWER(u.email)=LOWER(?) LIMIT 1")) {
+                    ps.setString(1, email);
+                    try (ResultSet rs = ps.executeQuery()) { if (rs.next()) pharmId = rs.getLong(1); }
+                }
+                if (pharmId != null) return pharmId;
+            }
+        } catch (Exception ex) {
+            System.err.println("[PharmacyController] requireCurrentPharmacistId error: " + ex);
+            new javafx.scene.control.Alert(javafx.scene.control.Alert.AlertType.ERROR,
+                    "Failed to resolve pharmacist: " + ex.getMessage()).showAndWait();
+            return null;
+        }
+        new javafx.scene.control.Alert(javafx.scene.control.Alert.AlertType.ERROR,
+                "Your account has role PHARMACIST but is not linked in pharmacists table. Please ask admin to link it.").showAndWait();
+        return null;
+    }
+
     private java.time.OffsetDateTime fetchAppointmentDateById(Long apptId) {
         if (apptId == null) return null;
         try (Connection c = Database.get();
@@ -535,7 +589,7 @@ public class PharmacyController {
                         case PENDING -> "PENDING";
                         case APPROVED -> "Approved";
                         case REJECTED -> "Rejected";
-                        case DISPENSED -> "Completed";
+                        case DISPENSED -> "Dispensed";
                     }
             ));
         }
@@ -584,9 +638,16 @@ public class PharmacyController {
     private void showPrescriptionDetails(DashboardRow row) {
         if (row == null) return;
         this.selectedRow = row;
+        if (Prescription_number != null) Prescription_number.setText("");
 
         // Switch to prescription pane
         showPrescriptionsPane();
+
+        // Enable/disable Finish button based on prescription status
+        if (Finish_Prescription != null) {
+            boolean ro = row.status != null && "DISPENSED".equalsIgnoreCase(row.status.name());
+            Finish_Prescription.setDisable(ro);
+        }
 
         // Patient name + NID (read-only)
         if (PatientNameTF != null) {
@@ -598,6 +659,18 @@ public class PharmacyController {
         // Doctor name
         if (DoctorNameLabel != null) {
             DoctorNameLabel.setText(row.doctorName);
+        }
+
+        // Prescription number (ID)
+        if (Prescription_number != null) {
+            if (row.prescriptionId > 0) {
+                Prescription_number.setText(String.valueOf(row.prescriptionId));
+            } else if (row.appointmentId != null) {
+                // Optional fallback: try to resolve prescription id by appointment id if needed
+                Prescription_number.setText("–");
+            } else {
+                Prescription_number.setText("–");
+            }
         }
 
         // Pharmacist full name + Welcome first name
@@ -634,29 +707,90 @@ public class PharmacyController {
 
     private void loadPrescriptionItems(long prescId) {
         itemRows.clear();
+
+        // 1) Load items for the prescription (current behavior)
+        java.util.List<PrescriptionItem> items = java.util.Collections.emptyList();
         try (Connection c = Database.get()) {
             PrescriptionItemDAO itemDao = new PrescriptionItemDAO();
-            var items = itemDao.listByPrescription(c, prescId);
-            for (PrescriptionItem it : items) {
-                PrescItemRow r = new PrescItemRow();
-                r.setId(it.getId());
-                if (it.getMedicineId() != null) r.setMedicineId(it.getMedicineId());
-                r.setMedicineName(it.getMedicineName());
-                r.setStrength(it.getStrength());
-                r.setForm(it.getForm());
-                if (it.getDose() != null) r.setDose(it.getDose());
-                if (it.getDurationDays() != null) r.setDurationDays(it.getDurationDays());
-                if (it.getFreqPerDay() != null) r.setFreqPerDay(it.getFreqPerDay());
-                r.setDosage(it.getDosage());
-                r.setDosageText(it.getDosageText());
-                r.setQuantity(it.getQuantity());
-                r.setQtyDispensed(it.getQtyDispensed());
-                r.setStatus(it.getStatus().name());
-                itemRows.add(r);
+            items = itemDao.listByPrescription(c, prescId);
+        } catch (Exception ex) {
+            System.err.println("[PharmacyController] loadPrescriptionItems (fetch items) error: " + ex);
+        }
+
+        if (items == null || items.isEmpty()) {
+            if (TablePrescriptionItems != null) TablePrescriptionItems.setItems(itemRows);
+            return;
+        }
+
+        // 2) Pre-collect medicine ids and names to lookup stock in one go
+        java.util.Set<Long> medIds = new java.util.LinkedHashSet<>();
+        java.util.Set<String> medNames = new java.util.LinkedHashSet<>();
+        for (PrescriptionItem it : items) {
+            if (it.getMedicineId() != null) medIds.add(it.getMedicineId());
+            else if (it.getMedicineName() != null && !it.getMedicineName().isBlank()) medNames.add(it.getMedicineName().trim());
+        }
+
+        // 3) Build maps id->available and lower(name)->available
+        java.util.Map<Long, Integer> stockById = new java.util.HashMap<>();
+        java.util.Map<String, Integer> stockByLowerName = new java.util.HashMap<>();
+
+        try (Connection c = Database.get()) {
+            // 3.a) Lookup by ids
+            if (!medIds.isEmpty()) {
+                String in = medIds.stream().map(x -> "?").collect(java.util.stream.Collectors.joining(","));
+                String sql = "SELECT id, available_quantity FROM medicines WHERE id IN (" + in + ")";
+                try (PreparedStatement ps = c.prepareStatement(sql)) {
+                    int i = 1; for (Long id : medIds) ps.setLong(i++, id);
+                    try (ResultSet rs = ps.executeQuery()) {
+                        while (rs.next()) {
+                            stockById.put(rs.getLong(1), rs.getInt(2));
+                        }
+                    }
+                }
+            }
+            // 3.b) Lookup by names (case-insensitive)
+            if (!medNames.isEmpty()) {
+                String in = medNames.stream().map(x -> "?").collect(java.util.stream.Collectors.joining(","));
+                String sql = "SELECT LOWER(name), available_quantity FROM medicines WHERE LOWER(name) IN (" + in + ")";
+                try (PreparedStatement ps = c.prepareStatement(sql)) {
+                    int i = 1; for (String nm : medNames) ps.setString(i++, nm.toLowerCase());
+                    try (ResultSet rs = ps.executeQuery()) {
+                        while (rs.next()) {
+                            stockByLowerName.put(rs.getString(1), rs.getInt(2));
+                        }
+                    }
+                }
             }
         } catch (Exception ex) {
-            System.err.println("[PharmacyController] loadPrescriptionItems error: " + ex);
+            System.err.println("[PharmacyController] loadPrescriptionItems (fetch stock) error: " + ex);
         }
+
+        // 4) Build UI rows and include stockAvailable
+        for (PrescriptionItem it : items) {
+            PrescItemRow r = new PrescItemRow();
+            r.setId(it.getId());
+            if (it.getMedicineId() != null) r.setMedicineId(it.getMedicineId());
+            r.setMedicineName(it.getMedicineName());
+            r.setStrength(it.getStrength());
+            r.setForm(it.getForm());
+            if (it.getDose() != null) r.setDose(it.getDose());
+            if (it.getDurationDays() != null) r.setDurationDays(it.getDurationDays());
+            if (it.getFreqPerDay() != null) r.setFreqPerDay(it.getFreqPerDay());
+            r.setDosage(it.getDosage());
+            r.setDosageText(it.getDosageText());
+            r.setQuantity(it.getQuantity());
+            r.setQtyDispensed(it.getQtyDispensed());
+            r.setStatus(it.getStatus().name());
+
+            // Resolve stock: prefer by id, otherwise by lower(name)
+            Integer stock = null;
+            if (it.getMedicineId() != null) stock = stockById.get(it.getMedicineId());
+            if (stock == null && it.getMedicineName() != null) stock = stockByLowerName.get(it.getMedicineName().toLowerCase());
+            r.setStockAvailable(stock == null ? 0 : stock);
+
+            itemRows.add(r);
+        }
+
         if (TablePrescriptionItems != null) TablePrescriptionItems.setItems(itemRows);
     }
 
@@ -692,6 +826,11 @@ public class PharmacyController {
                 @Override protected void updateItem(Void item, boolean empty) {
                     super.updateItem(item, empty);
                     if (empty) { setGraphic(null); return; }
+                    PrescItemRow row = getTableView().getItems().get(getIndex());
+                    boolean ro = isCurrentPrescriptionReadOnly();
+                    boolean pending = row != null && row.getStatus() != null && row.getStatus().equalsIgnoreCase("PENDING");
+                    approve.setDisable(ro || !pending);
+                    reject.setDisable(ro || !pending);
                     var box = new javafx.scene.layout.HBox(6, approve, reject);
                     setGraphic(box);
                 }
@@ -714,15 +853,98 @@ public class PharmacyController {
     private void onApproveItem(int rowIndex) {
         if (rowIndex < 0 || rowIndex >= itemRows.size() || selectedRow == null) return;
         PrescItemRow r = itemRows.get(rowIndex);
+
+        // 1) Ask pharmacist how many to dispense (allow partial)
+        int prescribed = Math.max(0, r.getQuantity());
+        int inStock = Math.max(0, r.getStockAvailable()); // 0 if null
+        int suggested = Math.min(prescribed, inStock);
+        if (suggested < 0) suggested = 0;
+
+        javafx.scene.control.TextInputDialog dlg = new javafx.scene.control.TextInputDialog(String.valueOf(suggested));
+        dlg.setTitle("Dispense quantity");
+        dlg.setHeaderText("How many units do you want to dispense?");
+        dlg.setContentText("Dispense (0–" + prescribed + ", stock=" + inStock + "): ");
+
+        java.util.Optional<String> ans = dlg.showAndWait();
+        if (ans.isEmpty()) return; // cancelled
+
+        int dispense;
+        try {
+            dispense = Integer.parseInt(ans.get().trim());
+        } catch (NumberFormatException ex) {
+            new javafx.scene.control.Alert(javafx.scene.control.Alert.AlertType.ERROR, "Please enter a valid integer.").showAndWait();
+            return;
+        }
+
+        // 2) Validate bounds
+        if (dispense < 0) {
+            new javafx.scene.control.Alert(javafx.scene.control.Alert.AlertType.ERROR, "Dispense must be >= 0").showAndWait();
+            return;
+        }
+        if (dispense > prescribed) {
+            new javafx.scene.control.Alert(javafx.scene.control.Alert.AlertType.ERROR, "Cannot dispense more than prescribed (" + prescribed + ")").showAndWait();
+            return;
+        }
+        if (dispense > inStock) {
+            new javafx.scene.control.Alert(javafx.scene.control.Alert.AlertType.ERROR, "Not enough stock (available: " + inStock + ")").showAndWait();
+            return;
+        }
+
+        // 3) Persist, **including inventory deduction now** (not only on finish)
         try (Connection c = Database.get()) {
-            PrescriptionItemDAO dao = new PrescriptionItemDAO();
-            int qty = Math.max(0, r.getQuantity());
-            dao.updateDispensed(c, r.getId(), qty, ItemStatus.APPROVED, null);
-            r.setStatus("APPROVED");
-            r.setQtyDispensed(qty);
-            TablePrescriptionItems.refresh();
+            try {
+                c.setAutoCommit(false);
+
+                PrescriptionItemDAO dao = new PrescriptionItemDAO();
+                ItemStatus newStatus = (dispense > 0) ? ItemStatus.APPROVED : ItemStatus.CANCELLED;
+                dao.updateDispensed(c, r.getId(), dispense, newStatus, null);
+
+                // Deduct inventory immediately so Stock reflects the change
+                Long medId = r.getMedicineId();
+                if (medId == null) {
+                    // Try to resolve medicine id by name (case-insensitive)
+                    try (PreparedStatement ps = c.prepareStatement("SELECT id FROM medicines WHERE LOWER(name)=LOWER(?) LIMIT 1")) {
+                        ps.setString(1, r.getMedicineName());
+                        try (ResultSet rs = ps.executeQuery()) {
+                            if (rs.next()) medId = rs.getLong(1);
+                        }
+                    }
+                }
+                if (medId != null && dispense > 0) {
+                    try (PreparedStatement ps = c.prepareStatement(
+                            "INSERT INTO inventory_transactions (medicine_id, qty_change, reason, ref_type, ref_id)\n" +
+                            "VALUES (?, ?, ?, ?, ?)")) {
+                        ps.setLong(1, medId);
+                        ps.setInt(2, -dispense);                       // negative = outflow
+                        ps.setString(3, "DISPENSE");                  // reason
+                        ps.setString(4, "prescription_item");        // ref_type
+                        ps.setLong(5, r.getId());                      // ref_id = item id
+                        ps.executeUpdate();
+                    }
+                }
+
+                c.commit();
+
+                // Update UI model
+                r.setQtyDispensed(dispense);
+                r.setStatus(newStatus.name());
+                if (dispense > 0) {
+                    int newStock = Math.max(0, inStock - dispense);
+                    r.setStockAvailable(newStock);
+                }
+                TablePrescriptionItems.refresh();
+
+                // Refresh side counts (optional)
+                refreshPharmacyDashboardCounts();
+            } catch (Exception txErr) {
+                try { c.rollback(); } catch (Exception ignored) {}
+                throw txErr;
+            } finally {
+                try { c.setAutoCommit(true); } catch (Exception ignored) {}
+            }
         } catch (Exception ex) {
             System.err.println("[PharmacyController] approve item error: " + ex);
+            new javafx.scene.control.Alert(javafx.scene.control.Alert.AlertType.ERROR, "Failed to update item: " + ex.getMessage()).showAndWait();
         }
     }
 
@@ -737,6 +959,52 @@ public class PharmacyController {
             TablePrescriptionItems.refresh();
         } catch (Exception ex) {
             System.err.println("[PharmacyController] reject item error: " + ex);
+        }
+    }
+
+    // Handler: Mark prescription as DISPENSED (completed) and prevent further edits
+    private void onFinishPrescription() {
+        if (selectedRow == null) return;
+        long prescId = selectedRow.prescriptionId;
+        if (prescId <= 0) return;
+
+        // Strictly require pharmacist mapping (no auto-create)
+        Long pharmacistId = requireCurrentPharmacistId();
+        if (pharmacistId == null) return;
+
+        // Mark prescription as DISPENSED (completed)
+        try (Connection c = Database.get();
+             PreparedStatement ps = c.prepareStatement(
+                     "UPDATE prescriptions\n" +
+                     "SET status = 'DISPENSED',\n" +
+                     "    pharmacist_id = ?,\n" +
+                     "    decision_at   = COALESCE(decision_at, NOW()),\n" +
+                     "    approved_at   = COALESCE(approved_at, decision_at),\n" +
+                     "    approved_by   = COALESCE(approved_by, ?),\n" +
+                     "    dispensed_at  = NOW(),\n" +
+                     "    dispensed_by  = ?\n" +
+                     "WHERE id = ? AND status <> 'DISPENSED'")) {
+            ps.setLong(1, pharmacistId);  // pharmacist_id
+            ps.setLong(2, pharmacistId);  // approved_by (fallback if null)
+            ps.setLong(3, pharmacistId);  // dispensed_by
+            ps.setLong(4, prescId);       // WHERE id = ?
+            int changed = ps.executeUpdate();
+
+            if (changed > 0) {
+                // Reflect in memory row and UI
+                selectedRow.status = com.example.healthflow.model.PrescriptionStatus.DISPENSED;
+                if (Finish_Prescription != null) Finish_Prescription.setDisable(true);
+                // Force items column actions to re-evaluate disabled state
+                if (TablePrescriptionItems != null) TablePrescriptionItems.refresh();
+                refreshPharmacyDashboardCounts();
+                loadDashboardTable();
+                new javafx.scene.control.Alert(javafx.scene.control.Alert.AlertType.INFORMATION, "Prescription marked as completed.").showAndWait();
+            } else {
+                new javafx.scene.control.Alert(javafx.scene.control.Alert.AlertType.INFORMATION, "Already completed.").showAndWait();
+            }
+        } catch (Exception ex) {
+            System.err.println("[PharmacyController] finish prescription error: " + ex);
+            new javafx.scene.control.Alert(javafx.scene.control.Alert.AlertType.ERROR, "Failed to complete prescription: " + ex.getMessage()).showAndWait();
         }
     }
 
@@ -841,13 +1109,26 @@ public class PharmacyController {
         this(new ConnectivityMonitor());
     }
 
+    private void ensureConnectivityBannerOnce() {
+        if (rootPane == null) return;
+        // لا تكرار: افحص إن كان مضاف مسبقًا
+        for (javafx.scene.Node n : rootPane.getChildren()) {
+            if (n instanceof ConnectivityBanner) {
+                return; // موجود بالفعل
+            }
+        }
+        ConnectivityBanner banner = new ConnectivityBanner(monitor);
+        rootPane.getChildren().add(0, banner);
+    }
+
     @FXML
     private void initialize() {
         resolveLoggedInUserLabels();
 
         if (rootPane != null) {
-            ConnectivityBanner banner = new ConnectivityBanner(monitor);
-            rootPane.getChildren().add(0, banner);
+//            ConnectivityBanner banner = new ConnectivityBanner(monitor);
+//            rootPane.getChildren().add(0, banner);
+            ensureConnectivityBannerOnce();
 
             // attach shared CSS defensively
             try {
@@ -867,11 +1148,6 @@ public class PharmacyController {
         // Start connectivity monitor
         monitor.start();
 
-        // Add connectivity banner at the top of the UI
-        if (rootPane != null) {
-            ConnectivityBanner banner = new ConnectivityBanner(monitor);
-            rootPane.getChildren().add(0, banner);
-        }
 
         // Start header clock & date (12h, Asia/Gaza)
         startClock();
@@ -895,6 +1171,10 @@ public class PharmacyController {
         }
         if (InventoryButton != null) {
             InventoryButton.setOnAction(e -> showInventoryPane());
+        }
+        // Wire Finish button to handler
+        if (Finish_Prescription != null) {
+            Finish_Prescription.setOnAction(e -> onFinishPrescription());
         }
 
         // Back button: keep it simple for now — return to Dashboard
