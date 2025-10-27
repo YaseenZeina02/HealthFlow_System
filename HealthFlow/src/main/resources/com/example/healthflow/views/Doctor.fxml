@@ -252,8 +252,8 @@
                                     <TableView fx:constant="CONSTRAINED_RESIZE_POLICY" />
                                  </columnResizePolicy>
                               </TableView>
-                              <TextField fx:id="search" layoutX="653.0" layoutY="10.0" prefHeight="26.0" prefWidth="197.0" promptText="search" AnchorPane.rightAnchor="15.000000000000028" />
-                              <DatePicker fx:id="datePickerPatientsWithDoctorDash" cache="true" layoutX="490.0" layoutY="5.0" minHeight="-Infinity" prefHeight="40.0" prefWidth="150.0" styleClass="box" />
+                              <TextField fx:id="search" layoutX="653.0" layoutY="10.0" prefHeight="30.0" prefWidth="130.0" promptText="search" styleClass="box" AnchorPane.rightAnchor="15.000000000000028" />
+                              <DatePicker fx:id="datePickerPatientsWithDoctorDash" cache="true" layoutX="578.0" layoutY="11.0" minHeight="-Infinity" prefHeight="30.0" prefWidth="130.0" styleClass="box" AnchorPane.rightAnchor="158.79999999999995" />
                            </children>
                         </AnchorPane>
                      </children>
