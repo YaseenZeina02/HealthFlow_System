@@ -208,6 +208,8 @@ public class DoctorController {
 
 
 
+
+
     /* ====== Services / state ====== */
     private final ConnectivityMonitor monitor;
     private final DoctorDAO doctorDAO = new DoctorDAO();
@@ -215,6 +217,10 @@ public class DoctorController {
     private final PrescriptionDAO prescriptionDAO = new PrescriptionDAO();
 
     private final ObservableList<AppointmentRow> apptData = FXCollections.observableArrayList();
+    private FilteredList<AppointmentRow> apptFiltered = new FilteredList<>(apptData, r -> true);
+    private SortedList<AppointmentRow>   apptSorted   = new SortedList<>(apptFiltered);
+    private org.controlsfx.control.textfield.AutoCompletionBinding<String> apptSearchBinding;
+
     private final ObservableList<PatientRow> patientData = FXCollections.observableArrayList();
 
     // Refit callback for AppointmentsTable last column (Action)
@@ -285,6 +291,8 @@ public class DoctorController {
         wireAppointmentsTable();
         wirePatientsTable();
         wireSearch();
+
+        buildAppointmentSearchIndex(); // تجهيز ال-AutoComplete من أول تحميل
 
         wirePrescriptionItemsTable();
         // === Dashboard-by-date: bind DatePicker to table + counters (no extra filtering) ===
@@ -603,6 +611,76 @@ public class DoctorController {
             });
         }, "doc-stats-by-date").start();
     }
+
+    private void loadAppointmentsForDateTableAsync(java.time.LocalDate date) {
+        // استخدم اللودر الموحّد المتوافق مع AppointmentRow.of(Appt)
+        loadAppointmentsForDateAsync(date);
+    }
+
+    /** Build the search suggestions for the Appointments table and wire the live filter. */
+    private void buildAppointmentSearchIndex() {
+        if (searchLabel == null) return;
+
+        java.util.LinkedHashSet<String> suggestions = new java.util.LinkedHashSet<>();
+        for (AppointmentRow r : apptData) {
+            if (r == null) continue;
+            String idStr   = String.valueOf(r.getId());
+            String name    = nullToEmpty(r.getPatientName());
+            String nid     = nullToEmpty(r.getNationalId());
+            String status  = nullToEmpty(r.getStatus());
+            String dateStr = (r.getDate() == null) ? "" : r.getDate().toString();
+            String timeStr = nullToEmpty(r.getTimeStr());
+            for (String p : java.util.Arrays.asList(idStr, name, nid, status, dateStr, timeStr)) {
+                String t = nullToEmpty(p).trim();
+                if (!t.isEmpty()) suggestions.add(t);
+            }
+        }
+
+        try {
+            if (apptSearchBinding != null) apptSearchBinding.dispose();
+            apptSearchBinding = org.controlsfx.control.textfield.TextFields.bindAutoCompletion(searchLabel, suggestions);
+        } catch (IllegalAccessError err) {
+            // JavaFX 23 tightened module encapsulation; ControlsFX 11.2.x uses internal com.sun classes.
+            // Disable autocomplete gracefully and continue with plain live filtering.
+            apptSearchBinding = null;
+            System.out.println("[AutoComplete] Disabled due to module access error: " + err.getMessage());
+        } catch (Throwable t) {
+            // Any other runtime issue with ControlsFX; keep the app running.
+            apptSearchBinding = null;
+            System.out.println("[AutoComplete] Disabled: " + t.getClass().getSimpleName() + ": " + t.getMessage());
+        }
+
+        searchLabel.textProperty().removeListener(searchAppointmentsListener);
+        searchLabel.textProperty().addListener(searchAppointmentsListener);
+    }
+
+    // listener لفلترة جدول المواعيد حسب النص
+    private final javafx.beans.value.ChangeListener<String> searchAppointmentsListener = (obs, ov, nv) -> {
+        String q = (nv == null) ? "" : nv.trim().toLowerCase();
+        if (q.isEmpty()) {
+            apptFiltered.setPredicate(r -> true);
+            return;
+        }
+        apptFiltered.setPredicate(r -> {
+            if (r == null) return false;
+            String idStr   = String.valueOf(r.getId());
+            String name    = nullToEmpty(r.getPatientName()).toLowerCase();
+            String nid     = nullToEmpty(r.getNationalId()).toLowerCase();
+            String status  = nullToEmpty(r.getStatus()).toLowerCase();
+            String dateStr = (r.getDate() == null) ? "" : r.getDate().toString().toLowerCase();
+            String timeStr = nullToEmpty(r.getTimeStr()).toLowerCase();
+            return idStr.contains(q)
+                    || name.contains(q)
+                    || nid.contains(q)
+                    || status.contains(q)
+                    || dateStr.contains(q)
+                    || timeStr.contains(q);
+        });
+    };
+    private static boolean safeContains(String s, String q) {
+        return s != null && q != null && s.toLowerCase().contains(q);
+    }
+    private static String nullToEmpty(String s) { return s == null ? "" : s; }
 
 
 

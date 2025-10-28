@@ -256,4 +256,74 @@ public class AppointmentJdbcDAO {
             rs.next(); return rs.getInt(1);
         }
     }
+    /** يحصي المواعيد حسب الحالة في يوم معين (على مستوى جميع الأطباء). */
+    public static java.util.Map<String, Integer> countByStatusOnDate(java.time.LocalDate day) throws SQLException {
+        final String sql = """
+                SELECT status::text AS status, COUNT(*) AS cnt
+                FROM appointments
+                WHERE (appointment_date AT TIME ZONE 'Asia/Gaza')::date = ?
+                GROUP BY status::text
+                """;
+        try (Connection c = Database.get();
+             PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setObject(1, day);
+            try (ResultSet rs = ps.executeQuery()) {
+                java.util.Map<String, Integer> map = new java.util.LinkedHashMap<>();
+                while (rs.next()) {
+                    map.put(rs.getString("status"), rs.getInt("cnt"));
+                }
+                // اضمن وجود مفاتيح للحالات الشائعة حتى لو كانت صفر (اختياري)
+                String[] expected = {"SCHEDULED", "CONFIRMED", "PENDING", "COMPLETED", "CANCELLED"};
+                for (String k : expected) map.putIfAbsent(k, 0);
+                return map;
+            }
+        }
+    }
+
+    /** عدد الأطباء الذين لديهم مواعيد في تاريخ محدد */
+    public static int countDoctorsOnDate(java.time.LocalDate day) throws SQLException {
+        final String sql = "SELECT COUNT(DISTINCT doctor_id) FROM appointments WHERE appointment_date::date = ?";
+        try (Connection c = Database.get(); PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setObject(1, day);
+            try (ResultSet rs = ps.executeQuery()) { rs.next(); return rs.getInt(1); }
+        }
+    }
+
+    /** عدد المرضى الذين لديهم مواعيد في تاريخ محدد */
+    public static int countPatientsOnDate(java.time.LocalDate day) throws SQLException {
+        final String sql = "SELECT COUNT(DISTINCT patient_id) FROM appointments WHERE appointment_date::date = ?";
+        try (Connection c = Database.get(); PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setObject(1, day);
+            try (ResultSet rs = ps.executeQuery()) { rs.next(); return rs.getInt(1); }
+        }
+    }
+
+    /** عدد المواعيد الكلي في تاريخ محدد */
+    public static int countAppointmentsOnDate(java.time.LocalDate day) throws SQLException {
+        final String sql = "SELECT COUNT(*) FROM appointments WHERE appointment_date::date = ?";
+        try (Connection c = Database.get(); PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setObject(1, day);
+            try (ResultSet rs = ps.executeQuery()) { rs.next(); return rs.getInt(1); }
+        }
+    }
+
+    /** عدد المواعيد المكتملة في تاريخ محدد */
+    public static int countCompletedAppointmentsOnDate(java.time.LocalDate day) throws SQLException {
+        final String sql = "SELECT COUNT(*) FROM appointments WHERE appointment_date::date = ? AND status = 'COMPLETED'::appt_status";
+        try (Connection c = Database.get(); PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setObject(1, day);
+            try (ResultSet rs = ps.executeQuery()) { rs.next(); return rs.getInt(1); }
+        }
+    }
+
+    /** عدد المواعيد المتبقية (Pending + Scheduled) في تاريخ محدد */
+    public static int countRemainingAppointmentsOnDate(java.time.LocalDate day) throws SQLException {
+        final String sql = "SELECT COUNT(*) FROM appointments WHERE appointment_date::date = ? AND status IN ('PENDING'::appt_status,'SCHEDULED'::appt_status)";
+        try (Connection c = Database.get(); PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setObject(1, day);
+            try (ResultSet rs = ps.executeQuery()) { rs.next(); return rs.getInt(1); }
+        }
+    }
+
+
 }
