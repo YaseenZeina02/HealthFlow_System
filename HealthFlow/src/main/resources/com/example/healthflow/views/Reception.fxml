@@ -21,7 +21,7 @@
 <?import javafx.scene.text.Font?>
 <?import org.kordamp.ikonli.javafx.FontIcon?>
 
-<StackPane fx:id="rootPane" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="600.0" prefWidth="1100.0" stylesheets="@../Design/ReceptionDesign.css" xmlns="http://javafx.com/javafx/25" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.example.healthflow.controllers.ReceptionController">
+<StackPane fx:id="rootPane" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="600.0" prefWidth="1100.0" stylesheets="@../Design/ReceptionDesign.css" xmlns="http://javafx.com/javafx/19" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.example.healthflow.controllers.ReceptionController">
 
     <children>
         <AnchorPane prefHeight="200.0" prefWidth="200.0">
@@ -335,7 +335,6 @@
                                                 <TableColumn fx:id="colDoctor_Specialty" prefWidth="100.0" text="Specialty" />
                                                 <TableColumn fx:id="colDoctor_bio" prefWidth="100.0" text="Bio" />
                                                 <TableColumn fx:id="colDoctor_Status" prefWidth="100.0" text="Status" />
-                                                <TableColumn fx:id="colDoctor_available" prefWidth="100.0" text="Available" />
                                                 <TableColumn fx:id="colDocRoomNumber" prefWidth="100.0" text="Room" />
                                             </columns>
                                             <columnResizePolicy>

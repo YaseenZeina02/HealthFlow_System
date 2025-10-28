@@ -254,6 +254,14 @@ public class ReceptionController {
     private Label LabelToAlert;
 
 
+    // --- Dashboard table pipeline (Base -> Filtered -> Sorted) ---
+    private final javafx.collections.ObservableList<com.example.healthflow.dao.DoctorDAO.AppointmentRow> dashBase =
+            javafx.collections.FXCollections.observableArrayList();
+    private final javafx.collections.transformation.FilteredList<com.example.healthflow.dao.DoctorDAO.AppointmentRow> dashFiltered =
+            new javafx.collections.transformation.FilteredList<>(dashBase, r -> true);
+    private final javafx.collections.transformation.SortedList<com.example.healthflow.dao.DoctorDAO.AppointmentRow> dashSorted =
+            new javafx.collections.transformation.SortedList<>(dashFiltered);
+
     @FXML
     private Label getPatientName;
     @FXML
@@ -2654,6 +2662,60 @@ public class ReceptionController {
         }
     }
 
+    /** حمّل مواعيد اليوم المختار إلى جدول الداشبورد (TableAppInDashboard) */
+//    private void reloadDashboardAppointments() {
+//        if (TableAppInDashboard == null) return;
+//        java.time.LocalDate sel = (dataPickerDashboard != null && dataPickerDashboard.getValue() != null)
+//                ? dataPickerDashboard.getValue()
+//                : java.time.LocalDate.now();
+//        try {
+//            var rows = com.example.healthflow.dao.AppointmentJdbcDAO.listByDateAll(sel);
+//
+//            // ✅ مهم: حافظ على سلسلة (base -> filteredDash -> sortedDash)
+//            // لو عندك SortedList/FilteredList جاهزة (filteredDash, sortedDash):
+//            if (sortedDash != null) {
+//                // Get the ultimate modifiable base list under (SortedList -> FilteredList -> base)
+//                javafx.collections.ObservableList<?> base = sortedDash.getSource();
+//                if (base instanceof javafx.collections.transformation.FilteredList<?> fl) {
+//                    base = ((javafx.collections.transformation.FilteredList<?>) fl).getSource();
+//                }
+//                @SuppressWarnings("unchecked")
+//                javafx.collections.ObservableList<com.example.healthflow.dao.DoctorDAO.AppointmentRow> mod =
+//                        (javafx.collections.ObservableList<com.example.healthflow.dao.DoctorDAO.AppointmentRow>) base;
+//                mod.clear();
+//                mod.addAll(rows);
+//            } else if (filteredDash != null) {
+//                @SuppressWarnings("unchecked")
+//                javafx.collections.ObservableList<com.example.healthflow.dao.DoctorDAO.AppointmentRow> mod =
+//                        (javafx.collections.ObservableList<com.example.healthflow.dao.DoctorDAO.AppointmentRow>)(javafx.collections.ObservableList<?>) filteredDash.getSource();
+//                mod.clear();
+//                mod.addAll(rows);
+//            } else {
+//                // في أسوأ الأحوال، عيّن مباشرةً
+//                TableAppInDashboard.setItems(javafx.collections.FXCollections.observableArrayList(rows));
+//            }
+//
+//            // تشخيص سريع
+//            // System.out.println("reloadDashboardAppointments count = " + rows.size() + " for date " + sel);
+//
+//        } catch (Exception ex) {
+//            System.err.println("[ReceptionController] reloadDashboardAppointments error: " + ex);
+//        }
+//    }
+
+    private void reloadDashboardAppointments() {
+        if (TableAppInDashboard == null) return;
+        java.time.LocalDate sel = (dataPickerDashboard != null && dataPickerDashboard.getValue() != null)
+                ? dataPickerDashboard.getValue()
+                : java.time.LocalDate.now();
+        try {
+            var rows = com.example.healthflow.dao.AppointmentJdbcDAO.listByDateAll(sel);
+            dashBase.setAll(rows);   // <<<< المهم
+        } catch (Exception ex) {
+            System.err.println("[ReceptionController] reloadDashboardAppointments error: " + ex);
+        }
+    }
+
 
     private void wireDashboardAppointmentsSearch() {
         if (searchAppointmentDach == null) return;
@@ -2669,6 +2731,10 @@ public class ReceptionController {
 
         // أول تطبيق
         applyDashboardFilters();
+        if (TableAppInDashboard != null && TableAppInDashboard.getItems() != dashSorted) {
+            TableAppInDashboard.setItems(dashSorted);
+        }
+
     }
 
     // يحدّث الاسم + رقم الهوية بدون حجب واجهة المستخدم
@@ -2820,8 +2886,8 @@ public class ReceptionController {
 
         // ✅ نستخدم UNCONSTRAINED_RESIZE_POLICY لتمكين الـ H-Scroll عند زيادة مجموع عرض الأعمدة
         TableAppInDashboard.setColumnResizePolicy(TableView.UNCONSTRAINED_RESIZE_POLICY);
-        TableAppInDashboard.setItems(sortedDash);
-        sortedDash.comparatorProperty().bind(TableAppInDashboard.comparatorProperty());
+        TableAppInDashboard.setItems(dashSorted);
+        dashSorted.comparatorProperty().bind(TableAppInDashboard.comparatorProperty());
 
         // -------- Appointment ID (index shown 1..n) --------
         if (colAppointmentID != null) {
@@ -2946,6 +3012,8 @@ public class ReceptionController {
         }
 
         // لا نطبق أي عمليات ثقيلة هنا
+        reloadDashboardAppointments();
+
         applyDashboardFilters();
     }
 
@@ -2959,6 +3027,7 @@ public class ReceptionController {
         if (searchAppointmentDach != null) {
             searchAppointmentDach.textProperty().addListener((obs, old, q) -> applyDashboardFilters());
         }
+        reloadDashboardAppointments();
         applyDashboardFilters();
     }
 
@@ -2967,8 +3036,7 @@ public class ReceptionController {
                 ? "" : searchAppointmentDach.getText().trim().toLowerCase();
         LocalDate sel = (dataPickerDashboard == null) ? null : dataPickerDashboard.getValue();
 
-        filteredDash.setPredicate(r -> {
-            // date filter
+        dashFiltered.setPredicate(r -> {            // date filter
             LocalDateTime ldt = toLocal(r.startAt);
             if (sel != null) {
                 if (ldt == null || !ldt.toLocalDate().equals(sel)) return false;

@@ -400,7 +400,7 @@
                         </AnchorPane>
                      </children>
                   </AnchorPane>
-                  <AnchorPane fx:id="InventoryAnchorPane" prefHeight="536.0" prefWidth="890.0" style="-fx-background-color: #ededed;" stylesheets="@../Design/ReceptionDesign.css" visible="false" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+                  <AnchorPane fx:id="InventoryAnchorPane" prefHeight="536.0" prefWidth="890.0" style="-fx-background-color: #ededed;" stylesheets="@../Design/ReceptionDesign.css" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
                      <children>
                         <AnchorPane layoutX="13.0" layoutY="10.0" prefHeight="272.0" prefWidth="865.0" stylesheets="@../Design/ReceptionDesign.css" AnchorPane.leftAnchor="13.0" AnchorPane.rightAnchor="12.0" AnchorPane.topAnchor="10.0">
                            <children>
@@ -479,7 +479,7 @@
                               </SegmentedButton>
                            </children>
                         </HBox>
-                        <AnchorPane fx:id="ReceivePane" layoutX="14.0" layoutY="338.0" prefHeight="208.0" prefWidth="865.0" stylesheets="@../Design/ReceptionDesign.css" visible="false" AnchorPane.bottomAnchor="12.0" AnchorPane.leftAnchor="13.0" AnchorPane.rightAnchor="12.0">
+                        <AnchorPane fx:id="ReceivePane" layoutX="14.0" layoutY="338.0" prefHeight="208.0" prefWidth="865.0" stylesheets="@../Design/ReceptionDesign.css" AnchorPane.bottomAnchor="12.0" AnchorPane.leftAnchor="13.0" AnchorPane.rightAnchor="12.0">
                            <children>
                               <Label layoutX="14.0" layoutY="14.0" prefHeight="23.0" prefWidth="205.0" styleClass="header-top" stylesheets="@../Design/ReceptionDesign.css" text="Receive Medicines">
                                  <font>
@@ -524,7 +524,7 @@
                               <String fx:value="radius" />
                            </styleClass>
                         </AnchorPane>
-                        <AnchorPane fx:id="deductPane" layoutX="13.0" layoutY="338.0" prefHeight="208.0" prefWidth="865.0" AnchorPane.bottomAnchor="12.0" AnchorPane.leftAnchor="13.0" AnchorPane.rightAnchor="12.0" AnchorPane.topAnchor="338.0">
+                        <AnchorPane fx:id="deductPane" layoutX="13.0" layoutY="338.0" prefHeight="208.0" prefWidth="865.0" visible="false" AnchorPane.bottomAnchor="12.0" AnchorPane.leftAnchor="13.0" AnchorPane.rightAnchor="12.0" AnchorPane.topAnchor="338.0">
                            <children>
                               <Label layoutX="18.0" layoutY="14.0" prefHeight="23.0" prefWidth="205.0" styleClass="header-top" stylesheets="@../Design/ReceptionDesign.css" text="Deduct Medicines" AnchorPane.leftAnchor="18.0">
                                  <font>

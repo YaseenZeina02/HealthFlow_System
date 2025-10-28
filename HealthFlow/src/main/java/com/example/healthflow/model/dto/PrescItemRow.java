@@ -22,6 +22,11 @@ public class PrescItemRow {
     private final StringProperty notes = new SimpleStringProperty();
     private final IntegerProperty stockAvailable = new SimpleIntegerProperty(0);
     private final StringProperty diagnosis = new SimpleStringProperty();
+    private final LongProperty batchId = new SimpleLongProperty();
+
+    public LongProperty batchIdProperty() { return batchId; }
+    public long getBatchId() { return batchId.get(); }
+    public void setBatchId(long v) { batchId.set(v); }
 
     public PrescItemRow() {}
 
@@ -93,6 +98,7 @@ public class PrescItemRow {
     public StringProperty dosageTextProperty() { return dosageText; }
     public String getDosageText() { return dosageText.get(); }
     public void setDosageText(String v) { dosageText.set(v); }
+
 
 
 }

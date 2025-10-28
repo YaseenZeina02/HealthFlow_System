@@ -613,6 +613,7 @@ public class PharmacyController {
         }
     }
 
+
 //    private void showPrescriptionDetails(DashboardRow row) {
 //        if (row == null) return;
 //        this.selectedRow = row;

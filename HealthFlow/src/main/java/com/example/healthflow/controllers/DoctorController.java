@@ -15,6 +15,7 @@ import com.example.healthflow.service.DoctorDashboardService;
 import com.example.healthflow.service.DoctorDashboardService.Appt;
 import com.example.healthflow.service.DoctorDashboardService.Stats;
 import com.example.healthflow.ui.ConnectivityBanner;
+import javafx.animation.ScaleTransition;
 import com.example.healthflow.ui.OnlineBindings;
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
@@ -369,6 +370,11 @@ public class DoctorController {
             Update_Medication.setOnAction(e -> openEditSelectedItem());
         }
 
+        // When doctor finishes composing the draft and wants to send to pharmacy:
+        if (sendToPharmacy != null) {
+            sendToPharmacy.setOnAction(e -> handleSendToPharmacy());
+        }
+
 
         if (loadUserAndEnsureDoctorProfile()) {
             reloadAll();
@@ -429,6 +435,35 @@ public class DoctorController {
         PrescriptionMedicationAnchorPane.setVisible(false);
         AddMedicationAnchorPane.setVisible(true);
 //        markNavActive(InsertButton2);     //
+    }
+
+    /**
+     * Clear the draft prescription items table and return to Dashboard.
+     * Triggered by the doctor pressing the "sendToPharmacy" button.
+     */
+    private void handleSendToPharmacy() {
+        try {
+            // Clear the TableView content (visible rows)
+            if (TablePrescriptionItems != null) {
+                TablePrescriptionItems.getItems().clear();
+                TablePrescriptionItems.getSelectionModel().clearSelection();
+            }
+            // Clear the in-memory draft list (data source)
+            if (prescItemsEditable != null) {
+                prescItemsEditable.clear();
+            }
+            // Reset transient editing context
+            editingRow = null;
+            currentPrescriptionId = null;
+            selectedPatientUserId = null;
+            selectedPatientName = null;
+            selectedPatientNationalId = null;
+        } catch (Exception ex) {
+            // Non-fatal: show a small warning and continue to dashboard
+            showWarn("Prescription", "Failed to reset draft items: " + ex.getMessage());
+        }
+        // Navigate back to the dashboard view
+        showDashboardPane();
     }
 
     private void goBackToLogin() {
@@ -783,6 +818,8 @@ public class DoctorController {
         }, "doc-patients-by-date").start();
     }
 
+
+
     /* ================= Tables wiring ================= */
 
     /**
@@ -964,45 +1001,68 @@ public class DoctorController {
         // ✨ خلية الأكشن: زر Cancel و Edit
         colAction.setCellValueFactory(param -> new ReadOnlyObjectWrapper<>(param.getValue()));
         colAction.setCellFactory(tc -> new TableCell<AppointmentRow, AppointmentRow>() {
-
-            private final Button btnDone = new Button();
-            private final Button btnPresc = new Button("Prescription");
+            private final Button btnDone   = new Button();
             private final Button btnCancel = new Button();
+            private final Button btnPresc  = new Button("Prescription");
+            private final HBox box         = new HBox(8, btnDone, btnCancel, btnPresc);
 
-            private final HBox box = new HBox(8, btnDone, btnCancel, btnPresc);
             {
-                btnDone.getStyleClass().addAll("btn", "btn-complete");
-                btnDone.setGraphic(new FontIcon("fas-check-circle"));
-                btnDone.setTooltip(new Tooltip("Complete Appointment"));
-                btnPresc.getStyleClass().addAll("btn", "btn-complete");
-                btnCancel.getStyleClass().addAll("btn", "btn-complete");
-                btnCancel.setGraphic(new FontIcon("fas-times-circle"));
                 box.setAlignment(Pos.CENTER_LEFT);
-                btnDone.setOnAction(e -> {
-                    AppointmentRow row = getItem();
-                    completeAppointmentDb(row);
-                });
 
-                btnPresc.setOnAction(e -> {
-                    AppointmentRow row = getItem();
-                    openPrescriptionForAppointment(row);
+                // نصوص بسيطة بدل أيقونات خارجية
+                btnDone.setText("✔");
+                btnCancel.setText("✖");
+
+                btnDone.getStyleClass().addAll("btn", "btn-complete", "table-action");
+                btnCancel.getStyleClass().addAll("btn", "btn-danger", "table-action");
+                btnPresc.getStyleClass().addAll("btn", "btn-complete");
+
+                btnDone.setOnAction(e -> {
+                    playPressAnim(btnDone);
+                    AppointmentRow r = getItem();
+                    if (r == null) return;
+                    // دالتك الحالية لتكميل الموعد
+                    completeAppointmentDb(r);
+                    // عطّل ✔ و ✖ بعد الإكمال
+                    btnDone.setDisable(true);
+                    btnCancel.setDisable(true);
                 });
 
                 btnCancel.setOnAction(e -> {
-                    AppointmentRow row = getItem();
-                    cancelAppointment(row);
+                    playPressAnim(btnCancel);
+                    AppointmentRow r = getItem();
+                    if (r == null) return;
+                    // دالة الإلغاء التي عندك أسفل الملف
+                    cancelAppointment(r);
+                    // عطّل ✔ و ✖ بعد الإلغاء
+                    btnDone.setDisable(true);
+                    btnCancel.setDisable(true);
+                });
+
+                btnPresc.setOnAction(e -> {
+                    playPressAnim(btnPresc);
+                    AppointmentRow r = getItem();
+                    if (r == null) return;
+                    // يفتح واجهة الوصفة ويعرض الأصناف إن وُجدت
+                    openPrescriptionForAppointment(r);
                 });
             }
 
             @Override
             protected void updateItem(AppointmentRow row, boolean empty) {
                 super.updateItem(row, empty);
-                setText(null);
-                setContentDisplay(ContentDisplay.GRAPHIC_ONLY);
-                setGraphic(empty ? null : box);
+                if (empty || row == null) {
+                    setGraphic(null);
+                    return;
+                }
+                String st = (row.getStatus() == null) ? "" : row.getStatus().trim().toUpperCase();
+                boolean terminal = "COMPLETED".equals(st) || "CANCELLED".equals(st);
+                // عطّل ✔ و ✖ لما تكون الحالة نهائية؛ Prescription يظل شغّال
+                btnDone.setDisable(terminal);
+                btnCancel.setDisable(terminal);
+                setGraphic(box);
             }
         });
-
 
         // ارتفاع صف متغيّر (السكرول سيظهر تلقائياً عندما لا تتسع المساحة)
         AppointmentsTable.setFixedCellSize(-1);
@@ -1036,27 +1096,54 @@ public class DoctorController {
         }
     }
 
+//    private void cancelAppointment(AppointmentRow row) {
+//        if (row == null) return;
+//        try {
+//            boolean ok = doctorDAO.cancelAppointment(row.getId());
+//            if (ok) {
+//                // remove from UI list entirely as requested
+//                apptData.remove(row);
+//                // Reload table for the currently selected dashboard date
+//                loadTodayAppointmentsAsync();
+//                if (AppointmentsTable != null) AppointmentsTable.refresh();
+//                toast("Appointment cancelled.", "ok");
+//                var _dashDate = (datePickerPatientsWithDoctorDash != null && datePickerPatientsWithDoctorDash.getValue() != null)
+//                        ? datePickerPatientsWithDoctorDash.getValue()
+//                        : java.time.ZonedDateTime.now(APP_TZ).toLocalDate();
+//                loadStatsForDateAsync(_dashDate);
+//            } else {
+//                showWarn("Cancel", "Could not cancel appointment.");
+//            }
+//        } catch (Exception ex) {
+//            showWarn("Cancel", "Failed to update DB: " + ex.getMessage());
+//        }
+//    }
+
+    /** Cancel appointment in DB then update UI; leaves Prescription enabled. */
     private void cancelAppointment(AppointmentRow row) {
         if (row == null) return;
-        try {
-            boolean ok = doctorDAO.cancelAppointment(row.getId());
-            if (ok) {
-                // remove from UI list entirely as requested
-                apptData.remove(row);
-                // Reload table for the currently selected dashboard date
-                loadTodayAppointmentsAsync();
-                if (AppointmentsTable != null) AppointmentsTable.refresh();
-                toast("Appointment cancelled.", "ok");
-                var _dashDate = (datePickerPatientsWithDoctorDash != null && datePickerPatientsWithDoctorDash.getValue() != null)
-                        ? datePickerPatientsWithDoctorDash.getValue()
-                        : java.time.ZonedDateTime.now(APP_TZ).toLocalDate();
-                loadStatsForDateAsync(_dashDate);
-            } else {
-                showWarn("Cancel", "Could not cancel appointment.");
-            }
-        } catch (Exception ex) {
-            showWarn("Cancel", "Failed to update DB: " + ex.getMessage());
-        }
+        new Thread(() -> {
+            boolean ok = false;
+            try (Connection c = Database.get();
+                 java.sql.PreparedStatement ps = c.prepareStatement(
+                         "UPDATE appointments SET status = 'CANCELLED', updated_at = NOW() WHERE id = ?")) {
+                ps.setLong(1, row.getId());
+                ok = (ps.executeUpdate() == 1);
+            } catch (Exception ignore) { ok = false; }
+            final boolean success = ok;
+            Platform.runLater(() -> {
+                if (success) {
+                    row.setStatus("CANCELLED");
+                    if (AppointmentsTable != null) AppointmentsTable.refresh();
+                    var _dashDate = (datePickerPatientsWithDoctorDash != null && datePickerPatientsWithDoctorDash.getValue() != null)
+                            ? datePickerPatientsWithDoctorDash.getValue()
+                            : java.time.ZonedDateTime.now(APP_TZ).toLocalDate();
+                    loadStatsForDateAsync(_dashDate);
+                } else {
+                    showWarn("Update", "Could not cancel the appointment. Please try again later.");
+                }
+            });
+        }, "doc-cancel").start();
     }
 
     private void editAppointment(AppointmentRow row) {
@@ -1096,11 +1183,186 @@ public class DoctorController {
             this.selectedPatientNationalId = row.getNationalId();
 
             showPrescriptionPane();
+            loadPrescriptionItemsFromDb(currentPrescriptionId);
             Platform.runLater(() -> setPatientHeader(row.getPatientName(), row.getNationalId(), false));
 //            toast("Prescription #" + prescId + " ready.", "ok");
         } catch (Exception ex) {
             showError("Open Prescription", ex);
         }
+    }
+    /** Load items for a given prescription and push into the items table. */
+//    private void loadPrescriptionItemsFromDb(long prescId) {
+//        if (prescId <= 0) return;
+//        // امسح الداتا الحالية في الجدول/اللستة
+//        try {
+//            if (TablePrescriptionItems != null) {
+//                TablePrescriptionItems.getItems().clear();
+//                TablePrescriptionItems.getSelectionModel().clearSelection();
+//            }
+//            if (prescItemsEditable != null) prescItemsEditable.clear();
+//        } catch (Throwable ignore) {}
+//
+//        new Thread(() -> {
+//            java.util.List<PrescItemRow> rows = new java.util.ArrayList<>();
+//            Exception err = null;
+//            try (Connection c = Database.get();
+//                 java.sql.PreparedStatement ps = c.prepareStatement(
+//                         "SELECT id, medicine_id, medicine_name, " +
+//                                 "       COALESCE(dosage_text, dosage) AS dosage_display, " +
+//                                 "       quantity, status, batch_id, dose, freq_per_day, duration_days, strength, form, route, notes " +
+//                                 "FROM prescription_items WHERE prescription_id = ? ORDER BY id")) {
+//                ps.setLong(1, prescId);
+//                try (var rs = ps.executeQuery()) {
+//                    while (rs.next()) {
+//                        // أنشئ الصف واملأ الحقول بالضبط حسب خصائص PrescItemRow الظاهرة في الجدول
+//                        PrescItemRow r = new PrescItemRow();
+//                        r.setId(rs.getLong("id"));
+//                        r.setMedicineId((Long) rs.getObject("medicine_id"));
+//                        r.setMedicineName(rs.getString("medicine_name"));
+//                        r.setDosageText(rs.getString("dosage_display"));
+//                        r.setQuantity(rs.getInt("quantity"));
+//                        r.setStatus(rs.getString("status"));
+//                        r.setBatchId((Long) rs.getObject("batch_id"));
+//                        r.setDose((Integer) rs.getObject("dose"));
+//                        r.setFreqPerDay((Integer) rs.getObject("freq_per_day"));
+//                        r.setDurationDays((Integer) rs.getObject("duration_days"));
+//                        r.setStrength(rs.getString("strength"));
+//                        r.setForm(rs.getString("form"));
+//                        r.setRoute(rs.getString("route"));
+//                        r.setNotes(rs.getString("notes"));
+//                        rows.add(r);
+//                    }
+//                }
+//            } catch (Exception ex) {
+//                err = ex;
+//            }
+//
+//            Exception fErr = err;
+//            Platform.runLater(() -> {
+//                if (fErr != null) {
+//                    showWarn("Prescription Items", "Failed to load items: " + fErr.getMessage());
+//                    return;
+//                }
+//                // ادفع البيانات للـ ObservableList المربوطة بالجدول
+//                if (prescItemsEditable != null) {
+//                    prescItemsEditable.addAll(rows);
+//                } else if (TablePrescriptionItems != null) {
+//                    // fallback لو الجدول غير مربوط بلستة خارجية
+//                    TablePrescriptionItems.getItems().addAll(rows);
+//                }
+//                if (TablePrescriptionItems != null) TablePrescriptionItems.refresh();
+//            });
+//        }, "doc-load-presc-items").start();
+//    }
+
+    /** Load items for a given prescription and push into the items table. */
+    private void loadPrescriptionItemsFromDb(long prescId) {
+        if (prescId <= 0) return;
+        // امسح الداتا الحالية في الجدول/اللستة
+        try {
+            if (TablePrescriptionItems != null) {
+                TablePrescriptionItems.getItems().clear();
+                TablePrescriptionItems.getSelectionModel().clearSelection();
+            }
+            if (prescItemsEditable != null) prescItemsEditable.clear();
+        } catch (Throwable ignore) {}
+
+        new Thread(() -> {
+            java.util.List<PrescItemRow> rows = new java.util.ArrayList<>();
+            Exception err = null;
+            try (Connection c = Database.get();
+                 java.sql.PreparedStatement ps = c.prepareStatement(
+                         "SELECT id, medicine_id, medicine_name, " +
+                                 "       COALESCE(dosage_text, dosage) AS dosage_display, " +
+                                 "       quantity, status, batch_id, dose, freq_per_day, duration_days, strength, form, route, notes " +
+                                 "FROM prescription_items WHERE prescription_id = ? ORDER BY id")) {
+                ps.setLong(1, prescId);
+                try (var rs = ps.executeQuery()) {
+                    while (rs.next()) {
+                        // أنشئ الصف واملأ الحقول بالضبط حسب خصائص PrescItemRow الظاهرة في الجدول
+//                        PrescItemRow r = new PrescItemRow();
+//                        r.setId(rs.getLong("id"));
+//                        r.setMedicineId((Long) rs.getObject("medicine_id"));
+//                        r.setMedicineName(rs.getString("medicine_name"));
+//                        r.setDosageText(rs.getString("dosage_display"));
+//                        r.setQuantity(rs.getInt("quantity"));
+//                        r.setStatus(rs.getString("status"));
+//                        r.setBatchId((Long) rs.getObject("batch_id"));
+//                        r.setDose((Integer) rs.getObject("dose"));
+//                        r.setFreqPerDay((Integer) rs.getObject("freq_per_day"));
+//                        r.setDurationDays((Integer) rs.getObject("duration_days"));
+//                        r.setStrength(rs.getString("strength"));
+//                        r.setForm(rs.getString("form"));
+//                        r.setRoute(rs.getString("route"));
+//                        r.setNotes(rs.getString("notes"));
+                        PrescItemRow r = new PrescItemRow();
+
+// id (NOT NULL)
+                        r.setId(rs.getLong("id"));
+
+// medicine_id قد تكون NULL
+                        long mid = rs.getLong("medicine_id");
+                        if (!rs.wasNull()) {
+                            r.setMedicineId(mid);
+                        }
+
+                        r.setMedicineName(rs.getString("medicine_name"));
+                        r.setDosageText(rs.getString("dosage_display"));
+
+                        r.setQuantity(rs.getInt("quantity"));
+
+                        String st = rs.getString("status");
+                        if (st != null) r.setStatus(st);
+
+                        long b = rs.getLong("batch_id");
+                        if (!rs.wasNull()) {
+                            r.setBatchId(b);
+                        }
+
+                        Integer doseObj = (Integer) rs.getObject("dose");
+                        if (doseObj != null) r.setDose(doseObj);
+
+                        Integer freqObj = (Integer) rs.getObject("freq_per_day");
+                        if (freqObj != null) r.setFreqPerDay(freqObj);
+
+                        Integer durObj = (Integer) rs.getObject("duration_days");
+                        if (durObj != null) r.setDurationDays(durObj);
+
+                        String strength = rs.getString("strength");
+                        if (strength != null) r.setStrength(strength);
+
+                        String form = rs.getString("form");
+                        if (form != null) r.setForm(form);
+
+                        String route = rs.getString("route");
+                        if (route != null) r.setRoute(route);
+
+                        String notes = rs.getString("notes");
+                        if (notes != null) r.setNotes(notes);
+
+                        rows.add(r);
+                    }
+                }
+            } catch (Exception ex) {
+                err = ex;
+            }
+
+            Exception fErr = err;
+            Platform.runLater(() -> {
+                if (fErr != null) {
+                    showWarn("Prescription Items", "Failed to load items: " + fErr.getMessage());
+                    return;
+                }
+                // ادفع البيانات للـ ObservableList المربوطة بالجدول
+                if (prescItemsEditable != null) {
+                    prescItemsEditable.addAll(rows);
+                } else if (TablePrescriptionItems != null) {
+                    // fallback لو الجدول غير مربوط بلستة خارجية
+                    TablePrescriptionItems.getItems().addAll(rows);
+                }
+                if (TablePrescriptionItems != null) TablePrescriptionItems.refresh();
+            });
+        }, "doc-load-presc-items").start();
     }
 
     private void setPatientHeader(String name, String nid, boolean editable) {
@@ -2164,6 +2426,18 @@ public class DoctorController {
         });
     }
 
+    /** Tiny press animation (visual feedback) for table action buttons. */
+    private void playPressAnim(javafx.scene.control.Button b) {
+        if (b == null) return;
+        ScaleTransition st = new ScaleTransition(Duration.millis(120), b);
+        st.setFromX(1.0);
+        st.setFromY(1.0);
+        st.setToX(0.92);
+        st.setAutoReverse(true);
+        st.setCycleCount(2);
+        st.play();
+    }
+
     private String getSelectedMedicineName() {
         String v = (medicineName_combo == null) ? null : medicineName_combo.getValue();
         return (v == null) ? "" : v.trim();
@@ -2210,6 +2484,8 @@ public class DoctorController {
             }
         }, "doc-complete").start();
     }
+
+
 
     private void openPrescription(AppointmentRow row) {
         showInfo("Prescription", "Open prescription composer for: " + row.getPatientName() +
@@ -2350,7 +2626,5 @@ public class DoctorController {
         public void setUserId(long v) { userId.set(v); }
         public LongProperty userIdProperty() { return userId; }
     }
-
-
 }
 

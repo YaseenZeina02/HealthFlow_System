@@ -280,6 +280,52 @@ public class AppointmentJdbcDAO {
         }
     }
 
+    /** All appointments (any status) for a given calendar day, Asia/Gaza local date, for Reception dashboard. */
+    public static java.util.List<com.example.healthflow.dao.DoctorDAO.AppointmentRow>
+    listByDateAll(java.time.LocalDate day) throws java.sql.SQLException {
+        final String sql = """
+        SELECT 
+            a.id,
+            a.doctor_id,
+            a.patient_id,
+            a.appointment_date AS start_at,
+            udoc.full_name  AS doctor_name,
+            up.full_name    AS patient_name,
+            a.status::text  AS status,
+            d.specialty     AS specialty,
+            a.location      AS location
+        FROM appointments a
+        JOIN doctors d  ON d.id = a.doctor_id
+        JOIN users udoc ON udoc.id = d.user_id
+        JOIN patients p ON p.id = a.patient_id
+        JOIN users up   ON up.id = p.user_id
+        WHERE (a.appointment_date AT TIME ZONE 'Asia/Gaza')::date = ?
+        ORDER BY a.appointment_date
+    """;
+        try (var c = com.example.healthflow.db.Database.get();
+             var ps = c.prepareStatement(sql)) {
+            ps.setObject(1, day);
+            try (var rs = ps.executeQuery()) {
+                var rows = new java.util.ArrayList<com.example.healthflow.dao.DoctorDAO.AppointmentRow>();
+                while (rs.next()) {
+                    var r = new com.example.healthflow.dao.DoctorDAO.AppointmentRow(
+                            rs.getLong("id"),
+                            rs.getLong("doctor_id"),
+                            rs.getLong("patient_id"),
+                            rs.getObject("start_at", java.time.OffsetDateTime.class),
+                            rs.getString("doctor_name"),
+                            rs.getString("patient_name"),
+                            rs.getString("specialty"),
+                            rs.getString("status")
+                    );
+                    r.location = rs.getString("location");
+                    rows.add(r);
+                }
+                return rows;
+            }
+        }
+    }
+
     /** عدد الأطباء الذين لديهم مواعيد في تاريخ محدد */
     public static int countDoctorsOnDate(java.time.LocalDate day) throws SQLException {
         final String sql = "SELECT COUNT(DISTINCT doctor_id) FROM appointments WHERE appointment_date::date = ?";
