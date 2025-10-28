@@ -232,6 +232,53 @@
 /*    -fx-border-color: #159399;*/
 /*}*/
 
+/*--------------------------------------------- */
+.date-picker.boxDataPickar {
+    -fx-background-color: white;
+    -fx-background-radius: 12;
+    -fx-border-color: #1aa3a8;
+    -fx-border-width: 1;
+    -fx-border-radius: 12;
+    -fx-padding: 0;
+}
+
+/* خلي حقل النص شفاف داخل الإطار العام */
+.date-picker.boxDataPickar > .text-field {
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+    -fx-border-width: 0;
+    -fx-padding: 6 8 6 10;
+    -fx-font-size: 14px;
+    -fx-text-fill: #222;
+    -fx-prompt-text-fill: #9aa3a7;
+}
+
+/* زر التقويم بدون أي خط فاصل */
+.date-picker.boxDataPickar > .arrow-button {
+    -fx-background-color: transparent;
+    -fx-background-radius: 0 12 12 0;
+    -fx-border-color: transparent;  /* إزالة الخط العمودي */
+    -fx-border-width: 0;
+    -fx-padding: 0 10;
+    -fx-cursor: hand;
+}
+
+.date-picker.boxDataPickar > .arrow-button:hover {
+    -fx-background-color: rgba(26,163,168,0.08);
+}
+
+/* تأثير عند الفوكس */
+.date-picker.boxDataPickar:focused {
+    -fx-border-color: #0e7c80;
+    -fx-effect: dropshadow(gaussian, rgba(14,124,128,0.25), 8, 0.25, 0, 0);
+}
+
+/* تحسين مظهر نافذة التقويم */
+.date-picker-popup .month-year-pane .label { -fx-font-weight: 600; }
+.date-picker .cell { -fx-padding: 6; }
+.date-picker .selected { -fx-background-color: #0e7c80; -fx-text-fill: white; }
+.date-picker .today { -fx-background-color: rgba(26,163,168,0.15); }
+/*--------------------------------------------- */
 /* ComboBox */
 .combo-box.box > .arrow-button {
     -fx-background-color: transparent;
