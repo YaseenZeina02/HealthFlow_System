@@ -21,7 +21,7 @@
 <?import javafx.scene.text.Font?>
 <?import org.kordamp.ikonli.javafx.FontIcon?>
 
-<StackPane fx:id="rootPane" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="600.0" prefWidth="1100.0" stylesheets="@../Design/ReceptionDesign.css" xmlns="http://javafx.com/javafx/19" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.example.healthflow.controllers.ReceptionController">
+<StackPane fx:id="rootPane" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="600.0" prefWidth="1100.0" stylesheets="@../Design/ReceptionDesign.css" xmlns="http://javafx.com/javafx/23.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.example.healthflow.controllers.ReceptionController">
 
     <children>
         <AnchorPane prefHeight="200.0" prefWidth="200.0">
@@ -34,7 +34,7 @@
                             <children>
                                 <AnchorPane prefHeight="40.0" prefWidth="210.0" stylesheets="@../Design/ReceptionDesign.css">
                                     <children>
-                                        <Label layoutX="54.0" layoutY="8.0" prefHeight="23.0" prefWidth="130.0" text="HelthFLow System" textFill="WHITE">
+                                        <Label layoutX="54.0" layoutY="8.0" prefHeight="23.0" prefWidth="130.0" text="HealthFlow System" textFill="WHITE">
                                             <font>
                                                 <Font size="15.0" />
                                             </font>
@@ -140,11 +140,6 @@
                                     <children>
 
                                         <AnchorPane layoutY="184.8" prefHeight="360.0" prefWidth="600.0" stylesheets="@../Design/ReceptionDesign.css" AnchorPane.bottomAnchor="14.0" AnchorPane.leftAnchor="11.0" AnchorPane.rightAnchor="273.0" AnchorPane.topAnchor="185.0">
-                                            <styleClass>
-                                                <String fx:value="white-bg" />
-                                                <String fx:value="radius" />
-                                                <String fx:value="shadow" />
-                                            </styleClass>
                                             <children>
                                                 <Label layoutX="15.0" layoutY="18.0" styleClass="header-top" stylesheets="@../Design/ReceptionDesign.css" text="Appointment Details" AnchorPane.topAnchor="14.0">
                                                     <font>
@@ -166,10 +161,15 @@
                                                         <TableView fx:constant="CONSTRAINED_RESIZE_POLICY" />
                                                     </columnResizePolicy>
                                                 </TableView>
-                                                <TextField fx:id="searchAppointmentDach" layoutX="321.0" layoutY="7.0" prefHeight="0.0" prefWidth="130.0" promptText="search" styleClass="box" AnchorPane.rightAnchor="154.19999999999993" AnchorPane.topAnchor="7.0" />
-                                                <Button fx:id="clearSelectionDach" layoutX="244.0" layoutY="10.0" mnemonicParsing="false" prefHeight="20.0" prefWidth="60.0" styleClass="btn-2" stylesheets="@../Design/ReceptionDesign.css" text="Clear" AnchorPane.rightAnchor="301.5999999999999" AnchorPane.topAnchor="10.0" />
-                                                <DatePicker fx:id="dataPickerDashboard" cache="true" layoutX="461.0" layoutY="9.0" minHeight="-Infinity" prefHeight="30.0" prefWidth="130.0" styleClass="box" AnchorPane.rightAnchor="14.199999999999932" />
+                                                <TextField fx:id="searchAppointmentDach" layoutX="394.0" layoutY="6.0" prefHeight="0.0" prefWidth="130.0" promptText="search" styleClass="box" AnchorPane.rightAnchor="81.19999999999993" AnchorPane.topAnchor="6.0" />
+                                                <Button fx:id="clearSelectionDach" layoutX="532.0" layoutY="10.0" mnemonicParsing="false" prefHeight="20.0" prefWidth="60.0" styleClass="btn-2" stylesheets="@../Design/ReceptionDesign.css" text="Clear" AnchorPane.rightAnchor="13.599999999999909" AnchorPane.topAnchor="10.0" />
+                                    <DatePicker fx:id="dataPickerDashboard" layoutX="257.0" layoutY="6.0" prefHeight="30.0" prefWidth="130.0" styleClass="boxDataPickar" AnchorPane.rightAnchor="218.19999999999993" />
                                             </children>
+                                 <styleClass>
+                                    <String fx:value="white-bg" />
+                                    <String fx:value="radius" />
+                                    <String fx:value="shadow" />
+                                 </styleClass>
                                         </AnchorPane>
 
                                         <AnchorPane layoutY="183.2" prefHeight="360.0" prefWidth="250.0" stylesheets="@../Design/ReceptionDesign.css" AnchorPane.bottomAnchor="15.0" AnchorPane.rightAnchor="11.0" AnchorPane.topAnchor="183.0">
@@ -440,7 +440,7 @@
                                                         <Font name="System Bold Italic" size="20.0" />
                                                     </font>
                                                 </Label>
-                                                <DatePicker fx:id="DateOfBirthPicker" layoutX="520.0" layoutY="53.0" prefHeight="0.0" prefWidth="180.0" styleClass="box" />
+                                                <DatePicker fx:id="DateOfBirthPicker" layoutX="520.0" layoutY="61.0" prefHeight="30.0" prefWidth="180.0" styleClass="boxDataPickar" />
 
                                                 <Label layoutX="387.0" layoutY="123.0" prefHeight="30.0" prefWidth="106.0" styleClass="text-gradient" stylesheets="@../Design/ReceptionDesign.css" text="Phone">
                                                     <font>
@@ -506,7 +506,7 @@
                                                 <Button fx:id="clear_Appointments" layoutX="619.0" layoutY="366.0" mnemonicParsing="false" prefHeight="30.0" prefWidth="100.0" styleClass="btn-2" stylesheets="@../Design/ReceptionDesign.css" text="Clear" AnchorPane.bottomAnchor="14.0" AnchorPane.rightAnchor="133.0" />
                                                 <Button fx:id="deleteAppointments" layoutX="762.0" layoutY="327.0" mnemonicParsing="false" prefHeight="30.0" prefWidth="100.0" styleClass="btn-2" stylesheets="@../Design/ReceptionDesign.css" text="Delete" AnchorPane.bottomAnchor="14.0" AnchorPane.rightAnchor="20.0" />
                                                 <Button fx:id="deleteRowApptTable" layoutX="769.0" layoutY="13.0" mnemonicParsing="false" prefHeight="25.0" prefWidth="25.0" styleClass="btn-2" stylesheets="@../Design/ReceptionDesign.css" text="-" AnchorPane.rightAnchor="57.66666666666663" />
-                                                <DatePicker fx:id="dataPickerAppointment" cache="true" layoutX="627.0" layoutY="12.0" minHeight="-Infinity" prefHeight="30.0" prefWidth="130.0" styleClass="box" AnchorPane.rightAnchor="95.0" />
+                                                <DatePicker fx:id="dataPickerAppointment" cache="true" layoutX="627.0" layoutY="12.0" minHeight="-Infinity" prefHeight="30.0" prefWidth="130.0" styleClass="boxDataPickar" AnchorPane.rightAnchor="95.0" />
                                             </children>
                                             <styleClass>
                                                 <String fx:value="white-bg" />
