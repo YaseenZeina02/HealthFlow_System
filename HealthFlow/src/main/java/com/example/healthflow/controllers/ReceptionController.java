@@ -677,23 +677,21 @@ public class ReceptionController {
         setupAppointmentSlotsListener();
         wireDashboardAppointmentsSearch();
         wireDashboardAppointmentsSearchDP();
-//        wireAppointmentDateFilter();      // لاستخدام datePiker مهم
-        // === Dashboard table wiring ===
+        wireAppointmentDateFilter();      // لاستخدام datePiker مهم
         wireDashboardTable();
-
 
         if (dataPickerDashboard != null && dataPickerDashboard.getValue() == null) {
             dataPickerDashboard.setValue(LocalDate.now());
         }
+        reloadDashboardAppointments();
+
         if (appointmentStatusChart != null) refreshAppointmentStatusChart(dataPickerDashboard.getValue());
         if (dataPickerDashboard != null) {
             dataPickerDashboard.valueProperty().addListener((obs, oldD, newD) -> {
+                reloadDashboardAppointments(); // عشان يعرض بيانات اليوم المختار
                 applyDashboardFilters();
                 refreshAppointmentStatusChart(newD);
-
                 updateAppointmentCounters();
-
-
                 if (newD != null) {
                     if (newD.isAfter(LocalDate.now())) {
                         showToast("warn", "The selected date is in the future. No appointments to show yet.");
@@ -704,6 +702,8 @@ public class ReceptionController {
             });
         }
         // Ensure dashboard initially shows today's appointments
+        reloadDashboardAppointments();
+
         applyDashboardFilters();
         if (appointmentStatusChart != null && dataPickerDashboard != null) {
             refreshAppointmentStatusChart(dataPickerDashboard.getValue());
@@ -2712,9 +2712,50 @@ public class ReceptionController {
                 : java.time.LocalDate.now();
         try {
             var rows = com.example.healthflow.dao.AppointmentJdbcDAO.listByDateAll(sel);
-            dashBase.setAll(rows);   // <<<< المهم
+            // Ensure mutation happens on FX thread
+            Platform.runLater(() -> {
+                dashBase.setAll(rows == null ? java.util.List.of() : rows); // حماية من null
+                applyDashboardFilters();  // فلاتر البحث فقط (بدون فلترة تاريخ هنا)
+                if (TableAppInDashboard != null) {
+                    LocalDate shown = (dataPickerDashboard != null && dataPickerDashboard.getValue() != null)
+                            ? dataPickerDashboard.getValue() : sel;
+                    if (rows == null || rows.isEmpty()) {
+                        TableAppInDashboard.setPlaceholder(new Label("No appointments on " + shown));
+                    } else {
+                        TableAppInDashboard.setPlaceholder(new Label(""));
+                    }
+                    TableAppInDashboard.refresh();
+                }
+            });
+            System.out.println("[ReceptionController] reloadDashboardAppointments sel=" + sel + " rows=" + (rows == null ? 0 : rows.size()));
         } catch (Exception ex) {
             System.err.println("[ReceptionController] reloadDashboardAppointments error: " + ex);
+            Platform.runLater(() -> {
+                if (TableAppInDashboard != null) TableAppInDashboard.setPlaceholder(new Label("Failed to load"));
+            });
+        }
+    }
+
+    // -- Dashboard DatePicker wiring: today by default + reload on change
+    private void wireDashboardDatePicker() {
+        if (dataPickerDashboard != null && dataPickerDashboard.getValue() == null) {
+            dataPickerDashboard.setValue(java.time.LocalDate.now());
+        }
+        if (dataPickerDashboard != null) {
+            dataPickerDashboard.valueProperty().addListener((obs, oldD, newD) -> {
+                reloadDashboardAppointments();
+                updateAppointmentCounters();
+                updatePatientDetailsChart();
+                applyDashboardFilters();
+            });
+        }
+        if (dataPickerDashboard != null) {
+            dataPickerDashboard.setOnAction(e -> {
+                reloadDashboardAppointments();
+                updateAppointmentCounters();
+                updatePatientDetailsChart();
+                applyDashboardFilters();
+            });
         }
     }
 
@@ -2885,10 +2926,10 @@ public class ReceptionController {
     // ===== Dashboard table: columns & actions =====
     private void wireDashboardTable() {
         if (TableAppInDashboard == null) return;
-
         // ✅ نستخدم UNCONSTRAINED_RESIZE_POLICY لتمكين الـ H-Scroll عند زيادة مجموع عرض الأعمدة
         TableAppInDashboard.setColumnResizePolicy(TableView.UNCONSTRAINED_RESIZE_POLICY);
         TableAppInDashboard.setItems(dashSorted);
+        TableAppInDashboard.setPlaceholder(new Label("Loading..."));
         dashSorted.comparatorProperty().bind(TableAppInDashboard.comparatorProperty());
 
         // -------- Appointment ID (index shown 1..n) --------
@@ -3015,7 +3056,6 @@ public class ReceptionController {
 
         // لا نطبق أي عمليات ثقيلة هنا
         reloadDashboardAppointments();
-
         applyDashboardFilters();
     }
 
@@ -3033,17 +3073,39 @@ public class ReceptionController {
         applyDashboardFilters();
     }
 
+    //    private void applyDashboardFilters() {
+    //        String q = (searchAppointmentDach == null || searchAppointmentDach.getText() == null)
+    //                ? "" : searchAppointmentDach.getText().trim().toLowerCase();
+    //        LocalDate sel = (dataPickerDashboard == null) ? null : dataPickerDashboard.getValue();
+    //
+    //        dashFiltered.setPredicate(r -> {            // date filter
+    //            LocalDateTime ldt = toLocal(r.startAt);
+    //            if (sel != null) {
+    //                if (ldt == null || !ldt.toLocalDate().equals(sel)) return false;
+    //            }
+    //            // search filter across multiple fields
+    //            if (q.isEmpty()) return true;
+    //            return (r.patientName != null && r.patientName.toLowerCase().contains(q)) ||
+    //                    (r.doctorName != null && r.doctorName.toLowerCase().contains(q)) ||
+    //                    (r.specialty != null && r.specialty.toLowerCase().contains(q)) ||
+    //                    (r.location != null && r.location.toLowerCase().contains(q)) ||
+    //                    (String.valueOf(r.id).contains(q));
+    //        });
+    //
+    //        if (TableAppInDashboard != null) {
+    //            TableAppInDashboard.refresh();
+    //            if (sel != null && TableAppInDashboard.getItems().isEmpty()) {
+    //                // messages handled on date listener
+    //            }
+    //        }
+    //    }
+
     private void applyDashboardFilters() {
         String q = (searchAppointmentDach == null || searchAppointmentDach.getText() == null)
                 ? "" : searchAppointmentDach.getText().trim().toLowerCase();
-        LocalDate sel = (dataPickerDashboard == null) ? null : dataPickerDashboard.getValue();
 
-        dashFiltered.setPredicate(r -> {            // date filter
-            LocalDateTime ldt = toLocal(r.startAt);
-            if (sel != null) {
-                if (ldt == null || !ldt.toLocalDate().equals(sel)) return false;
-            }
-            // search filter across multiple fields
+        dashFiltered.setPredicate(r -> {
+            // 🔎 search only; date filtering is already handled by reloadDashboardAppointments()
             if (q.isEmpty()) return true;
             return (r.patientName != null && r.patientName.toLowerCase().contains(q)) ||
                     (r.doctorName != null && r.doctorName.toLowerCase().contains(q)) ||
@@ -3054,13 +3116,8 @@ public class ReceptionController {
 
         if (TableAppInDashboard != null) {
             TableAppInDashboard.refresh();
-            if (sel != null && TableAppInDashboard.getItems().isEmpty()) {
-                // messages handled on date listener
-            }
         }
     }
-//    }
-
     /**
      * تحديث مخطط حالات المواعيد حسب تاريخ محدد (BarChart)
      */
@@ -3107,29 +3164,62 @@ public class ReceptionController {
 //            });
 
             Platform.runLater(() -> {
+                // Reset & disable animations to avoid label glitches
+                appointmentStatusChart.setAnimated(false);
                 appointmentStatusChart.getData().clear();
+                appointmentStatusChart.setLegendVisible(false); // save space
 
-                // 🔒 ثبّت فئات المحور X على المطلوب فقط
-                if (appointmentStatusChart.getXAxis() instanceof javafx.scene.chart.CategoryAxis cat) {
+                // ---- X Axis (Category) – use short labels to fit space ----
+                final String[] ORDER_FULL   = {"SCHEDULED", "COMPLETED", "CANCELLED"};
+                final String[] ORDER_SHORT  = {"SCHED.",   "COMP.",     "CANCEL."};
+
+                if (appointmentStatusChart.getXAxis() instanceof CategoryAxis cat) {
+                    cat.setAnimated(false);
                     cat.setAutoRanging(false);
-                    cat.setCategories(FXCollections.observableArrayList(
-                            "SCHEDULED", "COMPLETED", "CANCELLED"
-                    ));
-                }
-                // (اختياري) تأكد من AutoRange لمحور Y
-                if (appointmentStatusChart.getYAxis() instanceof javafx.scene.chart.NumberAxis y) {
-                    y.setAutoRanging(true);
-                    y.setLowerBound(0);
+                    cat.setCategories(FXCollections.observableArrayList(ORDER_SHORT));
+                    cat.setTickLabelRotation(0);
+                    cat.setTickLabelGap(2);
+                    cat.setStartMargin(8);
+                    cat.setEndMargin(8);
+                    cat.setStyle("-fx-tick-label-font-size: 12px;");
                 }
 
+                // ---- Y Axis (Number) – integer counts from 0 .. max ----
+                int maxVal = Math.max(
+                        Math.max(dataMap.getOrDefault("SCHEDULED", 0),
+                                 dataMap.getOrDefault("COMPLETED", 0)),
+                        dataMap.getOrDefault("CANCELLED", 0)
+                );
+                int upper = Math.max(1, maxVal); // keep baseline visible when all zeros
+                if (appointmentStatusChart.getYAxis() instanceof javafx.scene.chart.NumberAxis y) {
+                    y.setAnimated(false);
+                    y.setAutoRanging(false);
+                    y.setLowerBound(0);
+                    y.setUpperBound(upper);
+                    y.setTickUnit(1);
+                    y.setForceZeroInRange(true);
+                }
+
+                // ---- Build the series (map full keys -> short labels) ----
                 XYChart.Series<String, Number> series = new XYChart.Series<>();
                 series.setName(dayFinal.toString());
 
-                // ✅ لا نعرض إلا هذه الثلاثة فقط
-                String[] order = {"SCHEDULED", "COMPLETED", "CANCELLED"};
-                for (String key : order) {
-                    int v = dataMap.getOrDefault(key, 0);
-                    series.getData().add(new XYChart.Data<>(key, v));
+                for (int i = 0; i < ORDER_FULL.length; i++) {
+                    String full  = ORDER_FULL[i];
+                    String shortL = ORDER_SHORT[i];
+                    int v = dataMap.getOrDefault(full, 0);
+
+                    XYChart.Data<String, Number> d = new XYChart.Data<>(shortL, v);
+                    series.getData().add(d);
+
+                    // Add tooltip when Node becomes available
+                    d.nodeProperty().addListener((o, oldNode, newNode) -> {
+                        if (newNode != null) {
+                            Tooltip.install(newNode, new Tooltip(
+                                    (full.charAt(0) + full.substring(1).toLowerCase()) + ": " + v
+                            ));
+                        }
+                    });
                 }
 
                 appointmentStatusChart.getData().add(series);
@@ -3138,3 +3228,10 @@ public class ReceptionController {
         }, "appt-status-chart").start();
     }
 }
+    // =======================
+    // Controller initialization (add wireDashboardDatePicker to the wiring section)
+    // =======================
+    // (Assuming a method like initialize() exists, insert wiring call)
+    // (You may need to find the actual initialize() method in the file and add the following line
+    //   wireDashboardDatePicker();
+    //   right after other wire... calls)

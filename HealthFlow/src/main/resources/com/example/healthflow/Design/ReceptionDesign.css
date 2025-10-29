@@ -497,8 +497,43 @@
 /*}*/
 
 
-.chart-bar {
-    -fx-bar-fill: #F2742B;
+/* CHART CSS */
+/* Scheduled – برتقالي مائل للذهبي */
+.chart-bar.data0 {
+    -fx-bar-fill: #f39c12;
+}
+
+/* Completed – أخضر صحي وواضح */
+.chart-bar.data1 {
+    -fx-bar-fill: #27ae60;
+}
+
+/* Cancelled – رمادي محايد */
+.chart-bar.data2 {
+    -fx-bar-fill: #95a5a6;
+}
+
+/* تحسين المظهر العام */
+.chart-plot-background {
+    -fx-background-color: transparent;
+}
+
+.axis-label, .chart-title {
+    -fx-text-fill: #2c3e50;
+    -fx-font-weight: bold;
+}
+
+.chart-legend {
+    -fx-background-color: rgba(255, 255, 255, 0.8);
+    -fx-background-radius: 8;
+    -fx-padding: 4 8;
+    -fx-border-color: #ddd;
+    -fx-border-radius: 8;
+}
+
+.chart-vertical-grid-lines,
+.chart-horizontal-grid-lines {
+    -fx-stroke: #ecf0f1;
 }
 .table-view .box {
     -fx-padding: 0 10;     /* حواف أفقية أقل */
