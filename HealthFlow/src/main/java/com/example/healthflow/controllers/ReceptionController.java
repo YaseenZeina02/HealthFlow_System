@@ -32,6 +32,8 @@ import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.chart.BarChart;
+import javafx.scene.chart.CategoryAxis;
+import javafx.scene.chart.NumberAxis;
 import javafx.scene.chart.XYChart;
 import javafx.scene.control.*;
 import javafx.scene.control.cell.ComboBoxTableCell;
@@ -3079,29 +3081,60 @@ public class ReceptionController {
                 e.printStackTrace();
             }
             final java.util.Map<String, Integer> dataMap = counts;
+//            Platform.runLater(() -> {
+//                appointmentStatusChart.getData().clear();
+//                XYChart.Series<String, Number> series = new XYChart.Series<>();
+//                series.setName(dayFinal.toString());
+//
+//                // ✅ رتب الحالات المطلوبة فقط
+//                String[] order = {"SCHEDULED", "COMPLETED", "CANCELLED"};
+//                java.util.Set<String> added = new java.util.HashSet<>();
+//                for (String key : order) {
+//                    if (dataMap.containsKey(key)) {
+//                        series.getData().add(new XYChart.Data<>(key, dataMap.get(key)));
+//                        added.add(key);
+//                    }
+//                }
+//
+//                // أضف أي حالات أخرى (في حال ظهرت مستقبلاً مثل NO_SHOW)
+//                for (var e : dataMap.entrySet()) {
+//                    if (!added.contains(e.getKey())) {
+//                        series.getData().add(new XYChart.Data<>(e.getKey(), e.getValue()));
+//                    }
+//                }
+//
+//                appointmentStatusChart.getData().add(series);
+//            });
+
             Platform.runLater(() -> {
                 appointmentStatusChart.getData().clear();
+
+                // 🔒 ثبّت فئات المحور X على المطلوب فقط
+                if (appointmentStatusChart.getXAxis() instanceof javafx.scene.chart.CategoryAxis cat) {
+                    cat.setAutoRanging(false);
+                    cat.setCategories(FXCollections.observableArrayList(
+                            "SCHEDULED", "COMPLETED", "CANCELLED"
+                    ));
+                }
+                // (اختياري) تأكد من AutoRange لمحور Y
+                if (appointmentStatusChart.getYAxis() instanceof javafx.scene.chart.NumberAxis y) {
+                    y.setAutoRanging(true);
+                    y.setLowerBound(0);
+                }
+
                 XYChart.Series<String, Number> series = new XYChart.Series<>();
                 series.setName(dayFinal.toString());
 
-                // رتب الحالات بترتيب مفهوم إن توفّرت
-                String[] order = {"SCHEDULED", "CONFIRMED", "PENDING", "COMPLETED", "CANCELLED"};
-                java.util.Set<String> added = new java.util.HashSet<>();
+                // ✅ لا نعرض إلا هذه الثلاثة فقط
+                String[] order = {"SCHEDULED", "COMPLETED", "CANCELLED"};
                 for (String key : order) {
-                    if (dataMap.containsKey(key)) {
-                        series.getData().add(new XYChart.Data<>(key, dataMap.get(key)));
-                        added.add(key);
-                    }
+                    int v = dataMap.getOrDefault(key, 0);
+                    series.getData().add(new XYChart.Data<>(key, v));
                 }
-                // أضف أي حالات أخرى ظهرت في الجدول
-                for (var e : dataMap.entrySet()) {
-                    if (!added.contains(e.getKey())) {
-                        series.getData().add(new XYChart.Data<>(e.getKey(), e.getValue()));
-                    }
-                }
+
                 appointmentStatusChart.getData().add(series);
-//                appointmentStatusChart.setTitle("Appointments by status on " + dayFinal);
             });
+
         }, "appt-status-chart").start();
     }
 }

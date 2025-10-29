@@ -1279,67 +1279,35 @@ public class DoctorController {
                 ps.setLong(1, prescId);
                 try (var rs = ps.executeQuery()) {
                     while (rs.next()) {
-                        // أنشئ الصف واملأ الحقول بالضبط حسب خصائص PrescItemRow الظاهرة في الجدول
-//                        PrescItemRow r = new PrescItemRow();
-//                        r.setId(rs.getLong("id"));
-//                        r.setMedicineId((Long) rs.getObject("medicine_id"));
-//                        r.setMedicineName(rs.getString("medicine_name"));
-//                        r.setDosageText(rs.getString("dosage_display"));
-//                        r.setQuantity(rs.getInt("quantity"));
-//                        r.setStatus(rs.getString("status"));
-//                        r.setBatchId((Long) rs.getObject("batch_id"));
-//                        r.setDose((Integer) rs.getObject("dose"));
-//                        r.setFreqPerDay((Integer) rs.getObject("freq_per_day"));
-//                        r.setDurationDays((Integer) rs.getObject("duration_days"));
-//                        r.setStrength(rs.getString("strength"));
-//                        r.setForm(rs.getString("form"));
-//                        r.setRoute(rs.getString("route"));
-//                        r.setNotes(rs.getString("notes"));
                         PrescItemRow r = new PrescItemRow();
-
-// id (NOT NULL)
                         r.setId(rs.getLong("id"));
-
-// medicine_id قد تكون NULL
                         long mid = rs.getLong("medicine_id");
                         if (!rs.wasNull()) {
                             r.setMedicineId(mid);
                         }
-
                         r.setMedicineName(rs.getString("medicine_name"));
                         r.setDosageText(rs.getString("dosage_display"));
-
                         r.setQuantity(rs.getInt("quantity"));
-
                         String st = rs.getString("status");
                         if (st != null) r.setStatus(st);
-
                         long b = rs.getLong("batch_id");
                         if (!rs.wasNull()) {
                             r.setBatchId(b);
                         }
-
                         Integer doseObj = (Integer) rs.getObject("dose");
                         if (doseObj != null) r.setDose(doseObj);
-
                         Integer freqObj = (Integer) rs.getObject("freq_per_day");
                         if (freqObj != null) r.setFreqPerDay(freqObj);
-
                         Integer durObj = (Integer) rs.getObject("duration_days");
                         if (durObj != null) r.setDurationDays(durObj);
-
                         String strength = rs.getString("strength");
                         if (strength != null) r.setStrength(strength);
-
                         String form = rs.getString("form");
                         if (form != null) r.setForm(form);
-
                         String route = rs.getString("route");
                         if (route != null) r.setRoute(route);
-
                         String notes = rs.getString("notes");
                         if (notes != null) r.setNotes(notes);
-
                         rows.add(r);
                     }
                 }

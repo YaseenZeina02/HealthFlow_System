@@ -12,6 +12,10 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.time.LocalDate;
+import javafx.application.Platform;
+import javafx.concurrent.Task;
+import javafx.animation.PauseTransition;
+import javafx.scene.Cursor;
 
 import com.example.healthflow.net.ConnectivityMonitor;
 import com.example.healthflow.ui.ConnectivityBanner;
@@ -43,6 +47,20 @@ import javafx.scene.control.cell.PropertyValueFactory;
 public class PharmacyController {
 
     private final ConnectivityMonitor monitor;
+    // Controller state
+    private DashboardRow selectedRow;
+    private final ObservableList<DashboardRow> dashboardRows = FXCollections.observableArrayList();
+    private final ObservableList<PrescItemRow> itemRows = FXCollections.observableArrayList();
+
+    /* ====== Utilities / constants (match DoctorController style) ====== */
+    private static final java.time.ZoneId APP_TZ = java.time.ZoneId.of("Asia/Gaza");
+    private static final String ACTIVE_CLASS = "current";
+
+    // ===== Dashboard loading state & debounce =====
+    private volatile boolean dashboardLoading = false;
+    private LocalDate lastLoadedDate = null;
+    private PauseTransition dpDebounce;
+
 
     @FXML
     private VBox rootPane;
@@ -257,10 +275,6 @@ public class PharmacyController {
     @FXML
     private TableColumn<DashboardRow, String> colprescriptionStutus;
 
-    // Controller state
-    private DashboardRow selectedRow;
-    private final ObservableList<DashboardRow> dashboardRows = FXCollections.observableArrayList();
-    private final ObservableList<PrescItemRow> itemRows = FXCollections.observableArrayList();
 
     @FXML
     private TextField deductBatchNumber;
@@ -307,10 +321,12 @@ public class PharmacyController {
     @FXML
     private Label welcomeUser;
 
-
-    /* ====== Utilities / constants (match DoctorController style) ====== */
-    private static final java.time.ZoneId APP_TZ = java.time.ZoneId.of("Asia/Gaza");
-    private static final String ACTIVE_CLASS = "current";
+    private static final class DashboardData {
+        int total;
+        int waiting;
+        int completed;
+        java.util.List<PrescriptionDAO.DashboardRow> rows;
+    }
 
     private void setVisibleManaged(javafx.scene.Node node, boolean value) {
         if (node != null) {
@@ -349,7 +365,7 @@ public class PharmacyController {
     }
 
     // Resolve pharmacist/user display names and support both users.id and pharmacists.id in UserIdLabel.
-// Resolve pharmacist/user labels from the authenticated session FIRST; then fall back to labels/DB.
+    // Resolve pharmacist/user labels from the authenticated session FIRST; then fall back to labels/DB.
     private void resolveLoggedInUserLabels() {
         try {
             String full = null;
@@ -537,26 +553,114 @@ public class PharmacyController {
     }
 
     /* ====== Section switching (Dashboard / Prescriptions / Inventory) ====== */
+    //    private void showDashboardPane() {
+    //        setVisibleManaged(pharmacyDashboardAnchorPane, true);
+    //        setVisibleManaged(PrescriptionAnchorPane, false);
+    //        setVisibleManaged(InventoryAnchorPane, false);
+    //        if (DashboardButton != null) markNavActive(DashboardButton);
+    //        refreshPharmacyDashboardCounts();
+    //        loadDashboardTable();
+    //    }
+
+
+    //    private void loadDashboardTable() {
+    //        if (PresciptionsTable == null) return;
+    //        dashboardRows.clear();
+    //        LocalDate day = getSelectedDateOrToday();
+    //        try (Connection c = Database.get()) {
+    //            PrescriptionDAO dao = new PrescriptionDAO();
+    //            dashboardRows.addAll(dao.listDashboardRowsByDate(c, day));
+    //        } catch (Exception ex) {
+    //            System.err.println("[PharmacyController] loadDashboardTable error: " + ex);
+    //        }
+    //        PresciptionsTable.setItems(dashboardRows);
+    //    }
+
     private void showDashboardPane() {
         setVisibleManaged(pharmacyDashboardAnchorPane, true);
         setVisibleManaged(PrescriptionAnchorPane, false);
         setVisibleManaged(InventoryAnchorPane, false);
         if (DashboardButton != null) markNavActive(DashboardButton);
-        refreshPharmacyDashboardCounts();
-        loadDashboardTable();
+        loadDashboardAsync(false);
     }
     private void loadDashboardTable() {
-        if (PresciptionsTable == null) return;
-        dashboardRows.clear();
-        LocalDate day = getSelectedDateOrToday();
-        try (Connection c = Database.get()) {
-            PrescriptionDAO dao = new PrescriptionDAO();
-            dashboardRows.addAll(dao.listDashboardRowsByDate(c, day));
-        } catch (Exception ex) {
-            System.err.println("[PharmacyController] loadDashboardTable error: " + ex);
-        }
-        PresciptionsTable.setItems(dashboardRows);
+        loadDashboardAsync(true);
     }
+    private void loadDashboardAsync(boolean force) {
+        LocalDate day = getSelectedDateOrToday();
+        if (!force && lastLoadedDate != null && lastLoadedDate.equals(day) && !dashboardRows.isEmpty()) {
+            return; // already loaded for this day
+        }
+        if (dashboardLoading) return;
+        dashboardLoading = true;
+        lastLoadedDate = day;
+
+        if (alertLabel != null) alertLabel.setText("Loading " + day + " ...");
+        System.out.println("[PharmacyController] loadDashboardAsync start day=" + day);
+        if (PresciptionsTable != null) PresciptionsTable.setPlaceholder(new Label("Loading..."));
+
+        // Busy UI hint
+        if (rootPane != null) rootPane.setCursor(Cursor.WAIT);
+        if (DashboardButton != null && !DashboardButton.disableProperty().isBound()) {
+            DashboardButton.setDisable(true);
+        }
+
+        Task<DashboardData> task = new Task<>() {
+            @Override protected DashboardData call() throws Exception {
+                DashboardData data = new DashboardData();
+                try (Connection c = Database.get()) {
+                    PrescriptionDAO dao = new PrescriptionDAO();
+                    data.total     = dao.countTotalOnDate(c, day);
+                    data.waiting   = dao.countPendingOnDate(c, day);
+                    data.completed = dao.countCompletedOnDate(c, day);
+                    data.rows      = dao.listDashboardRowsByDate(c, day);
+                }
+                return data;
+            }
+        };
+
+        task.setOnSucceeded(ev -> {
+            DashboardData d = task.getValue();
+            System.out.println("[PharmacyController] loadDashboardAsync SUCCESS day=" + lastLoadedDate
+                    + " rows=" + (d == null || d.rows == null ? 0 : d.rows.size()));
+
+            // Update counts
+            if (d != null) {
+                if (PrescriptionsTodayTotal != null)   PrescriptionsTodayTotal.setText(String.valueOf(d.total));
+                if (PrescriptionsWatingNum != null)    PrescriptionsWatingNum.setText(String.valueOf(d.waiting));
+                if (PrescriptionsCompleteNum != null)  PrescriptionsCompleteNum.setText(String.valueOf(d.completed));
+                // Update table
+                dashboardRows.setAll(d.rows == null ? java.util.Collections.emptyList() : d.rows);
+            }
+            if (PresciptionsTable != null) PresciptionsTable.setPlaceholder(new Label(dashboardRows.isEmpty() ? "No data" : ""));
+
+            // Finalize UI state
+            dashboardLoading = false;
+            if (rootPane != null) rootPane.setCursor(Cursor.DEFAULT);
+            if (DashboardButton != null && !DashboardButton.disableProperty().isBound()) {
+                DashboardButton.setDisable(false);
+            }
+        });
+
+        task.setOnFailed(ev -> {
+            Throwable ex = task.getException();
+            System.err.println("[PharmacyController] loadDashboardAsync FAILED day=" + lastLoadedDate + " ex=" + ex);
+            if (alertLabel != null) alertLabel.setText("Failed to load dashboard: " + (ex == null ? "Unknown error" : ex.getMessage()));
+            if (PresciptionsTable != null) PresciptionsTable.setPlaceholder(new Label("Failed to load"));
+
+            // Finalize UI state
+            dashboardLoading = false;
+            if (rootPane != null) rootPane.setCursor(Cursor.DEFAULT);
+            if (DashboardButton != null && !DashboardButton.disableProperty().isBound()) {
+                DashboardButton.setDisable(false);
+            }
+        });
+
+        Thread th = new Thread(task, "pharm-dashboard-loader");
+        th.setDaemon(true);
+        th.start();
+    }
+
 
     private void setupDashboardTableColumns() {
         if (PresciptionsTable == null) return;
@@ -808,7 +912,8 @@ public class PharmacyController {
                 if (txt == null || txt.isBlank()) txt = cd.getValue().getDosage();
                 return new javafx.beans.property.SimpleStringProperty(txt == null ? "" : txt);
             });
-        }        if (colQuantity != null) colQuantity.setCellValueFactory(new PropertyValueFactory<>("quantity"));
+        }
+        if (colQuantity != null) colQuantity.setCellValueFactory(new PropertyValueFactory<>("quantity"));
         if (colStock != null) colStock.setCellValueFactory(new PropertyValueFactory<>("stockAvailable"));
         if (colItemStatus != null) colItemStatus.setCellValueFactory(new PropertyValueFactory<>("status"));
         if (colPresesItemAction != null) {
@@ -1019,22 +1124,31 @@ public class PharmacyController {
             setVisibleManaged(PrescriptionMedicationAnchorPane, true);
     }
 
+    //    private void showInventoryPane() {
+    //        setVisibleManaged(pharmacyDashboardAnchorPane, false);
+    //        setVisibleManaged(PrescriptionAnchorPane, false);
+    //        setVisibleManaged(InventoryAnchorPane, true);
+    //        markNavActive(InventoryButton);
+    //        // Ensure a default inventory mode
+    //        if (btnReceive != null) {
+    //            btnReceive.setSelected(true);
+    ////            showInventoryMode(true);
+    //            lastSelectedInvBtn = btnReceive;
+    //        }
+    //        if (segInv != null) {
+    //            // ensure the segmented control actually contains our toggles
+    //            if (!segInv.getButtons().contains(btnReceive) && btnReceive != null) segInv.getButtons().add(btnReceive);
+    //            if (!segInv.getButtons().contains(btnDeduct)  && btnDeduct  != null) segInv.getButtons().add(btnDeduct);
+    //        }
+    //    }
+
     private void showInventoryPane() {
         setVisibleManaged(pharmacyDashboardAnchorPane, false);
         setVisibleManaged(PrescriptionAnchorPane, false);
         setVisibleManaged(InventoryAnchorPane, true);
         markNavActive(InventoryButton);
-        // Ensure a default inventory mode
-        if (btnReceive != null) {
-            btnReceive.setSelected(true);
-//            showInventoryMode(true);
-            lastSelectedInvBtn = btnReceive;
-        }
-        if (segInv != null) {
-            // ensure the segmented control actually contains our toggles
-            if (!segInv.getButtons().contains(btnReceive) && btnReceive != null) segInv.getButtons().add(btnReceive);
-            if (!segInv.getButtons().contains(btnDeduct)  && btnDeduct  != null) segInv.getButtons().add(btnDeduct);
-        }
+        // تأكد أن التوصيلات سليمة وتنعكس على الواجهة
+        wireInventoryToggles();
     }
 
     /* ====== Inventory Receive vs Deduct (like segmented behavior) ====== */
@@ -1053,53 +1167,107 @@ public class PharmacyController {
     }
 
 
-    private void wireInventoryToggles() {
-        invToggleGroup = new ToggleGroup();
-        if (btnReceive != null) btnReceive.setToggleGroup(invToggleGroup);
-        if (btnDeduct != null)  btnDeduct.setToggleGroup(invToggleGroup);
+    //    private void wireInventoryToggles() {
+    //        invToggleGroup = new ToggleGroup();
+    //        if (btnReceive != null) btnReceive.setToggleGroup(invToggleGroup);
+    //        if (btnDeduct != null)  btnDeduct.setToggleGroup(invToggleGroup);
+    //
+    //        // Prevent deselection of the currently selected toggle by clicking it again
+    //        if (btnReceive != null) {
+    //            btnReceive.addEventFilter(MouseEvent.MOUSE_PRESSED, e -> {
+    //                if (btnReceive.isSelected()) e.consume();
+    //            });
+    //        }
+    //        if (btnDeduct != null) {
+    //            btnDeduct.addEventFilter(MouseEvent.MOUSE_PRESSED, e -> {
+    //                if (btnDeduct.isSelected()) e.consume();
+    //            });
+    //        }
+    //
+    //        // default & listener
+    //        if (btnReceive != null) {
+    //            btnReceive.setSelected(true);
+    ////            showInventoryMode(true);
+    //        }
+    //
+    //        if (btnDeduct != null) {
+    //            btnDeduct.setSelected(true);
+    ////            showInventoryMode(false);
+    //        }
+    //
+    ////
+    //        // Remember last selected; if selection becomes null, restore last
+    //        if (invToggleGroup != null) {
+    //            lastSelectedInvBtn = btnReceive != null ? btnReceive : btnDeduct;
+    //            invToggleGroup.selectedToggleProperty().addListener((obs, oldT, newT) -> {
+    //                if (newT == null) {
+    //                    if (lastSelectedInvBtn != null) invToggleGroup.selectToggle(lastSelectedInvBtn);
+    //                    return;
+    //                }
+    //                if (newT instanceof ToggleButton tb) {
+    //                    lastSelectedInvBtn = tb;
+    //                }
+    //            });
+    //        }
+    //        if (segInv != null) {
+    //            if (btnReceive != null && !segInv.getButtons().contains(btnReceive)) segInv.getButtons().add(btnReceive);
+    //            if (btnDeduct  != null && !segInv.getButtons().contains(btnDeduct))  segInv.getButtons().add(btnDeduct);
+    //        }
+    //    }
 
-        // Prevent deselection of the currently selected toggle by clicking it again
-        if (btnReceive != null) {
-            btnReceive.addEventFilter(MouseEvent.MOUSE_PRESSED, e -> {
-                if (btnReceive.isSelected()) e.consume();
-            });
-        }
-        if (btnDeduct != null) {
-            btnDeduct.addEventFilter(MouseEvent.MOUSE_PRESSED, e -> {
-                if (btnDeduct.isSelected()) e.consume();
-            });
-        }
+private void wireInventoryToggles() {
+    invToggleGroup = new ToggleGroup();
+    if (btnReceive != null) btnReceive.setToggleGroup(invToggleGroup);
+    if (btnDeduct != null)  btnDeduct.setToggleGroup(invToggleGroup);
 
-        // default & listener
-        if (btnReceive != null) {
-            btnReceive.setSelected(true);
-//            showInventoryMode(true);
-        }
-
-        if (btnDeduct != null) {
-            btnDeduct.setSelected(true);
-//            showInventoryMode(false);
-        }
-
-//
-        // Remember last selected; if selection becomes null, restore last
-        if (invToggleGroup != null) {
-            lastSelectedInvBtn = btnReceive != null ? btnReceive : btnDeduct;
-            invToggleGroup.selectedToggleProperty().addListener((obs, oldT, newT) -> {
-                if (newT == null) {
-                    if (lastSelectedInvBtn != null) invToggleGroup.selectToggle(lastSelectedInvBtn);
-                    return;
-                }
-                if (newT instanceof ToggleButton tb) {
-                    lastSelectedInvBtn = tb;
-                }
-            });
-        }
-        if (segInv != null) {
-            if (btnReceive != null && !segInv.getButtons().contains(btnReceive)) segInv.getButtons().add(btnReceive);
-            if (btnDeduct  != null && !segInv.getButtons().contains(btnDeduct))  segInv.getButtons().add(btnDeduct);
-        }
+    // امنع إلغاء التحديد بالضغط على الزر المحدد
+    if (btnReceive != null) {
+        btnReceive.addEventFilter(MouseEvent.MOUSE_PRESSED, e -> {
+            if (btnReceive.isSelected()) e.consume();
+        });
     }
+    if (btnDeduct != null) {
+        btnDeduct.addEventFilter(MouseEvent.MOUSE_PRESSED, e -> {
+            if (btnDeduct.isSelected()) e.consume();
+        });
+    }
+
+    // تأكد أن الـ SegmentedButton يحتوي أزرارنا
+    if (segInv != null) {
+        if (btnReceive != null && !segInv.getButtons().contains(btnReceive)) segInv.getButtons().add(btnReceive);
+        if (btnDeduct  != null && !segInv.getButtons().contains(btnDeduct))  segInv.getButtons().add(btnDeduct);
+    }
+
+    // الوضع الافتراضي = Receive
+    if (btnReceive != null) btnReceive.setSelected(true);
+    if (btnDeduct  != null) btnDeduct.setSelected(false);
+    lastSelectedInvBtn = (btnReceive != null) ? btnReceive : btnDeduct;
+
+    // أظهر البانل المناسب بدايةً
+    if (btnReceive != null && btnReceive.isSelected()) {
+        showInventoryReceiveMode();
+    } else {
+        showInventoryDeductMode();
+    }
+
+    // بدّل البانلز عند تغيير الاختيار + لا تسمح بـ null
+    if (invToggleGroup != null) {
+        invToggleGroup.selectedToggleProperty().addListener((obs, oldT, newT) -> {
+            if (newT == null) {
+                if (lastSelectedInvBtn != null) invToggleGroup.selectToggle(lastSelectedInvBtn);
+                return;
+            }
+            if (newT == btnReceive) {
+                showInventoryReceiveMode();
+            } else if (newT == btnDeduct) {
+                showInventoryDeductMode();
+            }
+            if (newT instanceof ToggleButton tb) {
+                lastSelectedInvBtn = tb;
+            }
+        });
+    }
+}
 
     public PharmacyController(ConnectivityMonitor monitor) {
         this.monitor = monitor;
@@ -1127,8 +1295,8 @@ public class PharmacyController {
         resolveLoggedInUserLabels();
 
         if (rootPane != null) {
-//            ConnectivityBanner banner = new ConnectivityBanner(monitor);
-//            rootPane.getChildren().add(0, banner);
+    //            ConnectivityBanner banner = new ConnectivityBanner(monitor);
+    //            rootPane.getChildren().add(0, banner);
             ensureConnectivityBannerOnce();
 
             // attach shared CSS defensively
@@ -1154,12 +1322,38 @@ public class PharmacyController {
         startClock();
 
 
-        // Default the date picker to today (Asia/Gaza) and listen for changes
+        //        // Default the date picker to today (Asia/Gaza) and listen for changes
+        //        if (PrescriptionDatePicker != null) {
+        //            PrescriptionDatePicker.setValue(java.time.ZonedDateTime.now(APP_TZ).toLocalDate());
+        //            PrescriptionDatePicker.valueProperty().addListener((obs, oldV, newV) -> {
+        //                refreshPharmacyDashboardCounts();
+        //                loadDashboardTable();
+        //            });
+        //        }
+
         if (PrescriptionDatePicker != null) {
             PrescriptionDatePicker.setValue(java.time.ZonedDateTime.now(APP_TZ).toLocalDate());
+            // Debounce: تجميع تغييرات التاريخ 250ms قبل التحميل
+            dpDebounce = new PauseTransition(Duration.millis(250));
+            dpDebounce.setOnFinished(e2 -> {
+                loadDashboardAsync(true);
+            });
             PrescriptionDatePicker.valueProperty().addListener((obs, oldV, newV) -> {
-                refreshPharmacyDashboardCounts();
-                loadDashboardTable();
+                if (dpDebounce != null) {
+                    dpDebounce.stop();
+                    dpDebounce.playFromStart();
+                } else {
+                    loadDashboardAsync(true);
+                }
+            });
+            // بعض المنصات تطلق فقط ActionEvent عند اختيار اليوم
+            PrescriptionDatePicker.setOnAction(e -> {
+                if (dpDebounce != null) {
+                    dpDebounce.stop();
+                    dpDebounce.playFromStart();
+                } else {
+                    loadDashboardAsync(true);
+                }
             });
         }
 
@@ -1189,6 +1383,12 @@ public class PharmacyController {
 
         // Disable actions when offline (if OnlineBindings present)
         try { OnlineBindings.disableWhenOffline(monitor, DashboardButton, PrescriptionsButton, InventoryButton, saveBtnReceive, saveBtnDeduct); } catch (Throwable ignored) {}
+        // Prevent multiple async loads via rapid clicks (if button stays enabled from bindings)
+        if (DashboardButton != null) {
+            DashboardButton.setOnAction(e -> {
+                if (!dashboardLoading) showDashboardPane();
+            });
+        }
 
         // Inventory toggles
         wireInventoryToggles();
@@ -1205,6 +1405,8 @@ public class PharmacyController {
         }
         refreshPharmacyDashboardCounts();
         setupDashboardTableColumns();
+        if (PresciptionsTable != null) PresciptionsTable.setItems(dashboardRows);
+
         setupItemsTableColumns();
         if (TablePrescriptionItems != null) {
             TablePrescriptionItems.setColumnResizePolicy(

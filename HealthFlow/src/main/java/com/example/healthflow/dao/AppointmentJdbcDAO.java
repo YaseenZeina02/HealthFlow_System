@@ -6,7 +6,9 @@ import com.example.healthflow.model.dto.DoctorApptRow;
 import java.sql.*;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class AppointmentJdbcDAO {
 
@@ -264,20 +266,23 @@ public class AppointmentJdbcDAO {
                 WHERE (appointment_date AT TIME ZONE 'Asia/Gaza')::date = ?
                 GROUP BY status::text
                 """;
-        try (Connection c = Database.get();
-             PreparedStatement ps = c.prepareStatement(sql)) {
+        Map<String, Integer> map = new HashMap<>();
+        // ضمّن المفاتيح المطلوبة دائمًا
+        map.put("SCHEDULED", 0);
+        map.put("COMPLETED", 0);
+        map.put("CANCELLED", 0);
+
+        try (Connection c = Database.get(); PreparedStatement ps = c.prepareStatement(sql)) {
             ps.setObject(1, day);
             try (ResultSet rs = ps.executeQuery()) {
-                java.util.Map<String, Integer> map = new java.util.LinkedHashMap<>();
                 while (rs.next()) {
-                    map.put(rs.getString("status"), rs.getInt("cnt"));
+                    String st = rs.getString("status");   // يأتي UPPER من enum
+                    int cnt = rs.getInt("cnt");
+                    if (map.containsKey(st)) map.put(st, cnt); // تجاهل أي حالات أخرى
                 }
-                // اضمن وجود مفاتيح للحالات الشائعة حتى لو كانت صفر (اختياري)
-                String[] expected = {"SCHEDULED", "CONFIRMED", "PENDING", "COMPLETED", "CANCELLED"};
-                for (String k : expected) map.putIfAbsent(k, 0);
-                return map;
             }
         }
+        return map;
     }
 
     /** All appointments (any status) for a given calendar day, Asia/Gaza local date, for Reception dashboard. */
