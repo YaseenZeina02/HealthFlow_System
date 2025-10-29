@@ -34,7 +34,7 @@
                             <children>
                                 <AnchorPane prefHeight="40.0" prefWidth="210.0" stylesheets="@../Design/ReceptionDesign.css">
                                     <children>
-                                        <Label layoutX="54.0" layoutY="8.0" prefHeight="23.0" prefWidth="130.0" text="HelthFLow System" textFill="WHITE">
+                                        <Label layoutX="54.0" layoutY="8.0" prefHeight="23.0" prefWidth="130.0" text="HealthFlow System" textFill="WHITE">
                                             <font>
                                                 <Font size="15.0" />
                                             </font>
@@ -161,9 +161,9 @@
                                                         <TableView fx:constant="CONSTRAINED_RESIZE_POLICY" />
                                                     </columnResizePolicy>
                                                 </TableView>
-                                                <TextField fx:id="searchAppointmentDach" layoutX="321.0" layoutY="7.0" prefHeight="0.0" prefWidth="130.0" promptText="search" styleClass="box" AnchorPane.rightAnchor="154.19999999999993" AnchorPane.topAnchor="7.0" />
-                                                <Button fx:id="clearSelectionDach" layoutX="244.0" layoutY="10.0" mnemonicParsing="false" prefHeight="20.0" prefWidth="60.0" styleClass="btn-2" stylesheets="@../Design/ReceptionDesign.css" text="Clear" AnchorPane.rightAnchor="301.5999999999999" AnchorPane.topAnchor="10.0" />
-                                    <DatePicker fx:id="dataPickerDashboard" layoutX="463.0" layoutY="7.0" prefHeight="30.0" prefWidth="130.0" styleClass="boxDataPickar" AnchorPane.rightAnchor="12.199999999999932" />
+                                                <TextField fx:id="searchAppointmentDach" layoutX="394.0" layoutY="6.0" prefHeight="0.0" prefWidth="130.0" promptText="search" styleClass="box" AnchorPane.rightAnchor="81.19999999999993" AnchorPane.topAnchor="6.0" />
+                                                <Button fx:id="clearSelectionDach" layoutX="532.0" layoutY="10.0" mnemonicParsing="false" prefHeight="20.0" prefWidth="60.0" styleClass="btn-2" stylesheets="@../Design/ReceptionDesign.css" text="Clear" AnchorPane.rightAnchor="13.599999999999909" AnchorPane.topAnchor="10.0" />
+                                    <DatePicker fx:id="dataPickerDashboard" layoutX="257.0" layoutY="6.0" prefHeight="30.0" prefWidth="130.0" styleClass="boxDataPickar" AnchorPane.rightAnchor="218.19999999999993" />
                                             </children>
                                  <styleClass>
                                     <String fx:value="white-bg" />
