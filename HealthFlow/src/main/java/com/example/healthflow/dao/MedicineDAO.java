@@ -11,43 +11,26 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class MedicineDAO {
-    public Medicine insert(Connection c, String name, String description) throws SQLException {
-        final String sql = """
-            INSERT INTO medicines (name, description) VALUES (?, ?)
-            RETURNING *
-            """;
+    public com.example.healthflow.core.packaging.MedicinePackaging getPackaging(Connection c, long medicineId) throws SQLException {
+        String sql = """
+            SELECT base_unit::text AS base_unit,
+                   tablets_per_blister, blisters_per_box,
+                   ml_per_bottle, grams_per_tube, split_allowed
+            FROM medicines WHERE id = ?
+        """;
         try (PreparedStatement ps = c.prepareStatement(sql)) {
-            ps.setString(1, name);
-            ps.setString(2, description);
-            try (ResultSet rs = ps.executeQuery()) {
-                if (rs.next()) {
-                    Medicine m = new Medicine();
-                    m.setId(rs.getLong("id"));
-                    m.setName(rs.getString("name"));
-                    m.setDescription(rs.getString("description"));
-                    m.setAvailableQuantity(rs.getInt("available_quantity"));
-                    m.setCreatedAt(rs.getObject("created_at", OffsetDateTime.class));
-                    m.setUpdatedAt(rs.getObject("updated_at", OffsetDateTime.class));
-                    return m;
-                }
-            }
-        }
-        throw new SQLException("Failed to create medicine");
-    }
-
-    public Medicine findById(Connection c, Long id) throws SQLException {
-        try (PreparedStatement ps = c.prepareStatement("SELECT * FROM medicines WHERE id = ?")) {
-            ps.setLong(1, id);
+            ps.setLong(1, medicineId);
             try (ResultSet rs = ps.executeQuery()) {
                 if (!rs.next()) return null;
-                Medicine m = new Medicine();
-                m.setId(rs.getLong("id"));
-                m.setName(rs.getString("name"));
-                m.setDescription(rs.getString("description"));
-                m.setAvailableQuantity(rs.getInt("available_quantity"));
-                m.setCreatedAt(rs.getObject("created_at", OffsetDateTime.class));
-                m.setUpdatedAt(rs.getObject("updated_at", OffsetDateTime.class));
-                return m;
+                var p = new com.example.healthflow.core.packaging.MedicinePackaging();
+                p.baseUnit = rs.getString("base_unit") == null ? null
+                        : com.example.healthflow.core.packaging.MedUnit.valueOf(rs.getString("base_unit"));
+                p.tabletsPerBlister = (Integer) rs.getObject("tablets_per_blister");
+                p.blistersPerBox    = (Integer) rs.getObject("blisters_per_box");
+                p.mlPerBottle       = (Integer) rs.getObject("ml_per_bottle");
+                p.gramsPerTube      = (Integer) rs.getObject("grams_per_tube");
+                p.splitAllowed      = (Boolean) rs.getObject("split_allowed");
+                return p;
             }
         }
     }

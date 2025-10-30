@@ -783,3 +783,47 @@ ALTER TYPE item_status2 RENAME VALUE 'PARTIAL' TO 'COMPLETED';
 
 ALTER TYPE item_status2 RENAME VALUE 'DISPENSED' TO 'APPROVED';
 
+
+-- 1) نوع وحدة الأساس للدواء
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'med_unit') THEN
+CREATE TYPE med_unit AS ENUM ('TABLET','CAPSULE','SYRUP','SUSPENSION','INJECTION','CREAM','OINTMENT','DROPS');
+END IF;
+END $$;
+
+-- 2) أعمدة التغليف على medicines (كلها NULLABLE وآمنة)
+ALTER TABLE medicines
+    ADD COLUMN IF NOT EXISTS base_unit med_unit,
+    ADD COLUMN IF NOT EXISTS tablets_per_blister INT,
+    ADD COLUMN IF NOT EXISTS blisters_per_box   INT,
+    ADD COLUMN IF NOT EXISTS ml_per_bottle      INT,
+    ADD COLUMN IF NOT EXISTS grams_per_tube     INT,
+    ADD COLUMN IF NOT EXISTS split_allowed      BOOLEAN;
+
+-- (اختياري) حدود منطقية ومنع القيم السالبة
+ALTER TABLE medicines
+    ADD CONSTRAINT IF NOT EXISTS chk_meds_pack_positive
+    CHECK (
+    (tablets_per_blister IS NULL OR tablets_per_blister > 0) AND
+    (blisters_per_box   IS NULL OR blisters_per_box   > 0) AND
+    (ml_per_bottle      IS NULL OR ml_per_bottle      > 0) AND
+    (grams_per_tube     IS NULL OR grams_per_tube     > 0)
+    );
+
+
+-- 3) نوع وحدات التغليف المقترحة/المعتمدة
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'pack_unit') THEN
+CREATE TYPE pack_unit AS ENUM ('UNIT','BLISTER','BOX','BOTTLE','TUBE');
+END IF;
+END $$;
+
+-- 4) أعمدة الاقتراح والاعتماد على prescription_items (NULLABLE وآمنة)
+ALTER TABLE prescription_items
+    ADD COLUMN IF NOT EXISTS qty_units_requested     INT,
+    ADD COLUMN IF NOT EXISTS suggested_unit          pack_unit,
+    ADD COLUMN IF NOT EXISTS suggested_count         INT,
+    ADD COLUMN IF NOT EXISTS suggested_units_total   INT,
+    ADD COLUMN IF NOT EXISTS approved_unit           pack_unit,
+    ADD COLUMN IF NOT EXISTS approved_count          INT,
+    ADD COLUMN IF NOT EXISTS approved_units_total    INT;

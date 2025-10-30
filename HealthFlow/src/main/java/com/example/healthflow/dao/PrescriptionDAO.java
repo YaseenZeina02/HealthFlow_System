@@ -97,6 +97,7 @@ public class PrescriptionDAO {
             Prescription p = create(c, appointmentId, doctorId, patientId, notes);
             if (items != null && !items.isEmpty()) {
                 itemDao.addItems(c, p.getId(), items);
+                
             }
             c.commit();
             return p;
@@ -150,6 +151,50 @@ public class PrescriptionDAO {
                     out.add(r);
                 }
                 return out;
+            }
+        }
+    }
+
+    public List<DashboardRow> listDashboardRowsByDateAndStatus(Connection c, LocalDate day, PrescriptionStatus st) throws SQLException {
+        final String sql = """
+        SELECT p.id AS prescription_id, p.appointment_id, p.created_at, p.status, p.notes,
+               a.appointment_date, udoc.full_name AS doctor_name, upat.full_name AS patient_name, upat.national_id AS patient_nid
+        FROM prescriptions p
+        LEFT JOIN appointments a ON a.id = p.appointment_id
+        JOIN doctors d   ON d.id  = p.doctor_id
+        JOIN users  udoc ON udoc.id = d.user_id
+        JOIN patients pat ON pat.id = p.patient_id
+        JOIN users  upat ON upat.id = pat.user_id
+        WHERE p.created_at::date = ? AND (? IS NULL OR p.status = ?::prescription_status)
+        ORDER BY p.created_at DESC
+    """;
+
+        try (PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setObject(1, day);
+            if (st == null) {
+                ps.setNull(2, java.sql.Types.VARCHAR);
+                ps.setNull(3, java.sql.Types.VARCHAR);
+            } else {
+                ps.setString(2, st.name());
+                ps.setString(3, st.name());
+            }
+
+            try (ResultSet rs = ps.executeQuery()) {
+                List<DashboardRow> out = new ArrayList<>();
+                while (rs.next()) {
+                    DashboardRow r = new DashboardRow();
+                    r.prescriptionId = rs.getLong("prescription_id");
+                    r.appointmentId  = (Long) rs.getObject("appointment_id");
+                    r.createdAt      = rs.getObject("created_at", OffsetDateTime.class);
+                    r.status         = PrescriptionStatus.fromString(rs.getString("status"));
+                    r.diagnosisNote  = rs.getString("notes");
+                    r.appointmentDateTime = rs.getObject("appointment_date", OffsetDateTime.class);
+                    r.doctorName     = rs.getString("doctor_name");
+                    r.patientName    = rs.getString("patient_name");
+                    r.patientNid     = rs.getString("patient_nid");
+                    out.add(r);
+                }
+                return out; // ✅ هنا السطر المهم
             }
         }
     }

@@ -128,8 +128,10 @@ public class DoctorController {
     @FXML private TableColumn<PrescItemRow, String>  colMedicineName;
     @FXML private TableColumn<PrescItemRow, String>  colDosage;
     @FXML private TableColumn<PrescItemRow, Integer> colDuration;
-    @FXML private TableColumn<PrescItemRow, Integer> colQuantity;
-    @FXML private TableColumn<PrescItemRow, String>  colDiagnosis;
+    @FXML private TableColumn<PrescItemRow, String> colQuantity;
+    @FXML private TableColumn<PrescItemRow, String> colPack;
+
+    //    @FXML private TableColumn<PrescItemRow, String>  colDiagnosis;
     @FXML private TableColumn<PrescItemRow, PrescItemRow> colPresesAction;
     @FXML private TableColumn<PrescItemRow, Integer> colDose;
     @FXML private TableColumn<PrescItemRow, Integer> colFreqPerDay;
@@ -675,8 +677,6 @@ public class DoctorController {
             if (apptSearchBinding != null) apptSearchBinding.dispose();
             apptSearchBinding = org.controlsfx.control.textfield.TextFields.bindAutoCompletion(searchLabel, suggestions);
         } catch (IllegalAccessError err) {
-            // JavaFX 23 tightened module encapsulation; ControlsFX 11.2.x uses internal com.sun classes.
-            // Disable autocomplete gracefully and continue with plain live filtering.
             apptSearchBinding = null;
             System.out.println("[AutoComplete] Disabled due to module access error: " + err.getMessage());
         } catch (Throwable t) {
@@ -1096,28 +1096,28 @@ public class DoctorController {
         }
     }
 
-//    private void cancelAppointment(AppointmentRow row) {
-//        if (row == null) return;
-//        try {
-//            boolean ok = doctorDAO.cancelAppointment(row.getId());
-//            if (ok) {
-//                // remove from UI list entirely as requested
-//                apptData.remove(row);
-//                // Reload table for the currently selected dashboard date
-//                loadTodayAppointmentsAsync();
-//                if (AppointmentsTable != null) AppointmentsTable.refresh();
-//                toast("Appointment cancelled.", "ok");
-//                var _dashDate = (datePickerPatientsWithDoctorDash != null && datePickerPatientsWithDoctorDash.getValue() != null)
-//                        ? datePickerPatientsWithDoctorDash.getValue()
-//                        : java.time.ZonedDateTime.now(APP_TZ).toLocalDate();
-//                loadStatsForDateAsync(_dashDate);
-//            } else {
-//                showWarn("Cancel", "Could not cancel appointment.");
-//            }
-//        } catch (Exception ex) {
-//            showWarn("Cancel", "Failed to update DB: " + ex.getMessage());
-//        }
-//    }
+    //    private void cancelAppointment(AppointmentRow row) {
+    //        if (row == null) return;
+    //        try {
+    //            boolean ok = doctorDAO.cancelAppointment(row.getId());
+    //            if (ok) {
+    //                // remove from UI list entirely as requested
+    //                apptData.remove(row);
+    //                // Reload table for the currently selected dashboard date
+    //                loadTodayAppointmentsAsync();
+    //                if (AppointmentsTable != null) AppointmentsTable.refresh();
+    //                toast("Appointment cancelled.", "ok");
+    //                var _dashDate = (datePickerPatientsWithDoctorDash != null && datePickerPatientsWithDoctorDash.getValue() != null)
+    //                        ? datePickerPatientsWithDoctorDash.getValue()
+    //                        : java.time.ZonedDateTime.now(APP_TZ).toLocalDate();
+    //                loadStatsForDateAsync(_dashDate);
+    //            } else {
+    //                showWarn("Cancel", "Could not cancel appointment.");
+    //            }
+    //        } catch (Exception ex) {
+    //            showWarn("Cancel", "Failed to update DB: " + ex.getMessage());
+    //        }
+    //    }
 
     /** Cancel appointment in DB then update UI; leaves Prescription enabled. */
     private void cancelAppointment(AppointmentRow row) {
@@ -1190,70 +1190,6 @@ public class DoctorController {
             showError("Open Prescription", ex);
         }
     }
-    /** Load items for a given prescription and push into the items table. */
-//    private void loadPrescriptionItemsFromDb(long prescId) {
-//        if (prescId <= 0) return;
-//        // امسح الداتا الحالية في الجدول/اللستة
-//        try {
-//            if (TablePrescriptionItems != null) {
-//                TablePrescriptionItems.getItems().clear();
-//                TablePrescriptionItems.getSelectionModel().clearSelection();
-//            }
-//            if (prescItemsEditable != null) prescItemsEditable.clear();
-//        } catch (Throwable ignore) {}
-//
-//        new Thread(() -> {
-//            java.util.List<PrescItemRow> rows = new java.util.ArrayList<>();
-//            Exception err = null;
-//            try (Connection c = Database.get();
-//                 java.sql.PreparedStatement ps = c.prepareStatement(
-//                         "SELECT id, medicine_id, medicine_name, " +
-//                                 "       COALESCE(dosage_text, dosage) AS dosage_display, " +
-//                                 "       quantity, status, batch_id, dose, freq_per_day, duration_days, strength, form, route, notes " +
-//                                 "FROM prescription_items WHERE prescription_id = ? ORDER BY id")) {
-//                ps.setLong(1, prescId);
-//                try (var rs = ps.executeQuery()) {
-//                    while (rs.next()) {
-//                        // أنشئ الصف واملأ الحقول بالضبط حسب خصائص PrescItemRow الظاهرة في الجدول
-//                        PrescItemRow r = new PrescItemRow();
-//                        r.setId(rs.getLong("id"));
-//                        r.setMedicineId((Long) rs.getObject("medicine_id"));
-//                        r.setMedicineName(rs.getString("medicine_name"));
-//                        r.setDosageText(rs.getString("dosage_display"));
-//                        r.setQuantity(rs.getInt("quantity"));
-//                        r.setStatus(rs.getString("status"));
-//                        r.setBatchId((Long) rs.getObject("batch_id"));
-//                        r.setDose((Integer) rs.getObject("dose"));
-//                        r.setFreqPerDay((Integer) rs.getObject("freq_per_day"));
-//                        r.setDurationDays((Integer) rs.getObject("duration_days"));
-//                        r.setStrength(rs.getString("strength"));
-//                        r.setForm(rs.getString("form"));
-//                        r.setRoute(rs.getString("route"));
-//                        r.setNotes(rs.getString("notes"));
-//                        rows.add(r);
-//                    }
-//                }
-//            } catch (Exception ex) {
-//                err = ex;
-//            }
-//
-//            Exception fErr = err;
-//            Platform.runLater(() -> {
-//                if (fErr != null) {
-//                    showWarn("Prescription Items", "Failed to load items: " + fErr.getMessage());
-//                    return;
-//                }
-//                // ادفع البيانات للـ ObservableList المربوطة بالجدول
-//                if (prescItemsEditable != null) {
-//                    prescItemsEditable.addAll(rows);
-//                } else if (TablePrescriptionItems != null) {
-//                    // fallback لو الجدول غير مربوط بلستة خارجية
-//                    TablePrescriptionItems.getItems().addAll(rows);
-//                }
-//                if (TablePrescriptionItems != null) TablePrescriptionItems.refresh();
-//            });
-//        }, "doc-load-presc-items").start();
-//    }
 
     /** Load items for a given prescription and push into the items table. */
     private void loadPrescriptionItemsFromDb(long prescId) {
@@ -1326,7 +1262,8 @@ public class DoctorController {
                     prescItemsEditable.addAll(rows);
                 } else if (TablePrescriptionItems != null) {
                     // fallback لو الجدول غير مربوط بلستة خارجية
-                    TablePrescriptionItems.getItems().addAll(rows);
+//                    TablePrescriptionItems.getItems().addAll(rows);
+                    Platform.runLater(this::reloadPrescriptionItemsFromDb);
                 }
                 if (TablePrescriptionItems != null) TablePrescriptionItems.refresh();
             });
@@ -1628,7 +1565,7 @@ public class DoctorController {
             used += cw.applyAsDouble(colDuration);
             used += cw.applyAsDouble(colRoute);
             used += cw.applyAsDouble(colQuantity);
-            used += cw.applyAsDouble(colDiagnosis);
+//            used += cw.applyAsDouble(colDiagnosis);
             used += cw.applyAsDouble(colPresesStatus);
             // ما نضيف عرض الـ Action هنا – بنحسبه بعدين
 
@@ -1651,8 +1588,65 @@ public class DoctorController {
         if (colMedicineName != null)  colMedicineName.setCellValueFactory(cd -> cd.getValue().medicineNameProperty());
         if (colDosage != null)        colDosage.setCellValueFactory(new PropertyValueFactory<>("dosageText"));
         if (colDuration != null)      colDuration.setCellValueFactory(cd -> cd.getValue().durationDaysProperty().asObject());
-        if (colQuantity != null)      colQuantity.setCellValueFactory(cd -> cd.getValue().quantityProperty().asObject());
-        if (colDiagnosis != null)     colDiagnosis.setCellValueFactory(cd -> cd.getValue().diagnosisProperty());
+        if (colQuantity != null) {
+            colQuantity.setCellValueFactory(cd -> {
+                var it = cd.getValue();
+
+                Integer u = it.getQtyUnitsRequested();
+                int d = Math.max(0, it.getDose());
+                int f = Math.max(0, it.getFreqPerDay());
+                int g = Math.max(0, it.getDurationDays());
+                if ((u == null || u <= 0) && d > 0 && f > 0 && g > 0) {
+                    u = d * f * g;
+                }
+
+                String unitShort;
+                String form = it.getForm();
+                if (form != null && form.equalsIgnoreCase("Tablet"))      unitShort = "tabs";
+                else if (form != null && form.equalsIgnoreCase("Capsule")) unitShort = "caps";
+                else unitShort = "units";
+
+                StringBuilder sb = new StringBuilder();
+                if (u != null && u > 0) sb.append(u).append(' ').append(unitShort);
+                else sb.append("—");
+
+                if (it.getSuggestedUnit() != null &&
+                        it.getSuggestedCount() != null &&
+                        it.getSuggestedUnitsTotal() != null) {
+                    sb.append("  •  Sugg: ")
+                            .append(it.getSuggestedCount()).append(' ')
+                            .append(it.getSuggestedUnit()).append(" = ")
+                            .append(it.getSuggestedUnitsTotal());
+                }
+
+                return new javafx.beans.property.ReadOnlyStringWrapper(sb.toString());
+            });
+
+            colQuantity.setCellFactory(col -> new TableCell<PrescItemRow, String>() {
+                @Override
+                protected void updateItem(String text, boolean empty) {
+                    super.updateItem(text, empty);
+                    if (empty || text == null) { setText(null); setTooltip(null); return; }
+                    setText(text);
+
+                    PrescItemRow row = (getTableRow() == null) ? null : (PrescItemRow) getTableRow().getItem();
+                    if (row != null) {
+                        int d = row.getDose(), f = row.getFreqPerDay(), days = row.getDurationDays();
+                        String tt = "Calculated: " + d + " × " + f + " × " + days;
+                        if (row.getSuggestedUnit() != null &&
+                                row.getSuggestedCount() != null &&
+                                row.getSuggestedUnitsTotal() != null) {
+                            tt += "\nSuggested: " + row.getSuggestedCount() + " " + row.getSuggestedUnit()
+                                    + " = " + row.getSuggestedUnitsTotal();
+                        }
+                        setTooltip(new Tooltip(tt));
+                    } else {
+                        setTooltip(null);
+                    }
+                }
+            });
+        }
+//        if (colDiagnosis != null)     colDiagnosis.setCellValueFactory(cd -> cd.getValue().diagnosisProperty());
         if (colPresesStatus != null)  colPresesStatus.setCellValueFactory(cd -> cd.getValue().statusProperty());
 
         // New DB-sourced columns
@@ -1687,7 +1681,7 @@ public class DoctorController {
         if (colDuration != null)      colDuration.setPrefWidth(70);
         if (colRoute != null)         colRoute.setPrefWidth(100);
         if (colQuantity != null)      colQuantity.setPrefWidth(80);
-        if (colDiagnosis != null)     colDiagnosis.setPrefWidth(260);
+//        if (colDiagnosis != null)     colDiagnosis.setPrefWidth(260);
 
         // Re-fit when table or columns change size (so H-scroll logic runs even with 0 rows)
         ChangeListener<Number> _refit = (obs, ov, nv) -> fitLastColumn.run();
@@ -1701,7 +1695,7 @@ public class DoctorController {
         if (colDuration != null)      colDuration.widthProperty().addListener(_refit);
         if (colRoute != null)         colRoute.widthProperty().addListener(_refit);
         if (colQuantity != null)      colQuantity.widthProperty().addListener(_refit);
-        if (colDiagnosis != null)     colDiagnosis.widthProperty().addListener(_refit);
+//        if (colDiagnosis != null)     colDiagnosis.widthProperty().addListener(_refit);
         if (colPresesStatus != null)  colPresesStatus.widthProperty().addListener(_refit);
         if (colPresesAction != null)  colPresesAction.widthProperty().addListener(_refit);
 
@@ -1710,23 +1704,176 @@ public class DoctorController {
 
         // Tooltip for Quantity column to explain formula
         if (colQuantity != null) {
-            colQuantity.setCellFactory(col -> new TableCell<PrescItemRow, Integer>() {
-                @Override protected void updateItem(Integer qty, boolean empty) {
-                    super.updateItem(qty, empty);
-                    if (empty || getTableRow() == null || getTableRow().getItem() == null) {
-                        setText(null); setTooltip(null);
+//            colQuantity.setCellFactory(col -> new TableCell<PrescItemRow, Integer>() {
+//                @Override protected void updateItem(Integer qty, boolean empty) {
+//                    super.updateItem(qty, empty);
+//                    if (empty || getTableRow() == null || getTableRow().getItem() == null) {
+//                        setText(null); setTooltip(null);
+//                        return;
+//                    }
+//                    PrescItemRow r = (PrescItemRow) getTableRow().getItem();
+//                    int dose = Math.max(0, r.getDose());
+//                    int freq = Math.max(0, r.getFreqPerDay());
+//                    int days = Math.max(0, r.getDurationDays());
+//                    int computed = (dose > 0 && freq > 0 && days > 0) ? (dose * freq * days) : 0;
+//
+//                    int displayQty = (qty == null || qty <= 0) ? computed : qty;
+//                    setText(displayQty <= 0 ? "" : String.valueOf(displayQty));
+//
+//                    Tooltip tip = new Tooltip("Qty = Dose × Freq/day × Duration\n= "
+//                            + (dose == 0 ? "?" : dose) + " × "
+//                            + (freq == 0 ? "?" : freq) + " × "
+//                            + (days == 0 ? "?" : days) + " = "
+//                            + (computed > 0 ? computed : "?"));
+//                    setTooltip(tip);
+//                }
+//            });
+
+            if (colQuantity != null) {
+                colQuantity.setCellValueFactory(cd -> {
+                    var it = cd.getValue();
+
+                    // 1) قيمة الداتابيز (قد تكون NULL)
+                    Integer u = it.getQtyUnitsRequested();
+
+                    // 2) احتساب بديل: Dose × Freq/day × Duration
+                    int d = Math.max(0, it.getDose());
+                    int f = Math.max(0, it.getFreqPerDay());
+                    int g = Math.max(0, it.getDurationDays());
+                    if ((u == null || u <= 0) && d > 0 && f > 0 && g > 0) {
+                        u = d * f * g;
+                    }
+
+                    // 3) اختصار وحدة العرض حسب الـ form
+                    String unitShort;
+                    String form = it.getForm();
+                    if (form != null && form.equalsIgnoreCase("Tablet"))      unitShort = "tabs";
+                    else if (form != null && form.equalsIgnoreCase("Syrup"))  unitShort = "units"; // (بنحدثها لاحقًا مع ml إن لزم)
+                    else                                                      unitShort = "units";
+
+                    // 4) بناء النص
+                    StringBuilder sb = new StringBuilder();
+                    if (u != null && u > 0) sb.append(u).append(' ').append(unitShort);
+                    else sb.append("—");
+
+                    if (it.getSuggestedUnit() != null &&
+                            it.getSuggestedCount() != null &&
+                            it.getSuggestedUnitsTotal() != null) {
+                        sb.append("  •  Sugg: ")
+                                .append(it.getSuggestedCount()).append(' ')
+                                .append(it.getSuggestedUnit()).append(" = ")
+                                .append(it.getSuggestedUnitsTotal());
+                    }
+
+                    return new javafx.beans.property.ReadOnlyStringWrapper(sb.toString());
+                });
+            }
+
+            colQuantity.setCellFactory(col -> new TableCell<PrescItemRow, String>() {
+                @Override
+                protected void updateItem(String text, boolean empty) {
+                    super.updateItem(text, empty);
+                    if (empty || text == null) {
+                        setText(null);
+                        setTooltip(null);
                         return;
                     }
-                    PrescItemRow r = (PrescItemRow) getTableRow().getItem();
-                    int dose   = Math.max(1, r.getDose());
-                    int freq   = Math.max(1, r.getFreqPerDay());
-                    int days   = Math.max(1, r.getDurationDays());
-                    setText(qty == null ? "" : String.valueOf(qty));
-                    Tooltip tip = new Tooltip("Qty = Dose × Freq/day × Duration\n= "
-                            + dose + " × " + freq + " × " + days + " = " + (dose * freq * days));
-                    setTooltip(tip);
+                    setText(text);
+
+                    // استخدم PrescItemRow بدلاً من PrescriptionItem
+                    PrescItemRow row = (getTableRow() == null) ? null : (PrescItemRow) getTableRow().getItem();
+                    if (row != null) {
+                        int d    = row.getDose();
+                        int f    = row.getFreqPerDay();
+                        int days = row.getDurationDays();
+                        String formula = d + " × " + f + " × " + days;
+
+                        String tt = "Calculated: " + formula;
+                        if (row.getSuggestedUnit() != null
+                                && row.getSuggestedCount() != null
+                                && row.getSuggestedUnitsTotal() != null) {
+                            tt += "\nSuggested: " + row.getSuggestedCount()
+                                    + " " + row.getSuggestedUnit()
+                                    + " = " + row.getSuggestedUnitsTotal();
+                        }
+                        setTooltip(new Tooltip(tt));
+                    } else {
+                        setTooltip(null);
+                    }
                 }
             });
+        }
+
+        // ----- Pack (Suggested / Approved) column -----
+        if (colPack != null) {
+            colPack.setText("Pack");
+            colPack.setPrefWidth(160);
+
+            // القيمة المعروضة داخل الخلية
+            colPack.setCellValueFactory(cd -> {
+                PrescItemRow it = cd.getValue();
+                StringBuilder sb = new StringBuilder();
+
+                // Suggested من الحقول: suggested_unit / suggested_count / suggested_units_total
+                if (it.getSuggestedUnit() != null
+                        && it.getSuggestedCount() != null
+                        && it.getSuggestedUnitsTotal() != null) {
+                    sb.append("Sugg: ")
+                            .append(it.getSuggestedCount()).append(' ')
+                            .append(String.valueOf(it.getSuggestedUnit()))
+                            .append(" = ").append(it.getSuggestedUnitsTotal());
+                }
+
+                // Approved (لو صارت لاحقاً بالصيدلية)
+                if (it.getApprovedUnit() != null
+                        && it.getApprovedCount() != null
+                        && it.getApprovedUnitsTotal() != null) {
+                    if (sb.length() > 0) sb.append("  |  ");
+                    sb.append("Appr: ")
+                            .append(it.getApprovedCount()).append(' ')
+                            .append(String.valueOf(it.getApprovedUnit()))
+                            .append(" = ").append(it.getApprovedUnitsTotal());
+                }
+
+                if (sb.length() == 0) sb.append("—");
+                return new javafx.beans.property.ReadOnlyStringWrapper(sb.toString());
+            });
+
+            // Tooltip يبيّن التفاصيل كاملة عند الوقوف على الخلية
+            colPack.setCellFactory(col -> new TableCell<PrescItemRow, String>() {
+                @Override
+                protected void updateItem(String text, boolean empty) {
+                    super.updateItem(text, empty);
+                    if (empty || text == null) { setText(null); setTooltip(null); return; }
+                    setText(text);
+
+                    PrescItemRow r = (getTableRow() == null) ? null : (PrescItemRow) getTableRow().getItem();
+                    if (r == null) { setTooltip(null); return; }
+
+                    StringBuilder tip = new StringBuilder();
+                    if (r.getSuggestedUnit() != null
+                            && r.getSuggestedCount() != null
+                            && r.getSuggestedUnitsTotal() != null) {
+                        tip.append("Suggested: ").append(r.getSuggestedCount()).append(' ')
+                                .append(r.getSuggestedUnit()).append(" = ").append(r.getSuggestedUnitsTotal());
+                    }
+                    if (r.getApprovedUnit() != null
+                            && r.getApprovedCount() != null
+                            && r.getApprovedUnitsTotal() != null) {
+                        if (tip.length() > 0) tip.append('\n');
+                        tip.append("Approved: ").append(r.getApprovedCount()).append(' ')
+                                .append(r.getApprovedUnit()).append(" = ").append(r.getApprovedUnitsTotal());
+                    }
+                    setTooltip(tip.length() > 0 ? new Tooltip(tip.toString()) : null);
+                }
+            });
+
+            // تأكد أنه يظهر بعد عمود Quantity لو ما كان مُعرّف ترتيبه في FXML
+            if (TablePrescriptionItems != null && !TablePrescriptionItems.getColumns().contains(colPack)) {
+                int qIdx = TablePrescriptionItems.getColumns().indexOf(colQuantity);
+                if (qIdx >= 0) TablePrescriptionItems.getColumns().add(qIdx + 1, colPack);
+                else TablePrescriptionItems.getColumns().add(colPack);
+            }
         }
 
         if (colPresesAction != null) {
@@ -1881,6 +2028,111 @@ public class DoctorController {
      * Try to create a minimal patient from the header when only a name and National ID are typed.
      * Returns the new/existing patient's user_id if successful, otherwise null.
      */
+
+    // Map DB model to table row, including packaging suggestion fields
+//    private PrescItemRow toRow(com.example.healthflow.model.PrescriptionItem it) {
+//        PrescItemRow r = new PrescItemRow();
+//        // ---- basic fields ----
+//        r.setId(it.getId() == null ? 0 : it.getId());
+//        r.setMedicineId(it.getMedicineId() == null ? 0 : it.getMedicineId());
+//        r.setMedicineName(it.getMedicineName());
+//        r.setStrength(it.getStrength());
+//        r.setForm(it.getForm());
+//        r.setRoute(it.getRoute());
+//        r.setDose(it.getDose() == null ? 0 : it.getDose());
+//        r.setFreqPerDay(it.getFreqPerDay() == null ? 0 : it.getFreqPerDay());
+//        r.setDurationDays(it.getDurationDays() == null ? 0 : it.getDurationDays());
+//        r.setDosageText(it.getDosageText());
+//        r.setStatus(it.getStatus() == null ? null : it.getStatus().name());
+//        r.setNotes(it.getNotes());
+//        if (it.getBatchId() != null) r.setBatchId(it.getBatchId());
+//        // --- map new packaging fields into the row (for Quantity column display) ---
+//        try {
+//            // qty_units_requested
+//            r.setQtyUnitsRequested(it.getQtyUnitsRequested());
+//
+//            // suggested_* (DAO returns text for suggested_unit)
+//            String su = null;
+//            try { su = it.getSuggestedUnit(); } catch (Throwable ignore) {}
+//            if (su != null && !su.isBlank()) {
+//                try {
+//                    r.setSuggestedUnit(com.example.healthflow.core.packaging.PackUnit.valueOf(su));
+//                } catch (IllegalArgumentException ex) {
+//                    // unknown enum text → ignore safely
+//                }
+//            }
+//            Integer sc = null;
+//            try { sc = it.getSuggestedCount(); } catch (Throwable ignore) {}
+//            if (sc != null) r.setSuggestedCount(sc);
+//
+//            Integer sut = null;
+//            try { sut = it.getSuggestedUnitsTotal(); } catch (Throwable ignore) {}
+//            if (sut != null) r.setSuggestedUnitsTotal(sut);
+//        } catch (Throwable ignore) {
+//            // keep UI rendering even if older model lacks accessors
+//        }
+//
+//        return r;
+//    }
+
+    private PrescItemRow toRow(com.example.healthflow.model.PrescriptionItem it) {
+        PrescItemRow r = new PrescItemRow();
+
+        // --- الحقول الأساسية ---
+        r.setMedicineName(it.getMedicineName());
+        r.setStrength(it.getStrength());
+        r.setForm(it.getForm());
+        r.setDose(it.getDose() == null ? 0 : it.getDose());
+        r.setFreqPerDay(it.getFreqPerDay() == null ? 0 : it.getFreqPerDay());
+        r.setDurationDays(it.getDurationDays() == null ? 0 : it.getDurationDays());
+        r.setRoute(it.getRoute());
+//        r.setQuantity(Math.max(0, it.getQuantity())); // كمية من الداتابيز (int primitive، ما فيه null)
+
+        Integer qObj = null;
+        try { qObj = it.getQuantity(); } catch (Throwable ignore) {}
+        r.setQuantity(qObj == null ? 0 : Math.max(0, qObj));
+
+        // --- حقول التغليف الجديدة ---
+        try {
+            // عدد الوحدات المطلوبة (الكمية بالوحدات الصغرى)
+            r.setQtyUnitsRequested(it.getQtyUnitsRequested());
+
+            // suggested_unit من DAO جاي String → نحوله إلى Enum
+            String su = it.getSuggestedUnit();
+            if (su != null && !su.isBlank()) {
+                try {
+                    r.setSuggestedUnit(com.example.healthflow.core.packaging.PackUnit.valueOf(su));
+                } catch (IllegalArgumentException ex) {
+                    r.setSuggestedUnit(null); // تجاهل النص الغير معروف
+                }
+            }
+
+            // باقي حقول الاقتراح
+            r.setSuggestedCount(it.getSuggestedCount());
+            r.setSuggestedUnitsTotal(it.getSuggestedUnitsTotal());
+        } catch (Throwable ignore) {
+            // لو نسخة قديمة من الموديل لا تحتوي accessor → تجاهل بدون كسر الواجهة
+        }
+
+        return r;
+    }
+
+    private void reloadPrescriptionItemsFromDb() {
+        if (currentPrescriptionId == null || currentPrescriptionId <= 0) return;
+        try (java.sql.Connection conn = Database.get()) {
+            java.util.List<com.example.healthflow.model.PrescriptionItem> fresh =
+                    new com.example.healthflow.dao.PrescriptionItemDAO().listByPrescription(conn, currentPrescriptionId);
+            javafx.collections.ObservableList<PrescItemRow> rows = javafx.collections.FXCollections.observableArrayList();
+            for (var it : fresh) {
+                PrescItemRow r = toRow(it);    // تحويل موحّد
+                rows.add(r);
+            }
+            if (TablePrescriptionItems != null) TablePrescriptionItems.setItems(rows);
+        } catch (Exception ex) {
+            toast("Failed to reload items: " + ex.getMessage(), "warn");
+        }
+    }
+
     private Long ensurePatientFromHeaderIfPossible(Connection c) {
         try {
             if (PatientNameTF == null || PatientNameTF.getText() == null) return null;
@@ -2130,6 +2382,10 @@ public class DoctorController {
                             qty
                     );
 
+                    try {
+                        new PrescriptionItemDAO().backfillSuggestions(c, prescId);
+                    } catch (Exception ignore) {}
+
                     // أعرض في الجدول بناءً على البيانات الراجعة (الاسم قد يتظبط بالتريغر)
                     PrescItemRow row = new PrescItemRow();
                     row.setId(db.getId());
@@ -2147,7 +2403,9 @@ public class DoctorController {
                     row.setDiagnosis(diagnosisTextUi);
                     row.setStatus(db.getStatus() == null ? "PENDING" : db.getStatus().name());
 
-                    prescItemsEditable.add(row);
+//                    prescItemsEditable.add(row);
+                    Platform.runLater(this::reloadPrescriptionItemsFromDb);
+
                     toast("The medicine has been added. ", "ok");
                 } else {
                     // UPDATE في الداتابيز
