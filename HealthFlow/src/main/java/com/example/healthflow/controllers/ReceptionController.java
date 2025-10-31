@@ -62,6 +62,8 @@ import java.util.concurrent.TimeUnit;
 public class ReceptionController {
 
     /* ============ UI ============ */
+
+
     @FXML
     private AnchorPane DashboardAnchorPane;
     @FXML
@@ -168,6 +170,9 @@ public class ReceptionController {
     private AnchorPane Doctors;
     @FXML
     private AnchorPane Patients;
+
+    @FXML
+    private AnchorPane reportAnchor;
 
     @FXML
     private Label TotalAppointments;
@@ -421,6 +426,55 @@ public class ReceptionController {
     // --- Coalesced UI refresh + DB NOTIFY ---
     private final RefreshScheduler uiRefresh = new RefreshScheduler(600);
     private DbNotifications apptDbListener;
+
+    // --- DB NOTIFY handlers (appointments -> refresh dashboard & chart) ---
+
+
+    private void startDbNotificationsSafe() {
+        try {
+            // Recreate listener to avoid stale/closed connections
+            stopDbNotifications();
+            apptDbListener = new DbNotifications();
+
+            // --- Appointments channel ---
+            apptDbListener.listen("appointments_changed", payload -> {
+                System.out.println("[ReceptionController] NOTIFY appointments_changed payload=" + payload);
+                slotCache.clear();
+                Platform.runLater(() -> scheduleCoalescedRefresh());
+            });
+
+            // --- Patients channel ---
+            apptDbListener.listen("patients_changed", payload -> {
+                System.out.println("[ReceptionController] NOTIFY patients_changed payload=" + payload);
+                uiRefresh.request(() -> {
+                    loadPatientsBG();
+                    ensureTableBindings();
+                    scheduleCoalescedRefresh();
+                });
+            });
+
+            // Some implementations auto-start on first listen; no explicit start() available
+            System.out.println("[ReceptionController] DbNotifications wired.");
+        } catch (Throwable t) {
+            System.err.println("[ReceptionController] startDbNotificationsSafe error: " + t);
+        }
+    }
+
+    private void onAppointmentsDbEvent(String payload) {
+        // Unified, debounced refresh
+        scheduleCoalescedRefresh();
+    }
+
+
+    private void stopDbNotifications() {
+        try {
+            if (apptDbListener != null) {
+                apptDbListener.close();
+                apptDbListener = null;
+            }
+        } catch (Exception ignore) {
+        }
+    }
 
     // To color current nav button
     private static final String ACTIVE_CLASS = "current";
@@ -769,8 +823,10 @@ public class ReceptionController {
         new Thread(this::updateAppointmentCounters, "appt-counts").start();
 
         // === التحديث اللحظي + تهيئة أولية ===
-        startDbNotifications();      // يبدأ LISTEN
-//        scheduleCoalescedRefresh();  // تعبئة أولية
+//        startDbNotificationsSafe();  // يبدأ LISTEN
+//        onAppointmentsDbEvent("init");
+        startDbNotifications();
+        scheduleCoalescedRefresh();  // تعبئة أولية
 
         Platform.runLater(() -> {
             var url = getClass().getResource(cssPath);
@@ -781,7 +837,21 @@ public class ReceptionController {
                     hook.getScene().getStylesheets().add(css);
                 }
             } else {
-                System.out.println("[CSS] ReceptionDesign.css not found at " + cssPath);
+            }
+        });
+
+        Platform.runLater(() -> {
+            // اختَر Node أكيد ملتصق بالمشهد
+            javafx.scene.Node hook =
+                    (rootPane != null) ? rootPane
+                            : (TableAppInDashboard != null ? TableAppInDashboard : TableINAppointment);
+
+            if (hook != null && hook.getScene() != null) {
+                javafx.stage.Window win = hook.getScene().getWindow();
+                if (win != null) {
+                    win.addEventHandler(javafx.stage.WindowEvent.WINDOW_CLOSE_REQUEST, e -> shutdown());
+                    win.addEventHandler(javafx.stage.WindowEvent.WINDOW_HIDDEN, e -> shutdown());
+                }
             }
         });
 
@@ -1608,44 +1678,34 @@ public class ReceptionController {
 //        });
 //    }
 
+
     /**
      * استماع لقناة DB NOTIFY
      */
-
     private void startDbNotifications() {
-        apptDbListener = new DbNotifications();
-
-        // appointments_changed -> فلش كاش الساعات وجدّد الشاشة
-        apptDbListener.listen("appointments_changed", payload -> {
-            slotCache.clear();
-//            scheduleCoalescedRefresh();
-        });
-
-        // patients_changed -> مستمع واحد مع debounce
-        apptDbListener.listen("patients_changed", payload -> {
-            System.out.println("NOTIFY patients_changed: " + payload);
-            uiRefresh.request(this::loadPatientsBG);
-        });
-
-        System.out.println("DbNotifications: starting listeners...");
+        startDbNotificationsSafe();
     }
 
-    /**
-     * Poll احتياطي خفيف فقط (تعطيل التحديث كل 1 دقيقة)
-     */
-//    private void startAutoRefresh() {
-//        autoRefreshExec.scheduleAtFixedRate(this::scheduleCoalescedRefresh, 10, 10, TimeUnit.SECONDS);
-//        autoRefreshExec.scheduleAtFixedRate(() -> {
-//            try {
-//                loadPatientsBG();
-//                DoctorDAO.loadDoctorsBG();
-//            } catch (Exception ignore) {
-//            }
-//        }, 0, 60, TimeUnit.SECONDS);
-//        // داخل startAutoRefresh()
+
+//    private void startDbNotifications() {
+//        if (apptDbListener != null) apptDbListener.close(); // لو كان قديم
+//        apptDbListener = new DbNotifications();
+//
+//        apptDbListener.listen("appointments_changed", payload -> {
+//            // 1) فضّي كاش الساعات
+//            slotCache.clear();
+//            // 2) حدّث الـ UI/الجدول والرسم
+//            onAppointmentsDbEvent(payload);
+//        });
+//
+//        apptDbListener.listen("patients_changed", payload -> {
+//            System.out.println("NOTIFY patients_changed: " + payload);
+//            uiRefresh.request(this::loadPatientsBG);   // داخليًا بيروح Platform.runLater
+//        });
+//
+//        System.out.println("DbNotifications: starting listeners...");
 //    }
 
-    // ==== بقية الدوال كما كانت (loadDoctorsBG, CRUD, إلخ) ====
 
     /* ===== Helpers (alerts & online guard wrapper) ===== */
     private boolean ensureOnlineOrAlert() {
@@ -2416,18 +2476,18 @@ public class ReceptionController {
                 ? dataPickerDashboard.getValue()
                 : java.time.LocalDate.now();
         try {
-            int doctors   = com.example.healthflow.dao.AppointmentJdbcDAO.countDoctorsOnDate(sel);
-            int appts     = com.example.healthflow.dao.AppointmentJdbcDAO.countAppointmentsOnDate(sel);
-            int patients  = com.example.healthflow.dao.AppointmentJdbcDAO.countPatientsOnDate(sel);
+            int doctors = com.example.healthflow.dao.AppointmentJdbcDAO.countDoctorsOnDate(sel);
+            int appts = com.example.healthflow.dao.AppointmentJdbcDAO.countAppointmentsOnDate(sel);
+            int patients = com.example.healthflow.dao.AppointmentJdbcDAO.countPatientsOnDate(sel);
             int completed = com.example.healthflow.dao.AppointmentJdbcDAO.countCompletedAppointmentsOnDate(sel);
             int remaining = com.example.healthflow.dao.AppointmentJdbcDAO.countRemainingAppointmentsOnDate(sel);
 
             Platform.runLater(() -> {
-                if (NumberOfTotalDoctors != null)       NumberOfTotalDoctors.setText(String.valueOf(doctors));
-                if (NumberOfTotalAppointments != null)  NumberOfTotalAppointments.setText(String.valueOf(appts));
-                if (NumberOfTotalPatients != null)      NumberOfTotalPatients.setText(String.valueOf(patients));
-                if (patientCompleteNum != null)         patientCompleteNum.setText(String.valueOf(completed));
-                if (RemainingNum != null)               RemainingNum.setText(String.valueOf(remaining));
+                if (NumberOfTotalDoctors != null) NumberOfTotalDoctors.setText(String.valueOf(doctors));
+                if (NumberOfTotalAppointments != null) NumberOfTotalAppointments.setText(String.valueOf(appts));
+                if (NumberOfTotalPatients != null) NumberOfTotalPatients.setText(String.valueOf(patients));
+                if (patientCompleteNum != null) patientCompleteNum.setText(String.valueOf(completed));
+                if (RemainingNum != null) RemainingNum.setText(String.valueOf(remaining));
                 updatePatientDetailsChart(); // تبقى كما هي
             });
         } catch (Exception ex) {
@@ -2664,7 +2724,9 @@ public class ReceptionController {
         }
     }
 
-    /** حمّل مواعيد اليوم المختار إلى جدول الداشبورد (TableAppInDashboard) */
+    /**
+     * حمّل مواعيد اليوم المختار إلى جدول الداشبورد (TableAppInDashboard)
+     */
 //    private void reloadDashboardAppointments() {
 //        if (TableAppInDashboard == null) return;
 //        java.time.LocalDate sel = (dataPickerDashboard != null && dataPickerDashboard.getValue() != null)
@@ -2704,7 +2766,6 @@ public class ReceptionController {
 //            System.err.println("[ReceptionController] reloadDashboardAppointments error: " + ex);
 //        }
 //    }
-
     private void reloadDashboardAppointments() {
         if (TableAppInDashboard == null) return;
         java.time.LocalDate sel = (dataPickerDashboard != null && dataPickerDashboard.getValue() != null)
@@ -3118,6 +3179,7 @@ public class ReceptionController {
             TableAppInDashboard.refresh();
         }
     }
+
     /**
      * تحديث مخطط حالات المواعيد حسب تاريخ محدد (BarChart)
      */
@@ -3170,8 +3232,8 @@ public class ReceptionController {
                 appointmentStatusChart.setLegendVisible(false); // save space
 
                 // ---- X Axis (Category) – use short labels to fit space ----
-                final String[] ORDER_FULL   = {"SCHEDULED", "COMPLETED", "CANCELLED"};
-                final String[] ORDER_SHORT  = {"SCHED.",   "COMP.",     "CANCEL."};
+                final String[] ORDER_FULL = {"SCHEDULED", "COMPLETED", "CANCELLED"};
+                final String[] ORDER_SHORT = {"SCHED.", "COMP.", "CANCEL."};
 
                 if (appointmentStatusChart.getXAxis() instanceof CategoryAxis cat) {
                     cat.setAnimated(false);
@@ -3187,7 +3249,7 @@ public class ReceptionController {
                 // ---- Y Axis (Number) – integer counts from 0 .. max ----
                 int maxVal = Math.max(
                         Math.max(dataMap.getOrDefault("SCHEDULED", 0),
-                                 dataMap.getOrDefault("COMPLETED", 0)),
+                                dataMap.getOrDefault("COMPLETED", 0)),
                         dataMap.getOrDefault("CANCELLED", 0)
                 );
                 int upper = Math.max(1, maxVal); // keep baseline visible when all zeros
@@ -3205,7 +3267,7 @@ public class ReceptionController {
                 series.setName(dayFinal.toString());
 
                 for (int i = 0; i < ORDER_FULL.length; i++) {
-                    String full  = ORDER_FULL[i];
+                    String full = ORDER_FULL[i];
                     String shortL = ORDER_SHORT[i];
                     int v = dataMap.getOrDefault(full, 0);
 
@@ -3227,7 +3289,7 @@ public class ReceptionController {
 
         }, "appt-status-chart").start();
     }
-}
+
     // =======================
     // Controller initialization (add wireDashboardDatePicker to the wiring section)
     // =======================
@@ -3235,3 +3297,112 @@ public class ReceptionController {
     // (You may need to find the actual initialize() method in the file and add the following line
     //   wireDashboardDatePicker();
     //   right after other wire... calls)
+
+
+    // Ensure tables are bound to their proper Sorted/Filtered lists (idempotent)
+    private void ensureTableBindings() {
+        try {
+            if (TableAppInDashboard != null && TableAppInDashboard.getItems() != dashSorted) {
+                dashSorted.comparatorProperty().bind(TableAppInDashboard.comparatorProperty());
+                TableAppInDashboard.setItems(dashSorted);
+            }
+        } catch (Throwable ignore) {
+        }
+        try {
+            if (TableINAppointment != null && TableINAppointment.getItems() != sortedAppt) {
+                sortedAppt.comparatorProperty().bind(TableINAppointment.comparatorProperty());
+                TableINAppointment.setItems(sortedAppt);
+            }
+        } catch (Throwable ignore) {
+        }
+        try {
+            if (DocTable_Recption != null && DocTable_Recption.getItems() != (doctorFiltered == null ? doctorData : doctorFiltered)) {
+                if (doctorFiltered == null) doctorFiltered = new FilteredList<>(doctorData, r -> true);
+                var sorted = new SortedList<>(doctorFiltered);
+                sorted.comparatorProperty().bind(DocTable_Recption.comparatorProperty());
+                DocTable_Recption.setItems(sorted);
+            }
+        } catch (Throwable ignore) {
+        }
+        try {
+            if (patientTable != null && patientTable.getItems() != (filtered == null ? patientData : filtered)) {
+                if (filtered == null) filtered = new FilteredList<>(patientData, r -> true);
+                var sorted = new SortedList<>(filtered);
+                sorted.comparatorProperty().bind(patientTable.comparatorProperty());
+                patientTable.setItems(sorted);
+            }
+        } catch (Throwable ignore) {
+        }
+    }
+
+    // Unified, debounced UI refresh pipeline used by DB NOTIFY and manual triggers
+    private void scheduleCoalescedRefresh() {
+        if (uiRefresh == null) return;
+        uiRefresh.request(() -> {
+            // 0) Ensure tables are wired to the right backing lists (fixes empty tables like TableINAppointment)
+            ensureTableBindings();
+
+            // 1) Dashboard appointments (date picker respected inside)
+            try {
+                reloadDashboardAppointments();
+            } catch (Throwable t) {
+                System.err.println("[UI-Refresh] reloadDashboardAppointments: " + t);
+            }
+            try {
+                applyDashboardFilters();
+            } catch (Throwable t) {
+                System.err.println("[UI-Refresh] applyDashboardFilters: " + t);
+            }
+
+            // 2) Chart & counters
+            try {
+                LocalDate day = (dataPickerDashboard == null) ? LocalDate.now() : dataPickerDashboard.getValue();
+                if (appointmentStatusChart != null) refreshAppointmentStatusChart(day);
+            } catch (Throwable t) {
+                System.err.println("[UI-Refresh] refreshAppointmentStatusChart: " + t);
+            }
+            try {
+                updateAppointmentCounters();
+            } catch (Throwable t) {
+                System.err.println("[UI-Refresh] updateAppointmentCounters: " + t);
+            }
+
+            // 3) Patients/Doctors datasets (background fetches but UI swap on FX thread)
+            try {
+                loadPatientsBG();
+            } catch (Throwable t) {
+                System.err.println("[UI-Refresh] loadPatientsBG: " + t);
+            }
+            try {
+                new Thread(() -> {
+                    try {
+                        var list = DoctorDAO.loadDoctorsBG();
+                        Platform.runLater(() -> {
+                            doctorData.setAll(list);
+                            ensureTableBindings();
+                        });
+                    } catch (Throwable ignore) {
+                    }
+                }, "doctors-reload").start();
+            } catch (Throwable t) {
+                System.err.println("[UI-Refresh] reload doctors: " + t);
+            }
+
+            // 4) Appointments pane table (if visible)
+            try {
+                loadAppointmentsTable();
+                if (TableINAppointment != null) TableINAppointment.refresh();
+            } catch (Throwable t) {
+                System.err.println("[UI-Refresh] loadAppointmentsTable: " + t);
+            }
+
+            // 5) Final touch: refresh visuals
+            try {
+                if (TableAppInDashboard != null) TableAppInDashboard.refresh();
+                if (DocTable_Recption != null) DocTable_Recption.refresh();
+                if (patientTable != null) patientTable.refresh();
+            } catch (Throwable ignore) {
+            }
+        });
+    }
+}

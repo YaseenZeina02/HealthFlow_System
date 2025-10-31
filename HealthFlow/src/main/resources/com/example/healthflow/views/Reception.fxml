@@ -203,7 +203,7 @@
                                             <children>
                                                 <ScrollPane layoutX="184.0" layoutY="-9.0" prefHeight="150.4" prefWidth="870.4000000000001" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
                                                     <content>
-                                                        <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="150.0" prefWidth="1300.0">
+                                                        <AnchorPane fx:id="reportAnchor" minHeight="0.0" minWidth="0.0" prefHeight="150.0" prefWidth="1300.0">
                                                             <children>
                                                                 <AnchorPane fx:id="Doctors" layoutX="14.0" layoutY="20.0" prefHeight="110.0" prefWidth="240.0" stylesheets="@../Design/ReceptionDesign.css">
                                                                     <styleClass>
