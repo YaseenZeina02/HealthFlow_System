@@ -82,6 +82,14 @@ public final class DbNotifications implements AutoCloseable {
                 try { st.execute("LISTEN " + ch); }
                 catch (SQLException e) { System.err.println("[DbNotifications] LISTEN failed for " + ch + " : " + e); }
             }
+            // Proactive resync after (re)connect
+            try {
+                handlers.forEach((ch, h) -> {
+                    try { h.accept("resync"); } catch (Throwable t) {
+                        System.err.println("[DbNotifications] resync handler error on channel " + ch + ": " + t);
+                    }
+                });
+            } catch (Throwable ignore) { }
         }
         System.out.println("[DbNotifications] connected (dedicated)");
     }

@@ -827,3 +827,6 @@ ALTER TABLE prescription_items
     ADD COLUMN IF NOT EXISTS approved_unit           pack_unit,
     ADD COLUMN IF NOT EXISTS approved_count          INT,
     ADD COLUMN IF NOT EXISTS approved_units_total    INT;
+
+
+ALTER TABLE patients ENABLE TRIGGER trg_patients_notify_insupddel;

@@ -262,11 +262,11 @@ public class ReceptionController {
 
 
     // --- Dashboard table pipeline (Base -> Filtered -> Sorted) ---
-    private final javafx.collections.ObservableList<com.example.healthflow.dao.DoctorDAO.AppointmentRow> dashBase =
+    private javafx.collections.ObservableList<com.example.healthflow.dao.DoctorDAO.AppointmentRow> dashBase =
             javafx.collections.FXCollections.observableArrayList();
-    private final javafx.collections.transformation.FilteredList<com.example.healthflow.dao.DoctorDAO.AppointmentRow> dashFiltered =
+    private javafx.collections.transformation.FilteredList<com.example.healthflow.dao.DoctorDAO.AppointmentRow> dashFiltered =
             new javafx.collections.transformation.FilteredList<>(dashBase, r -> true);
-    private final javafx.collections.transformation.SortedList<com.example.healthflow.dao.DoctorDAO.AppointmentRow> dashSorted =
+    private javafx.collections.transformation.SortedList<com.example.healthflow.dao.DoctorDAO.AppointmentRow> dashSorted =
             new javafx.collections.transformation.SortedList<>(dashFiltered);
 
     @FXML
@@ -328,6 +328,9 @@ public class ReceptionController {
     private static final DateTimeFormatter DATE_FMT_HUMAN = DateTimeFormatter.ofPattern("EEE, MMM dd, yyyy");
     private static final java.time.ZoneId APP_ZONE = java.time.ZoneId.of("Asia/Gaza");
     private static final java.time.ZoneId APP_TZ = java.time.ZoneId.of("Asia/Gaza");
+    // --- Lightweight change tracking (fallback if NOTIFY is missed) ---
+    private volatile java.sql.Timestamp lastApptTs = null;
+    private volatile java.sql.Timestamp lastPatientTs = null;
 
     // Cache: appointment.id -> patient's national_id (or fallback patient id)
     private final java.util.concurrent.ConcurrentHashMap<Long, String> apptPatientIdCache
@@ -446,8 +449,9 @@ public class ReceptionController {
             // --- Patients channel ---
             apptDbListener.listen("patients_changed", payload -> {
                 System.out.println("[ReceptionController] NOTIFY patients_changed payload=" + payload);
+                Platform.runLater(() -> loadPatientsBG());
                 uiRefresh.request(() -> {
-                    loadPatientsBG();
+//                    loadPatientsBG();
                     ensureTableBindings();
                     scheduleCoalescedRefresh();
                 });
@@ -827,6 +831,7 @@ public class ReceptionController {
 //        onAppointmentsDbEvent("init");
         startDbNotifications();
         scheduleCoalescedRefresh();  // تعبئة أولية
+        startLightweightPolling();
 
         Platform.runLater(() -> {
             var url = getClass().getResource(cssPath);
@@ -1379,7 +1384,12 @@ public class ReceptionController {
     }
 
     private void updateUserText(long userId, String column, String value) {
-        final String sql = "UPDATE users SET " + column + " = ? WHERE id = ?";
+        final String sql;
+        if ("gender".equalsIgnoreCase(column)) {
+            sql = "UPDATE users SET gender = ?::gender_type WHERE id = ?";
+        } else {
+            sql = "UPDATE users SET " + column + " = ? WHERE id = ?";
+        }
         try (Connection c = Database.get(); PreparedStatement ps = c.prepareStatement(sql)) {
             ps.setString(1, value);
             ps.setLong(2, userId);
@@ -1575,108 +1585,108 @@ public class ReceptionController {
     /**
      * تحديث لحظي مجمّع (coalesced)
      */
-//    private void scheduleCoalescedRefresh() {
-//        uiRefresh.request(() -> {
-//            new Thread(() -> {
-//                try {
-//                    var apptRows = AppointmentJdbcDAO.listScheduledAppointments();
-//                    var mapped = FXCollections.<ApptRow>observableArrayList();
-//                    for (var r : apptRows) {
-//                        ApptRow ar = new ApptRow();
-//                        ar.setId(r.id);
-//                        ar.setDoctorId(r.doctorId);
-//                        ar.setDoctorName(r.doctorName);
-//                        ar.setPatientName(r.patientName);
-//                        ar.setSpecialty(r.specialty);
-//                        ar.setStatus(r.status);
-//                        java.time.LocalDateTime ldt1 = toLocal(r.startAt);
-//                        if (ldt1 != null) {
-//                            ar.setDate(ldt1.toLocalDate());
-//                            ar.setTime(ldt1.toLocalTime());
-//                        }
-//
-//                        // ✅ أضف هذا السطر:
-//                        ar.setRoomNumber(r.location);
-//
-//                        ar.setNew(false);
-//                        ar.setDirty(false);
-//                        mapped.add(ar);
-//                    }
-//
-//                    var dashRows = apptRows;
-//                    if (TableAppInDashboard != null && searchAppointmentDach != null) {
-//                        String q = searchAppointmentDach.getText();
-//                        if (q != null && !q.isBlank()) dashRows = AppointmentJdbcDAO.searchScheduledAppointments(q);
-//                    }
-//                    final var dashRowsFinal = dashRows;
-//
-//                    int doctors = AppointmentJdbcDAO.countAvailableDoctors();
-//                    int appts = AppointmentJdbcDAO.countAppointments();
-//                    int patients = AppointmentJdbcDAO.countPatients();
-//                    int completed = AppointmentJdbcDAO.countCompletedAppointments();
-//                    int scheduled = AppointmentJdbcDAO.countScheduledAppointments();
-//
-//                    Platform.runLater(() -> {
-//                        apptEditable.setAll(mapped); // استبدال ذري
-//                        applyAppointmentFilters();
-//                        if (TableAppInDashboard != null) apptData.setAll(dashRowsFinal);
-//                        // Re-apply dashboard filters so table respects today's date upon first load
-//                        applyDashboardFilters();
-//                        if (NumberOfTotalDoctors != null) NumberOfTotalDoctors.setText(String.valueOf(doctors));
-//                        if (NumberOfTotalAppointments != null) NumberOfTotalAppointments.setText(String.valueOf(appts));
-//                        if (NumberOfTotalPatients != null) NumberOfTotalPatients.setText(String.valueOf(patients));
-//                        if (patientCompleteNum != null) patientCompleteNum.setText(String.valueOf(completed));
-//                        if (RemainingNum != null) RemainingNum.setText(String.valueOf(scheduled));
-//                        updatePatientDetailsChart();
-//                    });
-//                    TableUtils.applyDelta(apptEditable, mapped, ApptRow::getId);
-//
-//                    if (cmbSlots != null && avilabelDoctorApp != null && AppointmentDate != null
-//                            && avilabelDoctorApp.getValue() != null && AppointmentDate.getValue() != null) {
-//                        final LocalTime open = LocalTime.of(9, 0);
-//                        final LocalTime close = LocalTime.of(15, 0);
-//                        final int slotMin = 20;
-//                        var doc = avilabelDoctorApp.getValue();
-//                        var day = AppointmentDate.getValue();
-//                        var slots = doctorDAO.listFreeSlots(doc.doctorId, day, open, close, slotMin);
-////                        if (day.equals(LocalDate.now())) {
-////                            var now = LocalDateTime.now().withSecond(0).withNano(0);
-////                            int mod = now.getMinute() % slotMin;
-////                            var cutoff = (mod == 0) ? now : now.plusMinutes(slotMin - mod);
-////                            slots.removeIf(s -> s.from().isBefore(cutoff));
-////                            if (now.toLocalTime().isAfter(close)) slots.clear();
-////                        }
-//                        if (day.equals(LocalDate.now(APP_TZ))) {
-//                            LocalDateTime now = java.time.ZonedDateTime.now(APP_TZ)
-//                                    .toLocalDateTime().withSecond(0).withNano(0);
-//                            int mod = now.getMinute() % slotMin;
-//                            LocalDateTime cutoff = (mod == 0) ? now : now.plusMinutes(slotMin - mod);
-//                            slots.removeIf(s -> s.from().isBefore(cutoff));
-//                            if (now.toLocalTime().isAfter(close)) {
-//                                Platform.runLater(() -> {
-//                                    cmbSlots.getItems().clear();
-//                                    showInfo("Working Hours", "Clinic working hours are over for today.");
-//                                    showToast("info", "Clinic working hours are over for today.");
-//                                });
-//                                return;
-//                            }
-//                        }
-//                        Platform.runLater(() -> {
-//                            var selected = cmbSlots.getValue();
-//                            cmbSlots.setItems(FXCollections.observableArrayList(slots));
-//                            if (selected != null && slots.stream().anyMatch(s ->
-//                                    s.from().equals(selected.from()) && s.to().equals(selected.to()))) {
-//                                cmbSlots.getSelectionModel().select(selected);
-//                            }
-//                        });
-//                        TableUtils.applyDelta(apptEditable, mapped, ApptRow::getId);
-//                    }
-//                } catch (Exception e) {
-//                    Platform.runLater(() -> error("Auto refresh", e));
-//                }
-//            }, "ui-coalesced-refresh").start();
-//        });
-//    }
+    //    private void scheduleCoalescedRefresh() {
+    //        uiRefresh.request(() -> {
+    //            new Thread(() -> {
+    //                try {
+    //                    var apptRows = AppointmentJdbcDAO.listScheduledAppointments();
+    //                    var mapped = FXCollections.<ApptRow>observableArrayList();
+    //                    for (var r : apptRows) {
+    //                        ApptRow ar = new ApptRow();
+    //                        ar.setId(r.id);
+    //                        ar.setDoctorId(r.doctorId);
+    //                        ar.setDoctorName(r.doctorName);
+    //                        ar.setPatientName(r.patientName);
+    //                        ar.setSpecialty(r.specialty);
+    //                        ar.setStatus(r.status);
+    //                        java.time.LocalDateTime ldt1 = toLocal(r.startAt);
+    //                        if (ldt1 != null) {
+    //                            ar.setDate(ldt1.toLocalDate());
+    //                            ar.setTime(ldt1.toLocalTime());
+    //                        }
+    //
+    //                        // ✅ أضف هذا السطر:
+    //                        ar.setRoomNumber(r.location);
+    //
+    //                        ar.setNew(false);
+    //                        ar.setDirty(false);
+    //                        mapped.add(ar);
+    //                    }
+    //
+    //                    var dashRows = apptRows;
+    //                    if (TableAppInDashboard != null && searchAppointmentDach != null) {
+    //                        String q = searchAppointmentDach.getText();
+    //                        if (q != null && !q.isBlank()) dashRows = AppointmentJdbcDAO.searchScheduledAppointments(q);
+    //                    }
+    //                    final var dashRowsFinal = dashRows;
+    //
+    //                    int doctors = AppointmentJdbcDAO.countAvailableDoctors();
+    //                    int appts = AppointmentJdbcDAO.countAppointments();
+    //                    int patients = AppointmentJdbcDAO.countPatients();
+    //                    int completed = AppointmentJdbcDAO.countCompletedAppointments();
+    //                    int scheduled = AppointmentJdbcDAO.countScheduledAppointments();
+    //
+    //                    Platform.runLater(() -> {
+    //                        apptEditable.setAll(mapped); // استبدال ذري
+    //                        applyAppointmentFilters();
+    //                        if (TableAppInDashboard != null) apptData.setAll(dashRowsFinal);
+    //                        // Re-apply dashboard filters so table respects today's date upon first load
+    //                        applyDashboardFilters();
+    //                        if (NumberOfTotalDoctors != null) NumberOfTotalDoctors.setText(String.valueOf(doctors));
+    //                        if (NumberOfTotalAppointments != null) NumberOfTotalAppointments.setText(String.valueOf(appts));
+    //                        if (NumberOfTotalPatients != null) NumberOfTotalPatients.setText(String.valueOf(patients));
+    //                        if (patientCompleteNum != null) patientCompleteNum.setText(String.valueOf(completed));
+    //                        if (RemainingNum != null) RemainingNum.setText(String.valueOf(scheduled));
+    //                        updatePatientDetailsChart();
+    //                    });
+    //                    TableUtils.applyDelta(apptEditable, mapped, ApptRow::getId);
+    //
+    //                    if (cmbSlots != null && avilabelDoctorApp != null && AppointmentDate != null
+    //                            && avilabelDoctorApp.getValue() != null && AppointmentDate.getValue() != null) {
+    //                        final LocalTime open = LocalTime.of(9, 0);
+    //                        final LocalTime close = LocalTime.of(15, 0);
+    //                        final int slotMin = 20;
+    //                        var doc = avilabelDoctorApp.getValue();
+    //                        var day = AppointmentDate.getValue();
+    //                        var slots = doctorDAO.listFreeSlots(doc.doctorId, day, open, close, slotMin);
+    ////                        if (day.equals(LocalDate.now())) {
+    ////                            var now = LocalDateTime.now().withSecond(0).withNano(0);
+    ////                            int mod = now.getMinute() % slotMin;
+    ////                            var cutoff = (mod == 0) ? now : now.plusMinutes(slotMin - mod);
+    ////                            slots.removeIf(s -> s.from().isBefore(cutoff));
+    ////                            if (now.toLocalTime().isAfter(close)) slots.clear();
+    ////                        }
+    //                        if (day.equals(LocalDate.now(APP_TZ))) {
+    //                            LocalDateTime now = java.time.ZonedDateTime.now(APP_TZ)
+    //                                    .toLocalDateTime().withSecond(0).withNano(0);
+    //                            int mod = now.getMinute() % slotMin;
+    //                            LocalDateTime cutoff = (mod == 0) ? now : now.plusMinutes(slotMin - mod);
+    //                            slots.removeIf(s -> s.from().isBefore(cutoff));
+    //                            if (now.toLocalTime().isAfter(close)) {
+    //                                Platform.runLater(() -> {
+    //                                    cmbSlots.getItems().clear();
+    //                                    showInfo("Working Hours", "Clinic working hours are over for today.");
+    //                                    showToast("info", "Clinic working hours are over for today.");
+    //                                });
+    //                                return;
+    //                            }
+    //                        }
+    //                        Platform.runLater(() -> {
+    //                            var selected = cmbSlots.getValue();
+    //                            cmbSlots.setItems(FXCollections.observableArrayList(slots));
+    //                            if (selected != null && slots.stream().anyMatch(s ->
+    //                                    s.from().equals(selected.from()) && s.to().equals(selected.to()))) {
+    //                                cmbSlots.getSelectionModel().select(selected);
+    //                            }
+    //                        });
+    //                        TableUtils.applyDelta(apptEditable, mapped, ApptRow::getId);
+    //                    }
+    //                } catch (Exception e) {
+    //                    Platform.runLater(() -> error("Auto refresh", e));
+    //                }
+    //            }, "ui-coalesced-refresh").start();
+    //        });
+    //    }
 
 
     /**
@@ -1687,24 +1697,24 @@ public class ReceptionController {
     }
 
 
-//    private void startDbNotifications() {
-//        if (apptDbListener != null) apptDbListener.close(); // لو كان قديم
-//        apptDbListener = new DbNotifications();
-//
-//        apptDbListener.listen("appointments_changed", payload -> {
-//            // 1) فضّي كاش الساعات
-//            slotCache.clear();
-//            // 2) حدّث الـ UI/الجدول والرسم
-//            onAppointmentsDbEvent(payload);
-//        });
-//
-//        apptDbListener.listen("patients_changed", payload -> {
-//            System.out.println("NOTIFY patients_changed: " + payload);
-//            uiRefresh.request(this::loadPatientsBG);   // داخليًا بيروح Platform.runLater
-//        });
-//
-//        System.out.println("DbNotifications: starting listeners...");
-//    }
+    //    private void startDbNotifications() {
+    //        if (apptDbListener != null) apptDbListener.close(); // لو كان قديم
+    //        apptDbListener = new DbNotifications();
+    //
+    //        apptDbListener.listen("appointments_changed", payload -> {
+    //            // 1) فضّي كاش الساعات
+    //            slotCache.clear();
+    //            // 2) حدّث الـ UI/الجدول والرسم
+    //            onAppointmentsDbEvent(payload);
+    //        });
+    //
+    //        apptDbListener.listen("patients_changed", payload -> {
+    //            System.out.println("NOTIFY patients_changed: " + payload);
+    //            uiRefresh.request(this::loadPatientsBG);   // داخليًا بيروح Platform.runLater
+    //        });
+    //
+    //        System.out.println("DbNotifications: starting listeners...");
+    //    }
 
 
     /* ===== Helpers (alerts & online guard wrapper) ===== */
@@ -2511,6 +2521,7 @@ public class ReceptionController {
             try (PreparedStatement n = c.prepareStatement("SELECT pg_notify('appointments_changed','update')")) {
                 n.execute();
             }
+            lastApptTs = new java.sql.Timestamp(System.currentTimeMillis());
         } catch (SQLException e) {
             Platform.runLater(() -> showError("Update appointment_date", e));
         }
@@ -2713,6 +2724,7 @@ public class ReceptionController {
             try (PreparedStatement n = c.prepareStatement("SELECT pg_notify('appointments_changed','update')")) {
                 n.execute();
             }
+            lastApptTs = new java.sql.Timestamp(System.currentTimeMillis());
             showInfo("Update", "Appointment updated.");
 //            scheduleCoalescedRefresh();
         } catch (Exception e) {
@@ -2768,33 +2780,39 @@ public class ReceptionController {
 //    }
     private void reloadDashboardAppointments() {
         if (TableAppInDashboard == null) return;
+
         java.time.LocalDate sel = (dataPickerDashboard != null && dataPickerDashboard.getValue() != null)
                 ? dataPickerDashboard.getValue()
                 : java.time.LocalDate.now();
-        try {
-            var rows = com.example.healthflow.dao.AppointmentJdbcDAO.listByDateAll(sel);
-            // Ensure mutation happens on FX thread
-            Platform.runLater(() -> {
-                dashBase.setAll(rows == null ? java.util.List.of() : rows); // حماية من null
-                applyDashboardFilters();  // فلاتر البحث فقط (بدون فلترة تاريخ هنا)
-                if (TableAppInDashboard != null) {
-                    LocalDate shown = (dataPickerDashboard != null && dataPickerDashboard.getValue() != null)
-                            ? dataPickerDashboard.getValue() : sel;
-                    if (rows == null || rows.isEmpty()) {
-                        TableAppInDashboard.setPlaceholder(new Label("No appointments on " + shown));
-                    } else {
+
+        // اجلب البيانات بالخلفية حتى ما يعلق الـ UI
+        new Thread(() -> {
+            try {
+                var rows = com.example.healthflow.dao.AppointmentJdbcDAO.listByDateAll(sel);
+
+                // كل تفاعل مع الواجهة يتم داخل FX thread
+                Platform.runLater(() -> {
+                    if (rows != null && !rows.isEmpty()) {
+                        dashBase.setAll(rows);
                         TableAppInDashboard.setPlaceholder(new Label(""));
+                    } else {
+                        System.out.println("[Dashboard] no appointments found, keeping previous rows temporarily");
+                        TableAppInDashboard.setPlaceholder(new Label("No appointments on " + sel));
                     }
+
+                    applyDashboardFilters();
                     TableAppInDashboard.refresh();
-                }
-            });
-            System.out.println("[ReceptionController] reloadDashboardAppointments sel=" + sel + " rows=" + (rows == null ? 0 : rows.size()));
-        } catch (Exception ex) {
-            System.err.println("[ReceptionController] reloadDashboardAppointments error: " + ex);
-            Platform.runLater(() -> {
-                if (TableAppInDashboard != null) TableAppInDashboard.setPlaceholder(new Label("Failed to load"));
-            });
-        }
+                    System.out.println("[ReceptionController] reloadDashboardAppointments sel=" + sel + " rows=" + (rows == null ? 0 : rows.size()));
+                });
+
+            } catch (Exception ex) {
+                System.err.println("[ReceptionController] reloadDashboardAppointments error: " + ex);
+                Platform.runLater(() -> {
+                    if (TableAppInDashboard != null)
+                        TableAppInDashboard.setPlaceholder(new Label("Failed to load"));
+                });
+            }
+        }, "reload-dashboard").start();
     }
 
     // -- Dashboard DatePicker wiring: today by default + reload on change
@@ -2987,17 +3005,33 @@ public class ReceptionController {
     // ===== Dashboard table: columns & actions =====
     private void wireDashboardTable() {
         if (TableAppInDashboard == null) return;
-        // ✅ نستخدم UNCONSTRAINED_RESIZE_POLICY لتمكين الـ H-Scroll عند زيادة مجموع عرض الأعمدة
+
+        // --- 0) Ensure pipeline exists: dashBase -> dashFiltered -> dashSorted ---
+        if (dashBase == null) {
+            dashBase = javafx.collections.FXCollections.observableArrayList();
+        }
+        if (dashFiltered == null) {
+            dashFiltered = new javafx.collections.transformation.FilteredList<>(dashBase, r -> true);
+        }
+        if (dashSorted == null) {
+            dashSorted = new javafx.collections.transformation.SortedList<>(dashFiltered);
+        }
+
+        // --- 1) Table wiring (idempotent) ---
         TableAppInDashboard.setColumnResizePolicy(TableView.UNCONSTRAINED_RESIZE_POLICY);
-        TableAppInDashboard.setItems(dashSorted);
-        TableAppInDashboard.setPlaceholder(new Label("Loading..."));
-        dashSorted.comparatorProperty().bind(TableAppInDashboard.comparatorProperty());
+        try { dashSorted.comparatorProperty().bind(TableAppInDashboard.comparatorProperty()); } catch (Throwable ignore) {}
+        if (TableAppInDashboard.getItems() != dashSorted) {
+            TableAppInDashboard.setItems(dashSorted);
+        }
+        if (TableAppInDashboard.getPlaceholder() == null) {
+            TableAppInDashboard.setPlaceholder(new Label("Loading..."));
+        }
 
         // -------- Appointment ID (index shown 1..n) --------
         if (colAppointmentID != null) {
             colAppointmentID.setStyle("-fx-alignment: CENTER;");
             colAppointmentID.setMinWidth(60);
-            colAppointmentID.setPrefWidth(70);   // صغير
+            colAppointmentID.setPrefWidth(70);
             colAppointmentID.setMaxWidth(120);
             colAppointmentID.setResizable(true);
 
@@ -3070,25 +3104,16 @@ public class ReceptionController {
         if (colActionDash != null) {
             colActionDash.setStyle("-fx-alignment: CENTER;");
             colActionDash.setMinWidth(100);
-            colActionDash.setPrefWidth(110);  // ثابت وصغير
+            colActionDash.setPrefWidth(110);
             colActionDash.setMaxWidth(150);
             colActionDash.setResizable(true);
 
             colActionDash.setCellFactory(col -> new TableCell<DoctorDAO.AppointmentRow, Void>() {
                 private final Button btn = new Button("Open");
-
-                {
-                    btn.getStyleClass().add("action-btn");
-                    btn.setFocusTraversable(false);
-                }
-
-                @Override
-                protected void updateItem(Void item, boolean empty) {
+                { btn.getStyleClass().add("action-btn"); btn.setFocusTraversable(false); }
+                @Override protected void updateItem(Void item, boolean empty) {
                     super.updateItem(item, empty);
-                    if (empty) {
-                        setGraphic(null);
-                        return;
-                    }
+                    if (empty) { setGraphic(null); return; }
                     btn.setOnAction(e -> {
                         DoctorDAO.AppointmentRow r = getTableView().getItems().get(getIndex());
                         if (r == null) return;
@@ -3115,7 +3140,7 @@ public class ReceptionController {
             });
         }
 
-        // لا نطبق أي عمليات ثقيلة هنا
+        // ختامًا: أول تحميل + فلترة (خفيفة جدًا)
         reloadDashboardAppointments();
         applyDashboardFilters();
     }
@@ -3165,15 +3190,19 @@ public class ReceptionController {
         String q = (searchAppointmentDach == null || searchAppointmentDach.getText() == null)
                 ? "" : searchAppointmentDach.getText().trim().toLowerCase();
 
-        dashFiltered.setPredicate(r -> {
-            // 🔎 search only; date filtering is already handled by reloadDashboardAppointments()
+        // ✅ فلترة عامة (بدون فلترة تاريخ، لأنها موجودة في reloadDashboardAppointments)
+        java.util.function.Predicate<DoctorDAO.AppointmentRow> predicate = r -> {
+            if (r == null) return false;
             if (q.isEmpty()) return true;
-            return (r.patientName != null && r.patientName.toLowerCase().contains(q)) ||
-                    (r.doctorName != null && r.doctorName.toLowerCase().contains(q)) ||
-                    (r.specialty != null && r.specialty.toLowerCase().contains(q)) ||
-                    (r.location != null && r.location.toLowerCase().contains(q)) ||
-                    (String.valueOf(r.id).contains(q));
-        });
+            return (r.patientName != null && r.patientName.toLowerCase().contains(q))
+                    || (r.doctorName != null && r.doctorName.toLowerCase().contains(q))
+                    || (r.specialty != null && r.specialty.toLowerCase().contains(q))
+                    || (r.location != null && r.location.toLowerCase().contains(q))
+                    || (String.valueOf(r.id).contains(q));
+        };
+
+        if (dashFiltered != null) dashFiltered.setPredicate(predicate);
+        if (filteredDash != null) filteredDash.setPredicate(predicate);
 
         if (TableAppInDashboard != null) {
             TableAppInDashboard.refresh();
@@ -3405,4 +3434,69 @@ public class ReceptionController {
             }
         });
     }
+
+    // Start a very light polling that only checks MAX(updated_at) stamps; triggers a coalesced UI refresh on change
+    private void startLightweightPolling() {
+        java.util.concurrent.ScheduledExecutorService exec = this.autoRefreshExec;
+        if (exec == null) return; // safety
+
+        exec.scheduleAtFixedRate(() -> {
+            try {
+                // 1) appointments for selected day (cheap because of date filter)
+                java.time.LocalDate sel = (dataPickerDashboard != null && dataPickerDashboard.getValue() != null)
+                        ? dataPickerDashboard.getValue() : java.time.LocalDate.now();
+
+                java.sql.Timestamp apptTs = fetchMaxApptUpdatedAt(sel);
+                if ((lastApptTs == null && apptTs != null) || (apptTs != null && apptTs.after(lastApptTs))) {
+                    lastApptTs = apptTs;
+                    uiRefresh.request(() -> {
+                        ensureTableBindings();
+                        reloadDashboardAppointments();
+                        applyDashboardFilters();
+                        updateAppointmentCounters();
+                        if (appointmentStatusChart != null) refreshAppointmentStatusChart(sel);
+                    });
+                }
+
+                // 2) patients: watch both users/patients via greatest(updated_at)
+                java.sql.Timestamp patTs = fetchMaxPatientUpdatedAt();
+                if ((lastPatientTs == null && patTs != null) || (patTs != null && patTs.after(lastPatientTs))) {
+                    lastPatientTs = patTs;
+                    Platform.runLater(this::loadPatientsBG); // light, async
+                    uiRefresh.request(() -> {
+                        ensureTableBindings();
+                        scheduleCoalescedRefresh();
+                    });
+                }
+            } catch (Throwable t) {
+                System.err.println("[ReceptionController] poll error: " + t);
+            }
+        }, 1500, 3000, java.util.concurrent.TimeUnit.MILLISECONDS); // first run after 1.5s, then every 3s
+    }
+
+    private java.sql.Timestamp fetchMaxApptUpdatedAt(java.time.LocalDate day) {
+        final String sql = "SELECT MAX(updated_at) FROM appointments WHERE appointment_date::date = ?";
+        try (java.sql.Connection c = com.example.healthflow.db.Database.get();
+             java.sql.PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setObject(1, day);
+            try (java.sql.ResultSet rs = ps.executeQuery()) {
+                return rs.next() ? rs.getTimestamp(1) : null;
+            }
+        } catch (java.sql.SQLException e) {
+            return null;
+        }
+    }
+
+    private java.sql.Timestamp fetchMaxPatientUpdatedAt() {
+        final String sql = "SELECT MAX(GREATEST(u.updated_at, p.updated_at)) " +
+                "FROM users u JOIN patients p ON p.user_id = u.id";
+        try (java.sql.Connection c = com.example.healthflow.db.Database.get();
+             java.sql.PreparedStatement ps = c.prepareStatement(sql);
+             java.sql.ResultSet rs = ps.executeQuery()) {
+            return rs.next() ? rs.getTimestamp(1) : null;
+        } catch (java.sql.SQLException e) {
+            return null;
+        }
+    }
+
 }
