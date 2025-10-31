@@ -50,97 +50,158 @@ import java.util.List;
 public class DoctorController {
 
     /* ====== Cards / header / nav ====== */
-    @FXML private AnchorPane Appointments;
-    @FXML private Label TotalAppointmentsNum;
+    @FXML
+    private AnchorPane Appointments;
+    @FXML
+    private Label TotalAppointmentsNum;
 
-//    @FXML private AnchorPane Appointments21;
-    @FXML private Label PatientsNumberWithSpecificDoctor;
+    //    @FXML private AnchorPane Appointments21;
+    @FXML
+    private Label PatientsNumberWithSpecificDoctor;
 
-//    @FXML private AnchorPane Appointments2;
-    @FXML private Label AppointmentCompletedWithSpecificDoctor;
+    //    @FXML private AnchorPane Appointments2;
+    @FXML
+    private Label AppointmentCompletedWithSpecificDoctor;
 
-//    @FXML private AnchorPane Appointments22;
-    @FXML private Label AppointmentRemainingWithSpecificDoctor;
+    //    @FXML private AnchorPane Appointments22;
+    @FXML
+    private Label AppointmentRemainingWithSpecificDoctor;
 
-    @FXML private Button BackButton;
-    @FXML private Button DachboardButton;
-    @FXML private Button PatientsButton;
-    @FXML private Button PrescriptionButton;
-    @FXML private Button Add_Medication;
-    @FXML private Button cancelAddMedication;
-    @FXML private Button InsertMedicine; // to insert medicine to database
-    @FXML private Button sendToPharmacy;
+    @FXML
+    private Button BackButton;
+    @FXML
+    private Button DachboardButton;
+    @FXML
+    private Button PatientsButton;
+    @FXML
+    private Button PrescriptionButton;
+    @FXML
+    private Button Add_Medication;
+    @FXML
+    private Button cancelAddMedication;
+    @FXML
+    private Button InsertMedicine; // to insert medicine to database
+    @FXML
+    private Button sendToPharmacy;
 
-    @FXML private Button Update_Medication;
+    @FXML
+    private Button Update_Medication;
 //    @FXML private Button Delete_Medication;
 
-    @FXML private TextField medicineField;
+    @FXML
+    private TextField medicineField;
 
 
-    @FXML private AnchorPane CenterAnchorPane;
-    @FXML private AnchorPane DashboardAnchorPane;
-    @FXML private AnchorPane PatientAnchorPane;
-    @FXML private AnchorPane PrescriptionAnchorPane;
-    @FXML private AnchorPane PrescriptionMedicationAnchorPane;
-    @FXML private AnchorPane AddMedicationAnchorPane;
+    @FXML
+    private AnchorPane CenterAnchorPane;
+    @FXML
+    private AnchorPane DashboardAnchorPane;
+    @FXML
+    private AnchorPane PatientAnchorPane;
+    @FXML
+    private AnchorPane PrescriptionAnchorPane;
+    @FXML
+    private AnchorPane PrescriptionMedicationAnchorPane;
+    @FXML
+    private AnchorPane AddMedicationAnchorPane;
 
 
-    @FXML private Label DateOfDay;
-    @FXML private Label time;
-    @FXML private Label welcomeUser;
-    @FXML private Label UsernameLabel;
-    @FXML private Label UserIdLabel;
-    @FXML private Label alertLabel;
+    @FXML
+    private Label DateOfDay;
+    @FXML
+    private Label time;
+    @FXML
+    private Label welcomeUser;
+    @FXML
+    private Label UsernameLabel;
+    @FXML
+    private Label UserIdLabel;
+    @FXML
+    private Label alertLabel;
 
 
-    @FXML private Circle ActiveStatus;
+    @FXML
+    private Circle ActiveStatus;
 
-    @FXML private DatePicker datePickerPatientsWithDoctorDash;
+    @FXML
+    private DatePicker datePickerPatientsWithDoctorDash;
 
     /* ====== Dashboard table (appointments) ====== */
-    @FXML private TableView<AppointmentRow> AppointmentsTable;
-    @FXML private TableColumn<AppointmentRow, String> colSerialNumber;
-    @FXML private TableColumn<AppointmentRow, String> colDoctorName;
-    @FXML private TableColumn<AppointmentRow, String>    colPatientName;
-    @FXML private TableColumn<AppointmentRow, LocalDate> colDate;
-    @FXML private TableColumn<AppointmentRow, String>    colTime;
-    @FXML private TableColumn<AppointmentRow, String>    colStatus;
-    @FXML private TableColumn<AppointmentRow, AppointmentRow> colAction;
+    @FXML
+    private TableView<AppointmentRow> AppointmentsTable;
+    @FXML
+    private TableColumn<AppointmentRow, String> colSerialNumber;
+    @FXML
+    private TableColumn<AppointmentRow, String> colDoctorName;
+    @FXML
+    private TableColumn<AppointmentRow, String> colPatientName;
+    @FXML
+    private TableColumn<AppointmentRow, LocalDate> colDate;
+    @FXML
+    private TableColumn<AppointmentRow, String> colTime;
+    @FXML
+    private TableColumn<AppointmentRow, String> colStatus;
+    @FXML
+    private TableColumn<AppointmentRow, AppointmentRow> colAction;
 
     /* ====== Patients tab ====== */
-    @FXML private TableView<PatientRow> patientTable;
-    @FXML private TableColumn<PatientRow, String>  colNationalId;
-    @FXML private TableColumn<PatientRow, String>  colName;
-    @FXML private TableColumn<PatientRow, String>  colGender;
-    @FXML private TableColumn<PatientRow, Integer> colDob; // age
-    @FXML private TableColumn<PatientRow, String>  colMedicalHistory;
-    @FXML private TableColumn<PatientRow, PatientRow> colAction2;
-    @FXML private TextField search;      // patients search (future)
-    @FXML private TextField searchLabel; // appointments search (future)
-    @FXML private DatePicker datePickerPatientsWithDoctor;
+    @FXML
+    private TableView<PatientRow> patientTable;
+    @FXML
+    private TableColumn<PatientRow, String> colNationalId;
+    @FXML
+    private TableColumn<PatientRow, String> colName;
+    @FXML
+    private TableColumn<PatientRow, String> colGender;
+    @FXML
+    private TableColumn<PatientRow, Integer> colDob; // age
+    @FXML
+    private TableColumn<PatientRow, String> colMedicalHistory;
+    @FXML
+    private TableColumn<PatientRow, PatientRow> colAction2;
+    @FXML
+    private TextField search;      // patients search (future)
+    @FXML
+    private TextField searchLabel; // appointments search (future)
+    @FXML
+    private DatePicker datePickerPatientsWithDoctor;
     private FilteredList<PatientRow> filtered;
     private SortedList<PatientRow> sorted;
 
 
     /* ====== Medicine tab ====== */
-    @FXML private TableView<PrescItemRow> TablePrescriptionItems;
-    @FXML private TableColumn<PrescItemRow, Number>  colIdx;
-    @FXML private TableColumn<PrescItemRow, String>  colMedicineName;
-    @FXML private TableColumn<PrescItemRow, String>  colDosage;
-    @FXML private TableColumn<PrescItemRow, Integer> colDuration;
-    @FXML private TableColumn<PrescItemRow, String> colQuantity;
-    @FXML private TableColumn<PrescItemRow, String> colPack;
+    @FXML
+    private TableView<PrescItemRow> TablePrescriptionItems;
+    @FXML
+    private TableColumn<PrescItemRow, Number> colIdx;
+    @FXML
+    private TableColumn<PrescItemRow, String> colMedicineName;
+    @FXML
+    private TableColumn<PrescItemRow, String> colDosage;
+    @FXML
+    private TableColumn<PrescItemRow, Integer> colDuration;
+    @FXML
+    private TableColumn<PrescItemRow, String> colQuantity;
+    @FXML
+    private TableColumn<PrescItemRow, String> colPack;
 
     //    @FXML private TableColumn<PrescItemRow, String>  colDiagnosis;
-    @FXML private TableColumn<PrescItemRow, PrescItemRow> colPresesAction;
-    @FXML private TableColumn<PrescItemRow, Integer> colDose;
-    @FXML private TableColumn<PrescItemRow, Integer> colFreqPerDay;
-    @FXML private TableColumn<PrescItemRow, String>  colStrength;
-    @FXML private TableColumn<PrescItemRow, String>  colForm;
-    @FXML private TableColumn<PrescItemRow, String>  colRoute;
+    @FXML
+    private TableColumn<PrescItemRow, PrescItemRow> colPresesAction;
+    @FXML
+    private TableColumn<PrescItemRow, Integer> colDose;
+    @FXML
+    private TableColumn<PrescItemRow, Integer> colFreqPerDay;
+    @FXML
+    private TableColumn<PrescItemRow, String> colStrength;
+    @FXML
+    private TableColumn<PrescItemRow, String> colForm;
+    @FXML
+    private TableColumn<PrescItemRow, String> colRoute;
 
 
-    @FXML private TableColumn<PrescItemRow, String>  colPresesStatus;
+    @FXML
+    private TableColumn<PrescItemRow, String> colPresesStatus;
 
     // In-memory draft prescription items (source list for the table)
     private final ObservableList<PrescItemRow> prescItemsEditable = FXCollections.observableArrayList();
@@ -157,7 +218,8 @@ public class DoctorController {
     private Long currentDoctorUserId = null;
     private String currentDoctorFullName = null;
 
-    @FXML private AnchorPane rootPane;
+    @FXML
+    private AnchorPane rootPane;
 
 
 //    ------------------------------
@@ -174,7 +236,8 @@ public class DoctorController {
     @FXML
     private Label PatientNameLabel;
 
-    @FXML private TextField PatientNameTF;
+    @FXML
+    private TextField PatientNameTF;
 
 
     @FXML
@@ -196,6 +259,9 @@ public class DoctorController {
     @FXML
     private TextArea nots_Pre;
 
+    @FXML private Label qtyLabelCulc;
+
+
     @FXML
     private ComboBox<String> medicineName_combo;
 
@@ -209,10 +275,6 @@ public class DoctorController {
     private Label userStatus;
 
 
-
-
-
-
     /* ====== Services / state ====== */
     private final ConnectivityMonitor monitor;
     private final DoctorDAO doctorDAO = new DoctorDAO();
@@ -221,7 +283,7 @@ public class DoctorController {
 
     private final ObservableList<AppointmentRow> apptData = FXCollections.observableArrayList();
     private FilteredList<AppointmentRow> apptFiltered = new FilteredList<>(apptData, r -> true);
-    private SortedList<AppointmentRow>   apptSorted   = new SortedList<>(apptFiltered);
+    private SortedList<AppointmentRow> apptSorted = new SortedList<>(apptFiltered);
     private org.controlsfx.control.textfield.AutoCompletionBinding<String> apptSearchBinding;
 
     private final ObservableList<PatientRow> patientData = FXCollections.observableArrayList();
@@ -230,15 +292,20 @@ public class DoctorController {
     private Runnable appointmentsRefit = null;
 
 
+    public DoctorController(ConnectivityMonitor monitor) {
+        this.monitor = monitor;
+    }
 
-    public DoctorController(ConnectivityMonitor monitor) { this.monitor = monitor; }
-    public DoctorController() { this(new ConnectivityMonitor()); }
+    public DoctorController() {
+        this(new ConnectivityMonitor());
+    }
 
 
     /* ====== Nav highlight ====== */
     private static final String ACTIVE_CLASS = "current";
+
     private void markNavActive(Button active) {
-        Button[] all = {DachboardButton, PatientsButton ,PrescriptionButton};
+        Button[] all = {DachboardButton, PatientsButton, PrescriptionButton};
         for (Button b : all) {
             b.getStyleClass().remove(ACTIVE_CLASS);
             if (!b.getStyleClass().contains("nav-btn")) b.getStyleClass().add("nav-btn");
@@ -247,6 +314,7 @@ public class DoctorController {
             active.getStyleClass().add(ACTIVE_CLASS);
         }
     }
+
     /* ================= INIT ================= */
     @FXML
     private void initialize() {
@@ -289,7 +357,10 @@ public class DoctorController {
 
         BackButton.setOnAction(e -> goBackToLogin());
 
-        try { OnlineBindings.disableWhenOffline(monitor, DachboardButton, PatientsButton); } catch (Throwable ignored) {}
+        try {
+            OnlineBindings.disableWhenOffline(monitor, DachboardButton, PatientsButton);
+        } catch (Throwable ignored) {
+        }
 
         wireAppointmentsTable();
         wirePatientsTable();
@@ -332,7 +403,6 @@ public class DoctorController {
         loadMedicinesIntoCombo();
 
 
-
         if (PatientNameTF != null) {
             PatientNameTF.textProperty().addListener((obs, oldV, newV) -> {
                 String t = (newV == null) ? "" : newV.trim();
@@ -362,9 +432,7 @@ public class DoctorController {
         // Add / Save in the Add-Medicine pane
         if (InsertMedicine != null) {
             InsertMedicine.setOnAction(e -> {
-                System.out.println("[INSERT_MEDICINE BUTTON] Before adding medicine -> userId="
-                        + selectedPatientUserId + ", name=" + selectedPatientName
-                        + ", NID=" + selectedPatientNationalId);
+
                 addMedicineFromDialog();
             });
         }
@@ -385,6 +453,7 @@ public class DoctorController {
 
     /* ================= Header time & date (12h) ================= */
     private static final java.time.ZoneId APP_TZ = java.time.ZoneId.of("Asia/Gaza");
+
     private void startClock() {
         DateTimeFormatter tf = DateTimeFormatter.ofPattern("hh:mm:ss a");
         Timeline tl = new Timeline(
@@ -545,7 +614,9 @@ public class DoctorController {
 
     /* ================= Data loads ================= */
 
-    /** Load medicine names from DB into the medicineName_combo combobox. */
+    /**
+     * Load medicine names from DB into the medicineName_combo combobox.
+     */
     private void loadMedicinesIntoCombo() {
         if (medicineName_combo == null) return;
         medicineName_combo.setDisable(true);
@@ -578,6 +649,7 @@ public class DoctorController {
             });
         }, "load-meds-combo").start();
     }
+
     private void reloadAll() {
         var _dashDate = (datePickerPatientsWithDoctorDash != null && datePickerPatientsWithDoctorDash.getValue() != null)
                 ? datePickerPatientsWithDoctorDash.getValue()
@@ -591,7 +663,9 @@ public class DoctorController {
         loadPatientsForDateAsync(d);
     }
 
-    /** Load dashboard counters (total/completed/remaining/unique patients) for the logged-in doctor on a specific date. */
+    /**
+     * Load dashboard counters (total/completed/remaining/unique patients) for the logged-in doctor on a specific date.
+     */
     private void loadStatsForDateAsync(LocalDate date) {
         var u = Session.get();
         if (u == null || date == null) return;
@@ -616,10 +690,10 @@ public class DoctorController {
                     ps.setDate(2, java.sql.Date.valueOf(date));
                     try (var rs = ps.executeQuery()) {
                         if (rs.next()) {
-                            total         = rs.getInt("total");
-                            completed     = rs.getInt("completed");
+                            total = rs.getInt("total");
+                            completed = rs.getInt("completed");
                             patientsToday = rs.getInt("patients_today");
-                            remaining     = rs.getInt("remaining");
+                            remaining = rs.getInt("remaining");
                         }
                     }
                 }
@@ -654,17 +728,19 @@ public class DoctorController {
         loadAppointmentsForDateAsync(date);
     }
 
-    /** Build the search suggestions for the Appointments table and wire the live filter. */
+    /**
+     * Build the search suggestions for the Appointments table and wire the live filter.
+     */
     private void buildAppointmentSearchIndex() {
         if (searchLabel == null) return;
 
         java.util.LinkedHashSet<String> suggestions = new java.util.LinkedHashSet<>();
         for (AppointmentRow r : apptData) {
             if (r == null) continue;
-            String idStr   = String.valueOf(r.getId());
-            String name    = nullToEmpty(r.getPatientName());
-            String nid     = nullToEmpty(r.getNationalId());
-            String status  = nullToEmpty(r.getStatus());
+            String idStr = String.valueOf(r.getId());
+            String name = nullToEmpty(r.getPatientName());
+            String nid = nullToEmpty(r.getNationalId());
+            String status = nullToEmpty(r.getStatus());
             String dateStr = (r.getDate() == null) ? "" : r.getDate().toString();
             String timeStr = nullToEmpty(r.getTimeStr());
             for (String p : java.util.Arrays.asList(idStr, name, nid, status, dateStr, timeStr)) {
@@ -698,10 +774,10 @@ public class DoctorController {
         }
         apptFiltered.setPredicate(r -> {
             if (r == null) return false;
-            String idStr   = String.valueOf(r.getId());
-            String name    = nullToEmpty(r.getPatientName()).toLowerCase();
-            String nid     = nullToEmpty(r.getNationalId()).toLowerCase();
-            String status  = nullToEmpty(r.getStatus()).toLowerCase();
+            String idStr = String.valueOf(r.getId());
+            String name = nullToEmpty(r.getPatientName()).toLowerCase();
+            String nid = nullToEmpty(r.getNationalId()).toLowerCase();
+            String status = nullToEmpty(r.getStatus()).toLowerCase();
             String dateStr = (r.getDate() == null) ? "" : r.getDate().toString().toLowerCase();
             String timeStr = nullToEmpty(r.getTimeStr()).toLowerCase();
             return idStr.contains(q)
@@ -712,11 +788,14 @@ public class DoctorController {
                     || timeStr.contains(q);
         });
     };
+
     private static boolean safeContains(String s, String q) {
         return s != null && q != null && s.toLowerCase().contains(q);
     }
-    private static String nullToEmpty(String s) { return s == null ? "" : s; }
 
+    private static String nullToEmpty(String s) {
+        return s == null ? "" : s;
+    }
 
 
     private void loadPatientsAsync() { // kept for compatibility in other calls
@@ -726,7 +805,9 @@ public class DoctorController {
         loadPatientsForDateAsync(d);
     }
 
-    /** Load patients who have an appointment with the logged-in doctor on the given date. */
+    /**
+     * Load patients who have an appointment with the logged-in doctor on the given date.
+     */
     private void loadPatientsForDateAsync(java.time.LocalDate date) {
         var u = Session.get();
         if (u == null || date == null) return;
@@ -833,7 +914,9 @@ public class DoctorController {
         loadAppointmentsForDateAsync(date);
     }
 
-    /** Load appointments for the dashboard table for a specific date (bound to datePickerPatientsWithDoctorDash). */
+    /**
+     * Load appointments for the dashboard table for a specific date (bound to datePickerPatientsWithDoctorDash).
+     */
     private void loadAppointmentsForDateAsync(LocalDate date) {
         var u = Session.get();
         if (u == null || date == null) return;
@@ -923,21 +1006,22 @@ public class DoctorController {
 //        AppointmentsTable
         // أعمدة البيانات
         if (colPatientName != null) colPatientName.setCellValueFactory(new PropertyValueFactory<>("patientName"));
-        if (colDate != null)        colDate.setCellValueFactory(new PropertyValueFactory<>("date"));
-        if (colTime != null)        colTime.setCellValueFactory(new PropertyValueFactory<>("timeStr"));
-        if (colStatus != null)      colStatus.setCellValueFactory(new PropertyValueFactory<>("status"));
+        if (colDate != null) colDate.setCellValueFactory(new PropertyValueFactory<>("date"));
+        if (colTime != null) colTime.setCellValueFactory(new PropertyValueFactory<>("timeStr"));
+        if (colStatus != null) colStatus.setCellValueFactory(new PropertyValueFactory<>("status"));
 
         // Doctor name column: always show current doctor full name
         if (colDoctorName != null) colDoctorName.setCellValueFactory(v ->
-            new ReadOnlyStringWrapper(currentDoctorFullName != null ? currentDoctorFullName
-                    : (Session.get() != null ? Session.get().getFullName() : "")));
+                new ReadOnlyStringWrapper(currentDoctorFullName != null ? currentDoctorFullName
+                        : (Session.get() != null ? Session.get().getFullName() : "")));
 
         // Serial number column: running index (unsortable)
         if (colSerialNumber != null) {
             colSerialNumber.setResizable(true);
             colSerialNumber.setSortable(false);
             colSerialNumber.setCellFactory(col -> new TableCell<AppointmentRow, String>() {
-                @Override protected void updateItem(String item, boolean empty) {
+                @Override
+                protected void updateItem(String item, boolean empty) {
                     super.updateItem(item, empty);
                     setText(empty ? null : String.valueOf(getIndex() + 1));
                 }
@@ -946,12 +1030,15 @@ public class DoctorController {
 
         // Preferred widths so H-scroll appears when total exceeds viewport
         if (colSerialNumber != null) colSerialNumber.setPrefWidth(60);
-        if (colDoctorName != null)  colDoctorName.setPrefWidth(140);
+        if (colDoctorName != null) colDoctorName.setPrefWidth(140);
         if (colPatientName != null) colPatientName.setPrefWidth(220);
-        if (colDate != null)        colDate.setPrefWidth(140);
-        if (colTime != null)        colTime.setPrefWidth(110);
-        if (colStatus != null)      colStatus.setPrefWidth(140);
-        if (colAction != null)      { colAction.setPrefWidth(220); colAction.setMinWidth(180); }
+        if (colDate != null) colDate.setPrefWidth(140);
+        if (colTime != null) colTime.setPrefWidth(110);
+        if (colStatus != null) colStatus.setPrefWidth(140);
+        if (colAction != null) {
+            colAction.setPrefWidth(220);
+            colAction.setMinWidth(180);
+        }
 
         // --- Make the last column (Action) flex to fill remaining space when available ---
         final double actionBaseWidth = (colAction == null) ? 0 : Math.max(180, colAction.getPrefWidth());
@@ -960,11 +1047,11 @@ public class DoctorController {
             if (AppointmentsTable == null || colAction == null) return;
             double used = 0;
             if (colSerialNumber != null) used += colSerialNumber.getWidth();
-            if (colDoctorName   != null) used += colDoctorName.getWidth();
-            if (colPatientName  != null) used += colPatientName.getWidth();
-            if (colDate         != null) used += colDate.getWidth();
-            if (colTime         != null) used += colTime.getWidth();
-            if (colStatus       != null) used += colStatus.getWidth();
+            if (colDoctorName != null) used += colDoctorName.getWidth();
+            if (colPatientName != null) used += colPatientName.getWidth();
+            if (colDate != null) used += colDate.getWidth();
+            if (colTime != null) used += colTime.getWidth();
+            if (colStatus != null) used += colStatus.getWidth();
             double totalTableWidth = AppointmentsTable.getWidth();
             double padding = 14; // scrollbar/skin padding guard
             double remaining = totalTableWidth - used - padding;
@@ -976,14 +1063,16 @@ public class DoctorController {
         Platform.runLater(appointmentsRefit);
 
         // Re-fit when table or columns change size
-        ChangeListener<Number> _refit = (obs, ov, nv) -> { if (appointmentsRefit != null) appointmentsRefit.run(); };
+        ChangeListener<Number> _refit = (obs, ov, nv) -> {
+            if (appointmentsRefit != null) appointmentsRefit.run();
+        };
         AppointmentsTable.widthProperty().addListener(_refit);
         if (colSerialNumber != null) colSerialNumber.widthProperty().addListener(_refit);
-        if (colDoctorName   != null) colDoctorName.widthProperty().addListener(_refit);
-        if (colPatientName  != null) colPatientName.widthProperty().addListener(_refit);
-        if (colDate         != null) colDate.widthProperty().addListener(_refit);
-        if (colTime         != null) colTime.widthProperty().addListener(_refit);
-        if (colStatus       != null) colStatus.widthProperty().addListener(_refit);
+        if (colDoctorName != null) colDoctorName.widthProperty().addListener(_refit);
+        if (colPatientName != null) colPatientName.widthProperty().addListener(_refit);
+        if (colDate != null) colDate.widthProperty().addListener(_refit);
+        if (colTime != null) colTime.widthProperty().addListener(_refit);
+        if (colStatus != null) colStatus.widthProperty().addListener(_refit);
 
 
         // عمود الأكشن: حد أدنى ومعطّل تغيير الحجم والفرز
@@ -1001,10 +1090,10 @@ public class DoctorController {
         // ✨ خلية الأكشن: زر Cancel و Edit
         colAction.setCellValueFactory(param -> new ReadOnlyObjectWrapper<>(param.getValue()));
         colAction.setCellFactory(tc -> new TableCell<AppointmentRow, AppointmentRow>() {
-            private final Button btnDone   = new Button();
+            private final Button btnDone = new Button();
             private final Button btnCancel = new Button();
-            private final Button btnPresc  = new Button("Prescription");
-            private final HBox box         = new HBox(8, btnDone, btnCancel, btnPresc);
+            private final Button btnPresc = new Button("Prescription");
+            private final HBox box = new HBox(8, btnDone, btnCancel, btnPresc);
 
             {
                 box.setAlignment(Pos.CENTER_LEFT);
@@ -1045,6 +1134,7 @@ public class DoctorController {
                     if (r == null) return;
                     // يفتح واجهة الوصفة ويعرض الأصناف إن وُجدت
                     openPrescriptionForAppointment(r);
+//                    openPrescription(r);
                 });
             }
 
@@ -1119,7 +1209,9 @@ public class DoctorController {
     //        }
     //    }
 
-    /** Cancel appointment in DB then update UI; leaves Prescription enabled. */
+    /**
+     * Cancel appointment in DB then update UI; leaves Prescription enabled.
+     */
     private void cancelAppointment(AppointmentRow row) {
         if (row == null) return;
         new Thread(() -> {
@@ -1129,7 +1221,9 @@ public class DoctorController {
                          "UPDATE appointments SET status = 'CANCELLED', updated_at = NOW() WHERE id = ?")) {
                 ps.setLong(1, row.getId());
                 ok = (ps.executeUpdate() == 1);
-            } catch (Exception ignore) { ok = false; }
+            } catch (Exception ignore) {
+                ok = false;
+            }
             final boolean success = ok;
             Platform.runLater(() -> {
                 if (success) {
@@ -1152,28 +1246,42 @@ public class DoctorController {
                 + "\nPatient: " + safe(row.getPatientName()));
     }
 
-    /** Open prescription page for the selected appointment: ensures prescription exists and fills header. */
+    /**
+     * Open prescription page for the selected appointment: ensures prescription exists and fills header.
+     */
     private void openPrescriptionForAppointment(AppointmentRow row) {
         if (row == null) return;
         try (Connection c = Database.get()) {
             // Resolve doctor id (doctors.id) from current user
             var u = com.example.healthflow.service.AuthService.Session.get();
-            if (u == null) { showWarn("Prescription", "No logged-in user."); return; }
+            if (u == null) {
+                showWarn("Prescription", "No logged-in user.");
+                return;
+            }
             Long doctorId = doctorDAO.findDoctorIdByUserId(c, u.getId());
             if (doctorId == null) {
                 doctorDAO.ensureProfileForUser(c, u.getId());
                 doctorId = doctorDAO.findDoctorIdByUserId(c, u.getId());
             }
-            if (doctorId == null) { showWarn("Prescription", "Doctor profile missing."); return; }
+            if (doctorId == null) {
+                showWarn("Prescription", "Doctor profile missing.");
+                return;
+            }
 
             // Translate patient user id -> patients.id; fallback by national id if user id is missing
             Long patientUserId = (row.getPatientUserId() > 0) ? row.getPatientUserId() : null;
             if (patientUserId == null && row.getNationalId() != null && !row.getNationalId().isBlank()) {
                 patientUserId = doctorDAO.findPatientUserIdByNationalId(c, row.getNationalId());
             }
-            if (patientUserId == null) { showWarn("Prescription", "Patient user id not found for this appointment."); return; }
+            if (patientUserId == null) {
+                showWarn("Prescription", "Patient user id not found for this appointment.");
+                return;
+            }
             Long patientId = doctorDAO.findPatientIdByUserId(c, patientUserId);
-            if (patientId == null) { showWarn("Prescription", "Patient profile not found."); return; }
+            if (patientId == null) {
+                showWarn("Prescription", "Patient profile not found.");
+                return;
+            }
 
             // Ensure prescription for this appointment, then cache context and navigate to the pane
             long prescId = new PrescriptionDAO().ensurePrescriptionForAppointment(c, row.getId(), doctorId, patientId);
@@ -1181,6 +1289,13 @@ public class DoctorController {
             this.selectedPatientUserId = patientUserId;
             this.selectedPatientName = row.getPatientName();
             this.selectedPatientNationalId = row.getNationalId();
+
+            // Ensure pack suggestions exist before loading items so colPack won't show "—"
+            try (Connection c2 = Database.get()) {
+                c2.setAutoCommit(true);
+                new com.example.healthflow.dao.PrescriptionItemDAO().backfillSuggestions(c2, this.currentPrescriptionId);
+            } catch (Exception ignore) {
+            }
 
             showPrescriptionPane();
             loadPrescriptionItemsFromDb(currentPrescriptionId);
@@ -1191,7 +1306,9 @@ public class DoctorController {
         }
     }
 
-    /** Load items for a given prescription and push into the items table. */
+    /**
+     * Load items for a given prescription and push into the items table.
+     */
     private void loadPrescriptionItemsFromDb(long prescId) {
         if (prescId <= 0) return;
         // امسح الداتا الحالية في الجدول/اللستة
@@ -1201,7 +1318,8 @@ public class DoctorController {
                 TablePrescriptionItems.getSelectionModel().clearSelection();
             }
             if (prescItemsEditable != null) prescItemsEditable.clear();
-        } catch (Throwable ignore) {}
+        } catch (Throwable ignore) {
+        }
 
         new Thread(() -> {
             java.util.List<PrescItemRow> rows = new java.util.ArrayList<>();
@@ -1209,9 +1327,11 @@ public class DoctorController {
             try (Connection c = Database.get();
                  java.sql.PreparedStatement ps = c.prepareStatement(
                          "SELECT id, medicine_id, medicine_name, " +
-                                 "       COALESCE(dosage_text, dosage) AS dosage_display, " +
-                                 "       quantity, status, batch_id, dose, freq_per_day, duration_days, strength, form, route, notes " +
-                                 "FROM prescription_items WHERE prescription_id = ? ORDER BY id")) {
+                         "       COALESCE(dosage_text, dosage) AS dosage_display, " +
+                         "       quantity, status, batch_id, dose, freq_per_day, duration_days, strength, form, route, notes, " +
+                         "       qty_units_requested, suggested_unit::text AS suggested_unit, suggested_count, suggested_units_total, " +
+                         "       approved_unit::text  AS approved_unit,  approved_count,   approved_units_total " +
+                         "FROM prescription_items WHERE prescription_id = ? ORDER BY id")) {
                 ps.setLong(1, prescId);
                 try (var rs = ps.executeQuery()) {
                     while (rs.next()) {
@@ -1244,6 +1364,42 @@ public class DoctorController {
                         if (route != null) r.setRoute(route);
                         String notes = rs.getString("notes");
                         if (notes != null) r.setNotes(notes);
+                        // Pack suggestion / approval fields
+                        Integer qtyReq = (Integer) rs.getObject("qty_units_requested");
+                        if (qtyReq != null) r.setQtyUnitsRequested(qtyReq);
+
+                        String suggUnit = rs.getString("suggested_unit");
+                        if (suggUnit != null && !suggUnit.isBlank()) {
+                            try {
+                                r.setSuggestedUnit(com.example.healthflow.core.packaging.PackUnit.valueOf(suggUnit));
+                            } catch (IllegalArgumentException ex) {
+                                r.setSuggestedUnit(null);
+                            }
+                        } else {
+                            r.setSuggestedUnit(null);
+                        }
+
+                        Integer suggCount = (Integer) rs.getObject("suggested_count");
+                        if (suggCount != null) r.setSuggestedCount(suggCount);
+                        Integer suggTotal = (Integer) rs.getObject("suggested_units_total");
+                        if (suggTotal != null) r.setSuggestedUnitsTotal(suggTotal);
+
+
+                        String apprUnit = rs.getString("approved_unit");
+                        if (apprUnit != null && !apprUnit.isBlank()) {
+                            try {
+                                r.setApprovedUnit(com.example.healthflow.core.packaging.PackUnit.valueOf(apprUnit));
+                            } catch (IllegalArgumentException ex) {
+                                r.setApprovedUnit(null);
+                            }
+                        } else {
+                            r.setApprovedUnit(null);
+                        }
+
+                        Integer apprCount = (Integer) rs.getObject("approved_count");
+                        if (apprCount != null) r.setApprovedCount(apprCount);
+                        Integer apprTotal = (Integer) rs.getObject("approved_units_total");
+                        if (apprTotal != null) r.setApprovedUnitsTotal(apprTotal);
                         rows.add(r);
                     }
                 }
@@ -1268,6 +1424,7 @@ public class DoctorController {
                 if (TablePrescriptionItems != null) TablePrescriptionItems.refresh();
             });
         }, "doc-load-presc-items").start();
+        TablePrescriptionItems.setItems(prescItemsEditable);
     }
 
     private void setPatientHeader(String name, String nid, boolean editable) {
@@ -1290,19 +1447,19 @@ public class DoctorController {
     }
 
 
-
     private void wirePatientsTable() {
         if (patientTable == null) return;
 
-        if (colNationalId != null)     colNationalId.setCellValueFactory(new PropertyValueFactory<>("nationalId"));
-        if (colName != null)           colName.setCellValueFactory(new PropertyValueFactory<>("fullName"));
-        if (colGender != null)         colGender.setCellValueFactory(new PropertyValueFactory<>("gender"));
-        if (colDob != null)            colDob.setCellValueFactory(new PropertyValueFactory<>("age"));
-        if (colMedicalHistory != null) colMedicalHistory.setCellValueFactory(new PropertyValueFactory<>("medicalHistory"));
+        if (colNationalId != null) colNationalId.setCellValueFactory(new PropertyValueFactory<>("nationalId"));
+        if (colName != null) colName.setCellValueFactory(new PropertyValueFactory<>("fullName"));
+        if (colGender != null) colGender.setCellValueFactory(new PropertyValueFactory<>("gender"));
+        if (colDob != null) colDob.setCellValueFactory(new PropertyValueFactory<>("age"));
+        if (colMedicalHistory != null)
+            colMedicalHistory.setCellValueFactory(new PropertyValueFactory<>("medicalHistory"));
         if (colAction2 != null) {
             colAction2.setCellValueFactory(param -> new ReadOnlyObjectWrapper<>(param.getValue()));
             colAction2.setCellFactory(col -> new TableCell<PatientRow, PatientRow>() {
-                private final Button btnDone  = new Button();
+                private final Button btnDone = new Button();
                 private final Button btnPresc = new Button("Prescription");
                 private final HBox box = new HBox(8, btnDone, btnPresc);
 
@@ -1315,8 +1472,10 @@ public class DoctorController {
                     box.getStyleClass().add("table-actions");
 
                     // Compact sizes
-                    btnDone.setMinWidth(36); btnDone.setMaxWidth(Region.USE_PREF_SIZE);
-                    btnPresc.setMinWidth(78); btnPresc.setMaxWidth(Region.USE_PREF_SIZE);
+                    btnDone.setMinWidth(36);
+                    btnDone.setMaxWidth(Region.USE_PREF_SIZE);
+                    btnPresc.setMinWidth(78);
+                    btnPresc.setMaxWidth(Region.USE_PREF_SIZE);
 
                     // Disable when offline
                     btnDone.disableProperty().bind(monitor.onlineProperty().not());
@@ -1335,7 +1494,7 @@ public class DoctorController {
                             AppointmentRow sel = AppointmentsTable.getSelectionModel().getSelectedItem();
                             if (sel != null) {
                                 boolean matchByUser = (prow.getUserId() > 0) && (sel.getPatientUserId() == prow.getUserId());
-                                boolean matchByNid  = (prow.getNationalId() != null) && prow.getNationalId().equals(sel.getNationalId());
+                                boolean matchByNid = (prow.getNationalId() != null) && prow.getNationalId().equals(sel.getNationalId());
                                 boolean notCompleted = sel.getStatus() == null || !sel.getStatus().equalsIgnoreCase("COMPLETED");
                                 if ((matchByUser || matchByNid) && notCompleted) {
                                     target = sel;
@@ -1347,9 +1506,12 @@ public class DoctorController {
                         if (target == null) {
                             for (AppointmentRow ar : apptData) {
                                 boolean matchByUser = (prow.getUserId() > 0) && (ar.getPatientUserId() == prow.getUserId());
-                                boolean matchByNid  = (prow.getNationalId() != null) && prow.getNationalId().equals(ar.getNationalId());
+                                boolean matchByNid = (prow.getNationalId() != null) && prow.getNationalId().equals(ar.getNationalId());
                                 boolean notCompleted = ar.getStatus() == null || !ar.getStatus().equalsIgnoreCase("COMPLETED");
-                                if ((matchByUser || matchByNid) && notCompleted) { target = ar; break; }
+                                if ((matchByUser || matchByNid) && notCompleted) {
+                                    target = ar;
+                                    break;
+                                }
                             }
                         }
 
@@ -1358,7 +1520,10 @@ public class DoctorController {
                         } else {
                             // 3) DB fallback: try to locate today's active appointment for this patient & current doctor
                             var u = Session.get();
-                            if (u == null) { toast("No logged-in user.", "warn"); return; }
+                            if (u == null) {
+                                toast("No logged-in user.", "warn");
+                                return;
+                            }
                             Long doctorId = null;
                             try (Connection c = Database.get()) {
                                 // resolve doctor_id from current user once
@@ -1367,36 +1532,43 @@ public class DoctorController {
                                     doctorDAO.ensureProfileForUser(c, u.getId());
                                     doctorId = doctorDAO.findDoctorIdByUserId(c, u.getId());
                                 }
-                                if (doctorId == null) { toast("Doctor profile missing.", "warn"); return; }
+                                if (doctorId == null) {
+                                    toast("Doctor profile missing.", "warn");
+                                    return;
+                                }
 
                                 Long apptId = null;
                                 // Prefer matching by patient user id if available
                                 if (prow.getUserId() > 0) {
                                     try (var ps = c.prepareStatement(
                                             "SELECT a.id FROM appointments a " +
-                                            "JOIN patients p ON p.id = a.patient_id " +
-                                            "WHERE a.doctor_id = ? AND p.user_id = ? " +
-                                            "AND a.appointment_date::date = CURRENT_DATE " +
-                                            "AND a.status NOT IN ('COMPLETED','CANCELLED') " +
-                                            "ORDER BY a.appointment_date LIMIT 1")) {
+                                                    "JOIN patients p ON p.id = a.patient_id " +
+                                                    "WHERE a.doctor_id = ? AND p.user_id = ? " +
+                                                    "AND a.appointment_date::date = CURRENT_DATE " +
+                                                    "AND a.status NOT IN ('COMPLETED','CANCELLED') " +
+                                                    "ORDER BY a.appointment_date LIMIT 1")) {
                                         ps.setLong(1, doctorId);
                                         ps.setLong(2, prow.getUserId());
-                                        try (var rs = ps.executeQuery()) { if (rs.next()) apptId = rs.getLong(1); }
+                                        try (var rs = ps.executeQuery()) {
+                                            if (rs.next()) apptId = rs.getLong(1);
+                                        }
                                     }
                                 }
                                 // If still not found and we have a National ID, try via NID
                                 if (apptId == null && prow.getNationalId() != null && !prow.getNationalId().isBlank()) {
                                     try (var ps = c.prepareStatement(
                                             "SELECT a.id FROM appointments a " +
-                                            "JOIN patients p ON p.id = a.patient_id " +
-                                            "JOIN users pu ON pu.id = p.user_id " +
-                                            "WHERE a.doctor_id = ? AND pu.national_id = ? " +
-                                            "AND a.appointment_date::date = CURRENT_DATE " +
-                                            "AND a.status NOT IN ('COMPLETED','CANCELLED') " +
-                                            "ORDER BY a.appointment_date LIMIT 1")) {
+                                                    "JOIN patients p ON p.id = a.patient_id " +
+                                                    "JOIN users pu ON pu.id = p.user_id " +
+                                                    "WHERE a.doctor_id = ? AND pu.national_id = ? " +
+                                                    "AND a.appointment_date::date = CURRENT_DATE " +
+                                                    "AND a.status NOT IN ('COMPLETED','CANCELLED') " +
+                                                    "ORDER BY a.appointment_date LIMIT 1")) {
                                         ps.setLong(1, doctorId);
                                         ps.setString(2, prow.getNationalId());
-                                        try (var rs = ps.executeQuery()) { if (rs.next()) apptId = rs.getLong(1); }
+                                        try (var rs = ps.executeQuery()) {
+                                            if (rs.next()) apptId = rs.getLong(1);
+                                        }
                                     }
                                 }
 
@@ -1409,7 +1581,8 @@ public class DoctorController {
                                         var _dashDate = (datePickerPatientsWithDoctorDash != null && datePickerPatientsWithDoctorDash.getValue() != null)
                                                 ? datePickerPatientsWithDoctorDash.getValue()
                                                 : java.time.ZonedDateTime.now(APP_TZ).toLocalDate();
-                                        loadStatsForDateAsync(_dashDate);                                    } else {
+                                        loadStatsForDateAsync(_dashDate);
+                                    } else {
                                         toast("Could not mark appointment as COMPLETED.", "warn");
                                     }
                                 } else {
@@ -1456,9 +1629,9 @@ public class DoctorController {
 
                         // reset any previous draft so a new one is created for this patient
                         currentPrescriptionId = null;
-                        // navigate first
-                        showPrescriptionPane();
-                        // then fill header read-only with "name • NID" after layout
+                        // افتح واجهة الوصفة عبر الدالة التي تعمل backfill قبل التحميل
+                        openPrescriptionFromItems();
+                        // ثم حدّث الهيدر بعد العرض
                         Platform.runLater(() -> {
                             setPatientHeader(row.getFullName(), row.getNationalId(), false);
                             if (PatientNameTF != null) {
@@ -1471,7 +1644,8 @@ public class DoctorController {
                     });
                 }
 
-                @Override protected void updateItem(PatientRow row, boolean empty) {
+                @Override
+                protected void updateItem(PatientRow row, boolean empty) {
                     super.updateItem(row, empty);
                     setText(null);
                     setGraphic(empty ? null : box);
@@ -1509,6 +1683,7 @@ public class DoctorController {
 
         patientTable.setItems(patientData);
     }
+
     private void wireSearch() {
         filtered = new FilteredList<>(patientData, p -> true);
         if (searchLabel != null) {
@@ -1516,10 +1691,10 @@ public class DoctorController {
                 String s = (q == null) ? "" : q.trim().toLowerCase();
                 filtered.setPredicate(p -> {
                     if (s.isEmpty()) return true;
-                    if (contains(p.getFullName(), s))        return true;
-                    if (contains(p.getGender(), s))          return true;
-                    if (contains(p.getNationalId(), s))      return true;
-                    if (contains(p.getMedicalHistory(), s))  return true;
+                    if (contains(p.getFullName(), s)) return true;
+                    if (contains(p.getGender(), s)) return true;
+                    if (contains(p.getNationalId(), s)) return true;
+                    if (contains(p.getMedicalHistory(), s)) return true;
                     return String.valueOf(p.getAge()).contains(s);
                 });
             });
@@ -1534,410 +1709,191 @@ public class DoctorController {
     }
 
     /* ================= Prescription Items table wiring ================= */
-    private void wirePrescriptionItemsTable() {
-        if (TablePrescriptionItems == null) return;
+private void wirePrescriptionItemsTable() {
+    if (TablePrescriptionItems == null) return;
 
-        TablePrescriptionItems.setItems(prescItemsEditable);
-//        TablePrescriptionItems.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
-        TablePrescriptionItems.setColumnResizePolicy(TableView.UNCONSTRAINED_RESIZE_POLICY);
-        //  خلي آخر عمود (Action) ياكل الفراغ الفاضي بدون ما يلغيلك الـ H-Scroll
-        final double actionBase = (colPresesAction == null) ? 0 : Math.max(180, colPresesAction.getPrefWidth());
-        final double actionMax  = 240; // cap expansion so we don't kill H-scroll
+    TablePrescriptionItems.setItems(prescItemsEditable);
+    TablePrescriptionItems.setColumnResizePolicy(TableView.UNCONSTRAINED_RESIZE_POLICY);
 
-        // Helper: use actual width if laid out, otherwise fall back to pref width (so H-scroll can appear even when table is empty)
-        java.util.function.ToDoubleFunction<TableColumn<?, ?>> cw = (tc) -> {
-            if (tc == null) return 0.0;
-            double w = tc.getWidth();
-            return (w > 0.0 ? w : Math.max(tc.getPrefWidth(), tc.getMinWidth()));
-        };
+    final double actionBase = (colPresesAction == null) ? 0 : Math.max(180, colPresesAction.getPrefWidth());
+    final double actionMax  = 240; // cap expansion so we don't kill H-scroll
 
-        Runnable fitLastColumn = () -> {
-            if (TablePrescriptionItems == null || colPresesAction == null) return;
+    java.util.function.ToDoubleFunction<TableColumn<?, ?>> cw = (tc) -> {
+        if (tc == null) return 0.0;
+        double w = tc.getWidth();
+        return (w > 0.0 ? w : Math.max(tc.getPrefWidth(), tc.getMinWidth()));
+    };
 
-            double used = 0;
-            used += cw.applyAsDouble(colIdx);
-            used += cw.applyAsDouble(colMedicineName);
-            used += cw.applyAsDouble(colStrength);
-            used += cw.applyAsDouble(colForm);
-            used += cw.applyAsDouble(colDose);
-            used += cw.applyAsDouble(colDosage);
-            used += cw.applyAsDouble(colFreqPerDay);
-            used += cw.applyAsDouble(colDuration);
-            used += cw.applyAsDouble(colRoute);
-            used += cw.applyAsDouble(colQuantity);
-//            used += cw.applyAsDouble(colDiagnosis);
-            used += cw.applyAsDouble(colPresesStatus);
-            // ما نضيف عرض الـ Action هنا – بنحسبه بعدين
+    Runnable fitLastColumn = () -> {
+        if (TablePrescriptionItems == null || colPresesAction == null) return;
+        double used = 0;
+        used += cw.applyAsDouble(colIdx);
+        used += cw.applyAsDouble(colMedicineName);
+        used += cw.applyAsDouble(colStrength);
+        used += cw.applyAsDouble(colForm);
+        used += cw.applyAsDouble(colDose);
+        used += cw.applyAsDouble(colDosage);
+        used += cw.applyAsDouble(colFreqPerDay);
+        used += cw.applyAsDouble(colDuration);
+        used += cw.applyAsDouble(colRoute);
+        used += cw.applyAsDouble(colQuantity);
+        used += cw.applyAsDouble(colPresesStatus);
 
-            double total = TablePrescriptionItems.getWidth();
-            double padding = 14; // هامش/سكين
-            double remaining = total - used - padding;
+        double total = TablePrescriptionItems.getWidth();
+        double padding = 14;
+        double remaining = total - used - padding;
+        double newW = Math.max(actionBase, Math.min(remaining, actionMax));
+        colPresesAction.prefWidthProperty().unbind();
+        colPresesAction.setPrefWidth(newW);
+    };
 
-            // لو الأعمدة أكبر من الجدول → remaining سالب/صفر → نخلي الـ Action على عرضه الأساسي
-            double newW = Math.max(actionBase, Math.min(remaining, actionMax));
-            // ensure we are not bound before setting width
-            colPresesAction.prefWidthProperty().unbind();
-            colPresesAction.setPrefWidth(newW);
-        };
+    if (colIdx != null) {
+        colIdx.setSortable(false);
+        colIdx.setCellValueFactory(cd -> new ReadOnlyObjectWrapper<>(
+                TablePrescriptionItems.getItems().indexOf(cd.getValue()) + 1));
+    }
+    if (colMedicineName != null) colMedicineName.setCellValueFactory(cd -> cd.getValue().medicineNameProperty());
+    if (colDosage != null)       colDosage.setCellValueFactory(new PropertyValueFactory<>("dosageText"));
+    if (colDuration != null)     colDuration.setCellValueFactory(cd -> cd.getValue().durationDaysProperty().asObject());
 
-        if (colIdx != null) {
-            colIdx.setSortable(false);
-            colIdx.setCellValueFactory(cd -> new ReadOnlyObjectWrapper<>(
-                    TablePrescriptionItems.getItems().indexOf(cd.getValue()) + 1));
-        }
-        if (colMedicineName != null)  colMedicineName.setCellValueFactory(cd -> cd.getValue().medicineNameProperty());
-        if (colDosage != null)        colDosage.setCellValueFactory(new PropertyValueFactory<>("dosageText"));
-        if (colDuration != null)      colDuration.setCellValueFactory(cd -> cd.getValue().durationDaysProperty().asObject());
-        if (colQuantity != null) {
-            colQuantity.setCellValueFactory(cd -> {
-                var it = cd.getValue();
+    if (colQuantity != null) {
+        colQuantity.setCellValueFactory(cd -> {
+            var it = cd.getValue();
+            Integer u = it.getQtyUnitsRequested();
+            int d = Math.max(0, it.getDose());
+            int f = Math.max(0, it.getFreqPerDay());
+            int g = Math.max(0, it.getDurationDays());
+            if ((u == null || u <= 0) && d > 0 && f > 0 && g > 0) u = d * f * g;
 
-                Integer u = it.getQtyUnitsRequested();
-                int d = Math.max(0, it.getDose());
-                int f = Math.max(0, it.getFreqPerDay());
-                int g = Math.max(0, it.getDurationDays());
-                if ((u == null || u <= 0) && d > 0 && f > 0 && g > 0) {
-                    u = d * f * g;
-                }
+            String form = it.getForm();
+            String unitShort = (form != null && form.equalsIgnoreCase("Tablet")) ? "tabs"
+                                : (form != null && form.equalsIgnoreCase("Capsule")) ? "caps"
+                                : "units";
+            String text = (u != null && u > 0) ? (u + " " + unitShort) : "—";
+            return new ReadOnlyStringWrapper(text);
+        });
 
-                String unitShort;
-                String form = it.getForm();
-                if (form != null && form.equalsIgnoreCase("Tablet"))      unitShort = "tabs";
-                else if (form != null && form.equalsIgnoreCase("Capsule")) unitShort = "caps";
-                else unitShort = "units";
-
-                StringBuilder sb = new StringBuilder();
-                if (u != null && u > 0) sb.append(u).append(' ').append(unitShort);
-                else sb.append("—");
-
-                if (it.getSuggestedUnit() != null &&
-                        it.getSuggestedCount() != null &&
-                        it.getSuggestedUnitsTotal() != null) {
-                    sb.append("  •  Sugg: ")
-                            .append(it.getSuggestedCount()).append(' ')
-                            .append(it.getSuggestedUnit()).append(" = ")
-                            .append(it.getSuggestedUnitsTotal());
-                }
-
-                return new javafx.beans.property.ReadOnlyStringWrapper(sb.toString());
-            });
-
-            colQuantity.setCellFactory(col -> new TableCell<PrescItemRow, String>() {
-                @Override
-                protected void updateItem(String text, boolean empty) {
-                    super.updateItem(text, empty);
-                    if (empty || text == null) { setText(null); setTooltip(null); return; }
+        colQuantity.setCellFactory(col -> new TableCell<PrescItemRow, String>() {
+            @Override protected void updateItem(String text, boolean empty) {
+                super.updateItem(text, empty);
+                if (empty || text == null) {
+                    setText(null);
+                    setTooltip(null);
+                } else {
                     setText(text);
-
                     PrescItemRow row = (getTableRow() == null) ? null : (PrescItemRow) getTableRow().getItem();
                     if (row != null) {
                         int d = row.getDose(), f = row.getFreqPerDay(), days = row.getDurationDays();
-                        String tt = "Calculated: " + d + " × " + f + " × " + days;
-                        if (row.getSuggestedUnit() != null &&
-                                row.getSuggestedCount() != null &&
-                                row.getSuggestedUnitsTotal() != null) {
-                            tt += "\nSuggested: " + row.getSuggestedCount() + " " + row.getSuggestedUnit()
-                                    + " = " + row.getSuggestedUnitsTotal();
+                        String tt = "Qty = Dose × Freq/day × Duration\n= "
+                                + (d == 0 ? "?" : d) + " × "
+                                + (f == 0 ? "?" : f) + " × "
+                                + (days == 0 ? "?" : days);
+                        if (row.getSuggestedUnit() != null && row.getSuggestedCount() != null && row.getSuggestedUnitsTotal() != null) {
+                            tt += "\nSuggested: " + row.getSuggestedCount() + " " + row.getSuggestedUnit() + " (" + row.getSuggestedUnitsTotal() + ")";
                         }
                         setTooltip(new Tooltip(tt));
                     } else {
                         setTooltip(null);
                     }
                 }
-            });
-        }
-//        if (colDiagnosis != null)     colDiagnosis.setCellValueFactory(cd -> cd.getValue().diagnosisProperty());
-        if (colPresesStatus != null)  colPresesStatus.setCellValueFactory(cd -> cd.getValue().statusProperty());
+            }
+        });
+    }
 
-        // New DB-sourced columns
-        if (colFreqPerDay != null) {
-            colFreqPerDay.setCellValueFactory(new PropertyValueFactory<>("freqPerDay"));
-            colFreqPerDay.setPrefWidth(120);
-        }
-        if (colStrength != null) {
-            colStrength.setCellValueFactory(new PropertyValueFactory<>("strength"));
-            colStrength.setPrefWidth(80);
-        }
-        if (colForm != null) {
-            colForm.setCellValueFactory(new PropertyValueFactory<>("form"));
-            colForm.setPrefWidth(100);
-        }
-        if (colDose != null) {
-            colDose.setCellValueFactory(new PropertyValueFactory<>("dose"));
-            colDose.setPrefWidth(90);
-        }
-        if (colRoute != null) {
-            colRoute.setCellValueFactory(new PropertyValueFactory<>("route"));
-            colRoute.setPrefWidth(100);
-        }
+    // === Pack column (single binding) ===
+    if (colPack != null) {
+        colPack.setText("Pack");
+        colPack.setPrefWidth(160);
+        colPack.setCellValueFactory(cd -> cd.getValue().packProperty());        colPack.setCellFactory(col -> new TableCell<PrescItemRow, String>() {
+            @Override protected void updateItem(String text, boolean empty) {
+                super.updateItem(text, empty);
+                if (empty) { setText(null); setTooltip(null); return; }
+                setText((text == null || text.isBlank()) ? "—" : text);
+                setTooltip((text == null || text.isBlank()) ? null : new Tooltip(text));
+            }
+        });
+    }
 
-        // ---- Preferred widths for better balance (keeps H-scroll) ----
-        if (colMedicineName != null)  colMedicineName.setPrefWidth(100);
-        if (colDosage != null)        colDosage.setPrefWidth(310);
-        if (colStrength != null)      colStrength.setPrefWidth(80);
-        if (colForm != null)          colForm.setPrefWidth(80);
-        if (colDose != null)          colDose.setPrefWidth(60);
-        if (colFreqPerDay != null)    colFreqPerDay.setPrefWidth(70);
-        if (colDuration != null)      colDuration.setPrefWidth(70);
-        if (colRoute != null)         colRoute.setPrefWidth(100);
-        if (colQuantity != null)      colQuantity.setPrefWidth(80);
-//        if (colDiagnosis != null)     colDiagnosis.setPrefWidth(260);
+    if (colPresesStatus != null) colPresesStatus.setCellValueFactory(cd -> cd.getValue().statusProperty());
+    if (colFreqPerDay != null)   { colFreqPerDay.setCellValueFactory(new PropertyValueFactory<>("freqPerDay")); colFreqPerDay.setPrefWidth(120); }
+    if (colStrength  != null)    { colStrength.setCellValueFactory(new PropertyValueFactory<>("strength"));   colStrength.setPrefWidth(80); }
+    if (colForm      != null)    { colForm.setCellValueFactory(new PropertyValueFactory<>("form"));           colForm.setPrefWidth(100); }
+    if (colDose      != null)    { colDose.setCellValueFactory(new PropertyValueFactory<>("dose"));           colDose.setPrefWidth(90); }
+    if (colRoute     != null)    { colRoute.setCellValueFactory(new PropertyValueFactory<>("route"));         colRoute.setPrefWidth(100); }
 
-        // Re-fit when table or columns change size (so H-scroll logic runs even with 0 rows)
-        ChangeListener<Number> _refit = (obs, ov, nv) -> fitLastColumn.run();
-        TablePrescriptionItems.widthProperty().addListener(_refit);
-        if (colIdx != null)           colIdx.widthProperty().addListener(_refit);
-        if (colMedicineName != null)  colMedicineName.widthProperty().addListener(_refit);
-        if (colStrength != null)      colStrength.widthProperty().addListener(_refit);
-        if (colForm != null)          colForm.widthProperty().addListener(_refit);
-        if (colDosage != null)        colDosage.widthProperty().addListener(_refit);
-        if (colFreqPerDay != null)    colFreqPerDay.widthProperty().addListener(_refit);
-        if (colDuration != null)      colDuration.widthProperty().addListener(_refit);
-        if (colRoute != null)         colRoute.widthProperty().addListener(_refit);
-        if (colQuantity != null)      colQuantity.widthProperty().addListener(_refit);
-//        if (colDiagnosis != null)     colDiagnosis.widthProperty().addListener(_refit);
-        if (colPresesStatus != null)  colPresesStatus.widthProperty().addListener(_refit);
-        if (colPresesAction != null)  colPresesAction.widthProperty().addListener(_refit);
+    if (colMedicineName != null) colMedicineName.setPrefWidth(100);
+    if (colDosage != null)       colDosage.setPrefWidth(310);
+    if (colStrength != null)     colStrength.setPrefWidth(80);
+    if (colForm != null)         colForm.setPrefWidth(80);
+    if (colDose != null)         colDose.setPrefWidth(60);
+    if (colFreqPerDay != null)   colFreqPerDay.setPrefWidth(70);
+    if (colDuration != null)     colDuration.setPrefWidth(70);
+    if (colRoute != null)        colRoute.setPrefWidth(100);
+    if (colQuantity != null)     colQuantity.setPrefWidth(80);
 
-        // Run a second time after layout so pref widths are honored even with empty data
-        Platform.runLater(fitLastColumn);
+    ChangeListener<Number> _refit = (obs, ov, nv) -> fitLastColumn.run();
+    TablePrescriptionItems.widthProperty().addListener(_refit);
+    if (colIdx != null)           colIdx.widthProperty().addListener(_refit);
+    if (colMedicineName != null)  colMedicineName.widthProperty().addListener(_refit);
+    if (colStrength != null)      colStrength.widthProperty().addListener(_refit);
+    if (colForm != null)          colForm.widthProperty().addListener(_refit);
+    if (colDosage != null)        colDosage.widthProperty().addListener(_refit);
+    if (colFreqPerDay != null)    colFreqPerDay.widthProperty().addListener(_refit);
+    if (colDuration != null)      colDuration.widthProperty().addListener(_refit);
+    if (colRoute != null)         colRoute.widthProperty().addListener(_refit);
+    if (colQuantity != null)      colQuantity.widthProperty().addListener(_refit);
+    if (colPresesStatus != null)  colPresesStatus.widthProperty().addListener(_refit);
+    if (colPresesAction != null)  colPresesAction.widthProperty().addListener(_refit);
 
-        // Tooltip for Quantity column to explain formula
-        if (colQuantity != null) {
-//            colQuantity.setCellFactory(col -> new TableCell<PrescItemRow, Integer>() {
-//                @Override protected void updateItem(Integer qty, boolean empty) {
-//                    super.updateItem(qty, empty);
-//                    if (empty || getTableRow() == null || getTableRow().getItem() == null) {
-//                        setText(null); setTooltip(null);
-//                        return;
-//                    }
-//                    PrescItemRow r = (PrescItemRow) getTableRow().getItem();
-//                    int dose = Math.max(0, r.getDose());
-//                    int freq = Math.max(0, r.getFreqPerDay());
-//                    int days = Math.max(0, r.getDurationDays());
-//                    int computed = (dose > 0 && freq > 0 && days > 0) ? (dose * freq * days) : 0;
-//
-//                    int displayQty = (qty == null || qty <= 0) ? computed : qty;
-//                    setText(displayQty <= 0 ? "" : String.valueOf(displayQty));
-//
-//                    Tooltip tip = new Tooltip("Qty = Dose × Freq/day × Duration\n= "
-//                            + (dose == 0 ? "?" : dose) + " × "
-//                            + (freq == 0 ? "?" : freq) + " × "
-//                            + (days == 0 ? "?" : days) + " = "
-//                            + (computed > 0 ? computed : "?"));
-//                    setTooltip(tip);
-//                }
-//            });
+    Platform.runLater(fitLastColumn);
 
-            if (colQuantity != null) {
-                colQuantity.setCellValueFactory(cd -> {
-                    var it = cd.getValue();
-
-                    // 1) قيمة الداتابيز (قد تكون NULL)
-                    Integer u = it.getQtyUnitsRequested();
-
-                    // 2) احتساب بديل: Dose × Freq/day × Duration
-                    int d = Math.max(0, it.getDose());
-                    int f = Math.max(0, it.getFreqPerDay());
-                    int g = Math.max(0, it.getDurationDays());
-                    if ((u == null || u <= 0) && d > 0 && f > 0 && g > 0) {
-                        u = d * f * g;
+    if (colPresesAction != null) {
+        colPresesAction.setCellValueFactory(param -> new ReadOnlyObjectWrapper<>(param.getValue()));
+        colPresesAction.setSortable(false);
+        colPresesAction.setResizable(false);
+        colPresesAction.setCellFactory(tc -> new TableCell<PrescItemRow, PrescItemRow>() {
+            private final Button btnDel = new Button("Delete");
+            private final HBox box = new HBox(8, btnDel);
+            {
+                btnDel.getStyleClass().addAll("btn", "btn-danger");
+                box.setAlignment(Pos.CENTER_LEFT);
+                btnDel.setOnAction(e -> {
+                    PrescItemRow row = getItem();
+                    if (row == null) return;
+                    if (row.getId() > 0) {
+                        btnDel.setDisable(true);
+                        new Thread(() -> {
+                            try (Connection c = Database.get()) {
+                                c.setAutoCommit(true);
+                                new PrescriptionItemDAO().deleteById(c, row.getId());
+                                Platform.runLater(() -> { prescItemsEditable.remove(row); toast("Delete medication.", "ok"); btnDel.setDisable(false); });
+                            } catch (Exception ex) {
+                                Platform.runLater(() -> { toast("DB delete failed. Row kept.", "warn"); btnDel.setDisable(false); });
+                            }
+                        }, "delete-presc-item").start();
+                    } else {
+                        if (prescItemsEditable.remove(row)) toast("Row removed (not saved in DB).", "ok");
+                        else toast("Could not remove the row.", "warn");
                     }
-
-                    // 3) اختصار وحدة العرض حسب الـ form
-                    String unitShort;
-                    String form = it.getForm();
-                    if (form != null && form.equalsIgnoreCase("Tablet"))      unitShort = "tabs";
-                    else if (form != null && form.equalsIgnoreCase("Syrup"))  unitShort = "units"; // (بنحدثها لاحقًا مع ml إن لزم)
-                    else                                                      unitShort = "units";
-
-                    // 4) بناء النص
-                    StringBuilder sb = new StringBuilder();
-                    if (u != null && u > 0) sb.append(u).append(' ').append(unitShort);
-                    else sb.append("—");
-
-                    if (it.getSuggestedUnit() != null &&
-                            it.getSuggestedCount() != null &&
-                            it.getSuggestedUnitsTotal() != null) {
-                        sb.append("  •  Sugg: ")
-                                .append(it.getSuggestedCount()).append(' ')
-                                .append(it.getSuggestedUnit()).append(" = ")
-                                .append(it.getSuggestedUnitsTotal());
-                    }
-
-                    return new javafx.beans.property.ReadOnlyStringWrapper(sb.toString());
                 });
             }
-
-            colQuantity.setCellFactory(col -> new TableCell<PrescItemRow, String>() {
-                @Override
-                protected void updateItem(String text, boolean empty) {
-                    super.updateItem(text, empty);
-                    if (empty || text == null) {
-                        setText(null);
-                        setTooltip(null);
-                        return;
-                    }
-                    setText(text);
-
-                    // استخدم PrescItemRow بدلاً من PrescriptionItem
-                    PrescItemRow row = (getTableRow() == null) ? null : (PrescItemRow) getTableRow().getItem();
-                    if (row != null) {
-                        int d    = row.getDose();
-                        int f    = row.getFreqPerDay();
-                        int days = row.getDurationDays();
-                        String formula = d + " × " + f + " × " + days;
-
-                        String tt = "Calculated: " + formula;
-                        if (row.getSuggestedUnit() != null
-                                && row.getSuggestedCount() != null
-                                && row.getSuggestedUnitsTotal() != null) {
-                            tt += "\nSuggested: " + row.getSuggestedCount()
-                                    + " " + row.getSuggestedUnit()
-                                    + " = " + row.getSuggestedUnitsTotal();
-                        }
-                        setTooltip(new Tooltip(tt));
-                    } else {
-                        setTooltip(null);
-                    }
-                }
-            });
-        }
-
-        // ----- Pack (Suggested / Approved) column -----
-        if (colPack != null) {
-            colPack.setText("Pack");
-            colPack.setPrefWidth(160);
-
-            // القيمة المعروضة داخل الخلية
-            colPack.setCellValueFactory(cd -> {
-                PrescItemRow it = cd.getValue();
-                StringBuilder sb = new StringBuilder();
-
-                // Suggested من الحقول: suggested_unit / suggested_count / suggested_units_total
-                if (it.getSuggestedUnit() != null
-                        && it.getSuggestedCount() != null
-                        && it.getSuggestedUnitsTotal() != null) {
-                    sb.append("Sugg: ")
-                            .append(it.getSuggestedCount()).append(' ')
-                            .append(String.valueOf(it.getSuggestedUnit()))
-                            .append(" = ").append(it.getSuggestedUnitsTotal());
-                }
-
-                // Approved (لو صارت لاحقاً بالصيدلية)
-                if (it.getApprovedUnit() != null
-                        && it.getApprovedCount() != null
-                        && it.getApprovedUnitsTotal() != null) {
-                    if (sb.length() > 0) sb.append("  |  ");
-                    sb.append("Appr: ")
-                            .append(it.getApprovedCount()).append(' ')
-                            .append(String.valueOf(it.getApprovedUnit()))
-                            .append(" = ").append(it.getApprovedUnitsTotal());
-                }
-
-                if (sb.length() == 0) sb.append("—");
-                return new javafx.beans.property.ReadOnlyStringWrapper(sb.toString());
-            });
-
-            // Tooltip يبيّن التفاصيل كاملة عند الوقوف على الخلية
-            colPack.setCellFactory(col -> new TableCell<PrescItemRow, String>() {
-                @Override
-                protected void updateItem(String text, boolean empty) {
-                    super.updateItem(text, empty);
-                    if (empty || text == null) { setText(null); setTooltip(null); return; }
-                    setText(text);
-
-                    PrescItemRow r = (getTableRow() == null) ? null : (PrescItemRow) getTableRow().getItem();
-                    if (r == null) { setTooltip(null); return; }
-
-                    StringBuilder tip = new StringBuilder();
-                    if (r.getSuggestedUnit() != null
-                            && r.getSuggestedCount() != null
-                            && r.getSuggestedUnitsTotal() != null) {
-                        tip.append("Suggested: ").append(r.getSuggestedCount()).append(' ')
-                                .append(r.getSuggestedUnit()).append(" = ").append(r.getSuggestedUnitsTotal());
-                    }
-                    if (r.getApprovedUnit() != null
-                            && r.getApprovedCount() != null
-                            && r.getApprovedUnitsTotal() != null) {
-                        if (tip.length() > 0) tip.append('\n');
-                        tip.append("Approved: ").append(r.getApprovedCount()).append(' ')
-                                .append(r.getApprovedUnit()).append(" = ").append(r.getApprovedUnitsTotal());
-                    }
-                    setTooltip(tip.length() > 0 ? new Tooltip(tip.toString()) : null);
-                }
-            });
-
-            // تأكد أنه يظهر بعد عمود Quantity لو ما كان مُعرّف ترتيبه في FXML
-            if (TablePrescriptionItems != null && !TablePrescriptionItems.getColumns().contains(colPack)) {
-                int qIdx = TablePrescriptionItems.getColumns().indexOf(colQuantity);
-                if (qIdx >= 0) TablePrescriptionItems.getColumns().add(qIdx + 1, colPack);
-                else TablePrescriptionItems.getColumns().add(colPack);
+            @Override protected void updateItem(PrescItemRow row, boolean empty) {
+                super.updateItem(row, empty);
+                setText(null);
+                setGraphic(empty ? null : box);
             }
-        }
-
-        if (colPresesAction != null) {
-            colPresesAction.setCellValueFactory(param -> new ReadOnlyObjectWrapper<>(param.getValue()));
-            colPresesAction.setSortable(false);
-            colPresesAction.setResizable(false);
-            colPresesAction.setCellFactory(tc -> new TableCell<PrescItemRow, PrescItemRow>() {
-                private final Button btnDel = new Button("Delete");
-                private final HBox box = new HBox(8, btnDel);
-                {
-                    btnDel.getStyleClass().addAll("btn", "btn-danger");
-                    btnDel.setOnAction(e -> {
-                        PrescItemRow row = getItem();
-                        if (row == null) return;
-
-                        // If the row exists in DB, delete there FIRST, then remove from UI
-                        if (row.getId() > 0) {
-                            btnDel.setDisable(true); // prevent double clicks during async work
-                            new Thread(() -> {
-                                try (Connection c = Database.get()) {
-                                    c.setAutoCommit(true);
-                                    new PrescriptionItemDAO().deleteById(c, row.getId());
-                                    Platform.runLater(() -> {
-                                        prescItemsEditable.remove(row); // remove from UI only after DB success
-                                        toast("Delete medication.", "ok");
-                                        btnDel.setDisable(false);
-                                    });
-                                } catch (Exception ex) {
-                                    Platform.runLater(() -> {
-                                        toast("DB delete failed. Row kept.", "warn");
-                                        btnDel.setDisable(false);
-                                    });
-                                }
-                            }, "delete-presc-item").start();
-                        } else {
-                            // Not in DB yet → remove locally only
-                            boolean removed = prescItemsEditable.remove(row);
-                            if (removed) {
-                                toast("Row removed (not saved in DB).", "ok");
-                            } else {
-                                toast("Could not remove the row.", "warn");
-                            }
-                        }
-                    });
-                    box.setAlignment(Pos.CENTER_LEFT);
-                }
-                @Override protected void updateItem(PrescItemRow row, boolean empty) {
-                    super.updateItem(row, empty);
-                    setText(null);
-                    setGraphic(empty ? null : box);
-                }
-            });
-        }
-        // Removed width percentage bindings to avoid runtime exception.
+        });
     }
+}
 
     /**
      * Resolve patient id for the current prescription context.
-     *  Priority:
-     *   1) Cached selectedPatientUserId
-     *   2) Selected row from Appointments table
-     *   3) DB lookup by selectedPatientNationalId (set from Patients table action)
-     *   4) Extract national id from PatientNameLabel and lookup in DB
-     *   5) Scan today's appointments to match name/NID, then return user id or lookup by that NID
+     * Priority:
+     * 1) Cached selectedPatientUserId
+     * 2) Selected row from Appointments table
+     * 3) DB lookup by selectedPatientNationalId (set from Patients table action)
+     * 4) Extract national id from PatientNameLabel and lookup in DB
+     * 5) Scan today's appointments to match name/NID, then return user id or lookup by that NID
      */
     private Long resolveCurrentPatientId() {
         // 1) If we already cached it, return it
@@ -1958,7 +1914,8 @@ public class DoctorController {
                     selectedPatientUserId = uid; // cache
                     return uid;
                 }
-            } catch (Exception ignored) {}
+            } catch (Exception ignored) {
+            }
             return null;
         };
 
@@ -2007,7 +1964,9 @@ public class DoctorController {
         return null;
     }
 
-    /** Try to infer patient user id from current appointments by matching national id or name. */
+    /**
+     * Try to infer patient user id from current appointments by matching national id or name.
+     */
     private Long fallbackResolvePatientIdFromAppointments(PatientRow row) {
         if (row == null) return null;
         // try by national id first
@@ -2024,57 +1983,6 @@ public class DoctorController {
         return null;
     }
 
-    /**
-     * Try to create a minimal patient from the header when only a name and National ID are typed.
-     * Returns the new/existing patient's user_id if successful, otherwise null.
-     */
-
-    // Map DB model to table row, including packaging suggestion fields
-//    private PrescItemRow toRow(com.example.healthflow.model.PrescriptionItem it) {
-//        PrescItemRow r = new PrescItemRow();
-//        // ---- basic fields ----
-//        r.setId(it.getId() == null ? 0 : it.getId());
-//        r.setMedicineId(it.getMedicineId() == null ? 0 : it.getMedicineId());
-//        r.setMedicineName(it.getMedicineName());
-//        r.setStrength(it.getStrength());
-//        r.setForm(it.getForm());
-//        r.setRoute(it.getRoute());
-//        r.setDose(it.getDose() == null ? 0 : it.getDose());
-//        r.setFreqPerDay(it.getFreqPerDay() == null ? 0 : it.getFreqPerDay());
-//        r.setDurationDays(it.getDurationDays() == null ? 0 : it.getDurationDays());
-//        r.setDosageText(it.getDosageText());
-//        r.setStatus(it.getStatus() == null ? null : it.getStatus().name());
-//        r.setNotes(it.getNotes());
-//        if (it.getBatchId() != null) r.setBatchId(it.getBatchId());
-//        // --- map new packaging fields into the row (for Quantity column display) ---
-//        try {
-//            // qty_units_requested
-//            r.setQtyUnitsRequested(it.getQtyUnitsRequested());
-//
-//            // suggested_* (DAO returns text for suggested_unit)
-//            String su = null;
-//            try { su = it.getSuggestedUnit(); } catch (Throwable ignore) {}
-//            if (su != null && !su.isBlank()) {
-//                try {
-//                    r.setSuggestedUnit(com.example.healthflow.core.packaging.PackUnit.valueOf(su));
-//                } catch (IllegalArgumentException ex) {
-//                    // unknown enum text → ignore safely
-//                }
-//            }
-//            Integer sc = null;
-//            try { sc = it.getSuggestedCount(); } catch (Throwable ignore) {}
-//            if (sc != null) r.setSuggestedCount(sc);
-//
-//            Integer sut = null;
-//            try { sut = it.getSuggestedUnitsTotal(); } catch (Throwable ignore) {}
-//            if (sut != null) r.setSuggestedUnitsTotal(sut);
-//        } catch (Throwable ignore) {
-//            // keep UI rendering even if older model lacks accessors
-//        }
-//
-//        return r;
-//    }
-
     private PrescItemRow toRow(com.example.healthflow.model.PrescriptionItem it) {
         PrescItemRow r = new PrescItemRow();
 
@@ -2089,7 +1997,10 @@ public class DoctorController {
 //        r.setQuantity(Math.max(0, it.getQuantity())); // كمية من الداتابيز (int primitive، ما فيه null)
 
         Integer qObj = null;
-        try { qObj = it.getQuantity(); } catch (Throwable ignore) {}
+        try {
+            qObj = it.getQuantity();
+        } catch (Throwable ignore) {
+        }
         r.setQuantity(qObj == null ? 0 : Math.max(0, qObj));
 
         // --- حقول التغليف الجديدة ---
@@ -2114,12 +2025,52 @@ public class DoctorController {
             // لو نسخة قديمة من الموديل لا تحتوي accessor → تجاهل بدون كسر الواجهة
         }
 
+        // ---- Guard against unit/form mismatches (prevents "BOTTLE" with tablets, etc.) ----
+        try {
+            String f = (r.getForm() == null) ? "" : r.getForm().trim().toLowerCase();
+            boolean isSolid = f.equals("tablet") || f.equals("tab") || f.equals("tablets")
+                    || f.equals("capsule") || f.equals("capsules");
+            boolean isLiquid = f.equals("syrup") || f.equals("suspension") || f.equals("injection") || f.equals("drops");
+            boolean isSemi = f.equals("cream") || f.equals("ointment");
+
+            // suggested_*
+            if (r.getSuggestedUnit() != null) {
+                String u = r.getSuggestedUnit().name();
+                boolean ok = (isSolid && (u.equals("BLISTER") || u.equals("BOX") || u.equals("UNIT")))
+                        || (isLiquid && u.equals("BOTTLE"))
+                        || (isSemi && u.equals("TUBE"));
+                if (!ok) {
+                    r.setSuggestedUnit(null);
+                    r.setSuggestedCount(null);
+                    r.setSuggestedUnitsTotal(null);
+                }
+            }
+
+            // approved_* (same guard)
+            if (r.getApprovedUnit() != null) {
+                String u2 = r.getApprovedUnit().name();
+                boolean ok2 = (isSolid && (u2.equals("BLISTER") || u2.equals("BOX") || u2.equals("UNIT")))
+                        || (isLiquid && u2.equals("BOTTLE"))
+                        || (isSemi && u2.equals("TUBE"));
+                if (!ok2) {
+                    r.setApprovedUnit(null);
+                    r.setApprovedCount(null);
+                    r.setApprovedUnitsTotal(null);
+                }
+            }
+        } catch (Throwable ignore) { /* keep UI resilient */ }
+
         return r;
     }
 
     private void reloadPrescriptionItemsFromDb() {
         if (currentPrescriptionId == null || currentPrescriptionId <= 0) return;
         try (java.sql.Connection conn = Database.get()) {
+            // Backfill suggestions so Pack values are available even when opening from Prescription button
+            try {
+                conn.setAutoCommit(true);
+                new com.example.healthflow.dao.PrescriptionItemDAO().backfillSuggestions(conn, currentPrescriptionId);
+            } catch (Throwable ignore) { /* non-fatal; continue loading */ }
             java.util.List<com.example.healthflow.model.PrescriptionItem> fresh =
                     new com.example.healthflow.dao.PrescriptionItemDAO().listByPrescription(conn, currentPrescriptionId);
             javafx.collections.ObservableList<PrescItemRow> rows = javafx.collections.FXCollections.observableArrayList();
@@ -2163,7 +2114,7 @@ public class DoctorController {
             try (var psU = c.prepareStatement(
                     "INSERT INTO users (full_name, national_id, role, email) VALUES (?, ?, 'PATIENT', ?) RETURNING id");
                  var psP = c.prepareStatement(
-                    "INSERT INTO patients (user_id) VALUES (?) RETURNING id")) {
+                         "INSERT INTO patients (user_id) VALUES (?) RETURNING id")) {
                 psU.setString(1, name);
                 psU.setString(2, digits);
                 psU.setString(3, tempEmail);
@@ -2193,7 +2144,7 @@ public class DoctorController {
                     try (var psU2 = c.prepareStatement(
                             "INSERT INTO users (full_name, national_id, role, email) VALUES (?, ?, 'PATIENT', ?) RETURNING id");
                          var psP2 = c.prepareStatement(
-                            "INSERT INTO patients (user_id) VALUES (?) RETURNING id")) {
+                                 "INSERT INTO patients (user_id) VALUES (?) RETURNING id")) {
                         psU2.setString(1, name);
                         psU2.setString(2, digits);
                         psU2.setString(3, retryEmail);
@@ -2227,7 +2178,9 @@ public class DoctorController {
         return null;
     }
 
-    /** Ensure draft prescription exists in DB and return its id (creates one if missing). */
+    /**
+     * Ensure draft prescription exists in DB and return its id (creates one if missing).
+     */
     private Long ensureDraftPrescription() throws Exception {
         if (currentPrescriptionId != null) return currentPrescriptionId;
 
@@ -2284,7 +2237,9 @@ public class DoctorController {
 
     }
 
-    /** Lookup medicines.id by name (case-insensitive, trimmed). Returns null if not found. */
+    /**
+     * Lookup medicines.id by name (case-insensitive, trimmed). Returns null if not found.
+     */
     private Long findMedicineIdByName(Connection c, String name) throws SQLException {
         if (name == null) return null;
         String q = name.trim();
@@ -2330,13 +2285,16 @@ public class DoctorController {
             }
 
             // 2) dosage parts
-            String dose = (doseText != null && doseText.getText()!=null) ? doseText.getText().trim() : "";
-            String freqStr = (freq_day != null && freq_day.getText()!=null) ? freq_day.getText().trim() : "";
-            String durStr  = (duration != null && duration.getText()!=null) ? duration.getText().trim() : "";
+            String dose = (doseText != null && doseText.getText() != null) ? doseText.getText().trim() : "";
+            String freqStr = (freq_day != null && freq_day.getText() != null) ? freq_day.getText().trim() : "";
+            String durStr = (duration != null && duration.getText() != null) ? duration.getText().trim() : "";
             int freqPerDay = safeParseInt(freqStr, 0);
-            int days       = safeParseInt(durStr, 0);
+            int days = safeParseInt(durStr, 0);
             Integer doseInt = null;
-            try { doseInt = (dose.isBlank() ? null : Integer.valueOf(dose)); } catch (Exception ignored) {}
+            try {
+                doseInt = (dose.isBlank() ? null : Integer.valueOf(dose));
+            } catch (Exception ignored) {
+            }
             if (doseInt == null || doseInt <= 0) {
                 toast("Enter a positive Dose.", "warn");
                 return;
@@ -2346,18 +2304,18 @@ public class DoctorController {
                 return;
             }
 
-            String form  = (formCombo != null && formCombo.getValue()!=null) ? String.valueOf(formCombo.getValue()) : "";
-            String route = (routeCombo != null && routeCombo.getValue()!=null) ? String.valueOf(routeCombo.getValue()) : "";
-            String strength = (strength_combo != null && strength_combo.getValue()!=null) ? String.valueOf(strength_combo.getValue()) : "";
-            String notesStr = (nots_Pre != null && nots_Pre.getText()!=null) ? nots_Pre.getText().trim() : "";
+            String form = (formCombo != null && formCombo.getValue() != null) ? String.valueOf(formCombo.getValue()) : "";
+            String route = (routeCombo != null && routeCombo.getValue() != null) ? String.valueOf(routeCombo.getValue()) : "";
+            String strength = (strength_combo != null && strength_combo.getValue() != null) ? String.valueOf(strength_combo.getValue()) : "";
+            String notesStr = (nots_Pre != null && nots_Pre.getText() != null) ? nots_Pre.getText().trim() : "";
 
             // 3) compose dosage text
             StringBuilder ds = new StringBuilder();
             if (!strength.isBlank()) ds.append(strength).append(" ");
-            if (!form.isBlank())     ds.append(form).append(" \u2022 ");
-            if (!dose.isBlank())     ds.append(dose).append(" \u2022 ");
+            if (!form.isBlank()) ds.append(form).append(" \u2022 ");
+            if (!dose.isBlank()) ds.append(dose).append(" \u2022 ");
             ds.append(freqPerDay).append("x/day \u2022 ").append(days).append("d");
-            if (!route.isBlank())    ds.append(" \u2022 ").append(route);
+            if (!route.isBlank()) ds.append(" \u2022 ").append(route);
             if (!notesStr.isBlank()) ds.append(" \u2022 ").append(notesStr);
 
             // 4) quantity: dose * freq/day * days
@@ -2384,7 +2342,8 @@ public class DoctorController {
 
                     try {
                         new PrescriptionItemDAO().backfillSuggestions(c, prescId);
-                    } catch (Exception ignore) {}
+                    } catch (Exception ignore) {
+                    }
 
                     // أعرض في الجدول بناءً على البيانات الراجعة (الاسم قد يتظبط بالتريغر)
                     PrescItemRow row = new PrescItemRow();
@@ -2448,7 +2407,9 @@ public class DoctorController {
         }
     }
 
-    /** Open Add pane with the selected row prefilled to edit. */
+    /**
+     * Open Add pane with the selected row prefilled to edit.
+     */
     private void openEditSelectedItem() {
         PrescItemRow sel = (TablePrescriptionItems == null)
                 ? null : TablePrescriptionItems.getSelectionModel().getSelectedItem();
@@ -2460,7 +2421,7 @@ public class DoctorController {
 
         // نملأ ما نقدر نستعيده بثقة
         if (medicineName_combo != null) medicineName_combo.setValue(sel.getMedicineName());
-        if (duration != null)     duration.setText(String.valueOf(Math.max(0, sel.getDurationDays())));
+        if (duration != null) duration.setText(String.valueOf(Math.max(0, sel.getDurationDays())));
 
         // تقدير freq/day = quantity / duration إن أمكن (قسم صحيح)
         if (freq_day != null) {
@@ -2470,51 +2431,86 @@ public class DoctorController {
             freq_day.setText(freq > 0 ? String.valueOf(freq) : "");
         }
 
-        // لا يمكن استرجاع dose/strength/form/route من نص dosage بدقة — اتركها للمستخدم
-        if (doseText != null) doseText.clear();
-        if (strength_combo != null) strength_combo.getSelectionModel().clearSelection();
-        if (formCombo != null) formCombo.getSelectionModel().clearSelection();
-        if (routeCombo != null) routeCombo.getSelectionModel().clearSelection();
+        // املأ الحقول القابلة للاسترجاع من الصف المحدد
+        if (doseText != null) doseText.setText(sel.getDose() > 0 ? String.valueOf(sel.getDose()) : "");
+        if (strength_combo != null) {
+            if (sel.getStrength() != null && !sel.getStrength().isBlank())
+                strength_combo.getSelectionModel().select(sel.getStrength());
+            else strength_combo.getSelectionModel().clearSelection();
+        }
+        if (formCombo != null) {
+            if (sel.getForm() != null && !sel.getForm().isBlank()) formCombo.getSelectionModel().select(sel.getForm());
+            else formCombo.getSelectionModel().clearSelection();
+        }
+        if (routeCombo != null) {
+            if (sel.getRoute() != null && !sel.getRoute().isBlank())
+                routeCombo.getSelectionModel().select(sel.getRoute());
+            else routeCombo.getSelectionModel().clearSelection();
+        }
         if (nots_Pre != null) nots_Pre.setText(sel.getNotes() == null ? "" : sel.getNotes());
 
         if (InsertMedicine != null) InsertMedicine.setText("Save");
         showPrescriptionPaneToAddMedication();
+        setupQtyLiveLabel();
 
         // أخفِ قائمة الاقتراحات لو كانت ظاهرة
 // ركّز على الكومبو الحديثة بدل الحقل القديم
         if (medicineName_combo != null) medicineName_combo.requestFocus();
     }
 
-    /** Delete selected row; if it has a DB id (>0), delete from DB too. */
+    /**
+     * Delete selected row from the UI table and database, regardless of which list backs the table.
+     */
     private void deleteSelectedItem() {
-        PrescItemRow sel = (TablePrescriptionItems == null) ? null : TablePrescriptionItems.getSelectionModel().getSelectedItem();
+        PrescItemRow sel = (TablePrescriptionItems == null)
+                ? null : TablePrescriptionItems.getSelectionModel().getSelectedItem();
         if (sel == null) {
             toast("Select a row to delete.", "warn");
             return;
         }
-        boolean removed = prescItemsEditable.remove(sel);
+
+        // 1) Remove from the table's backing list (fallback to prescItemsEditable if needed)
+        boolean removed = false;
+        try {
+            if (TablePrescriptionItems != null && TablePrescriptionItems.getItems() != null) {
+                removed = TablePrescriptionItems.getItems().remove(sel);
+            }
+            if (!removed && prescItemsEditable != null) {
+                removed = prescItemsEditable.remove(sel);
+            }
+        } catch (Throwable ignore) { /* keep going */ }
+
         if (!removed) {
-            toast("Could not remove the row.", "warn");
-            return;
+            // If not removed from a local list, still continue with DB delete (source of truth)
+            toast("Removing from table failed; proceeding to delete from database...", "warn");
         }
-        if (sel.getId() > 0) {
+
+        // 2) Delete from DB if the row exists there
+        final long idToDelete = sel.getId();
+        if (idToDelete > 0) {
             new Thread(() -> {
                 try (Connection c = Database.get()) {
                     c.setAutoCommit(true);
-                    new PrescriptionItemDAO().deleteById(c, sel.getId());
+                    new com.example.healthflow.dao.PrescriptionItemDAO().deleteById(c, idToDelete);
                     Platform.runLater(() -> {
-                        sel.setId(0); // صار مش محفوظ
                         toast("Row deleted from database.", "ok");
+                        // Reload authoritative data from DB to keep UI consistent
+                        reloadPrescriptionItemsFromDb();
                     });
                 } catch (Exception ex) {
-                    Platform.runLater(() -> toast("Deleted locally but DB delete failed.", "warn"));
+                    Platform.runLater(() -> toast("DB delete failed: " + ex.getMessage(), "err"));
                 }
             }, "delete-presc-item").start();
         } else {
+            // Local-only row; just refresh UI
+            if (TablePrescriptionItems != null) TablePrescriptionItems.refresh();
             toast("Row removed.", "ok");
         }
     }
-    /** Clear Add-Medicine form fields. */
+
+    /**
+     * Clear Add-Medicine form fields.
+     */
     private void clearAddForm() {
         if (medicineName_combo != null) medicineName_combo.setValue(null);
         if (doseText != null) doseText.clear();
@@ -2533,23 +2529,27 @@ public class DoctorController {
         if (m == null) return;
         try {
             if (medicineName_combo != null) medicineName_combo.setValue(m.getName());
-        } catch (Throwable ignored) {}
+        } catch (Throwable ignored) {
+        }
         // Optional: fill other fields if present on MedicineRow
         try {
             if (strength_combo != null && m.getStrength() != null) {
                 strength_combo.getSelectionModel().select(m.getStrength());
             }
-        } catch (Throwable ignored) {}
+        } catch (Throwable ignored) {
+        }
         try {
             if (formCombo != null && m.getForm() != null) {
                 formCombo.getSelectionModel().select(m.getForm());
             }
-        } catch (Throwable ignored) {}
+        } catch (Throwable ignored) {
+        }
         try {
             if (routeCombo != null && m.getRoute() != null) {
                 routeCombo.getSelectionModel().select(m.getRoute());
             }
-        } catch (Throwable ignored) {}
+        } catch (Throwable ignored) {
+        }
 
 
     }
@@ -2575,22 +2575,48 @@ public class DoctorController {
         // Diagnosis يبقى على مستوى الهيدر/الوصفة وليس عنصر الدواء
 
         int dose = 0, freq = 0, dur = 0;
-        try { if (doseText != null && !doseText.getText().isBlank()) dose = Integer.parseInt(doseText.getText().trim()); } catch (Exception ignored) {}
-        try { if (freq_day != null && !freq_day.getText().isBlank()) freq = Integer.parseInt(freq_day.getText().trim()); } catch (Exception ignored) {}
-        try { if (duration != null && !duration.getText().isBlank()) dur = Integer.parseInt(duration.getText().trim()); } catch (Exception ignored) {}
+        try {
+            if (doseText != null && !doseText.getText().isBlank()) dose = Integer.parseInt(doseText.getText().trim());
+        } catch (Exception ignored) {
+        }
+        try {
+            if (freq_day != null && !freq_day.getText().isBlank()) freq = Integer.parseInt(freq_day.getText().trim());
+        } catch (Exception ignored) {
+        }
+        try {
+            if (duration != null && !duration.getText().isBlank()) dur = Integer.parseInt(duration.getText().trim());
+        } catch (Exception ignored) {
+        }
         int qty = (dose > 0 && freq > 0 && dur > 0) ? (dose * freq * dur) : target.getQuantity();
         // طبّق القيم على الصف (تجاهل لو Setter مش موجود)
-        try { target.setMedicineName(medName); } catch (Throwable ignored) {}
-        try { target.setDosage(String.valueOf(dose)); } catch (Throwable ignored) {}
-        try { target.setDurationDays(dur); } catch (Throwable ignored) {}
-        try { target.setQuantity(qty); } catch (Throwable ignored) {}
-        try { target.setNotes(notes); } catch (Throwable ignored) {}
-        try { target.setDiagnosis(diagnosisTextUi); } catch (Throwable ignored) {}
+        try {
+            target.setMedicineName(medName);
+        } catch (Throwable ignored) {
+        }
+        try {
+            target.setDosage(String.valueOf(dose));
+        } catch (Throwable ignored) {
+        }
+        try {
+            target.setDurationDays(dur);
+        } catch (Throwable ignored) {
+        }
+        try {
+            target.setQuantity(qty);
+        } catch (Throwable ignored) {
+        }
+        try {
+            target.setNotes(notes);
+        } catch (Throwable ignored) {
+        }
+        try {
+            target.setDiagnosis(diagnosisTextUi);
+        } catch (Throwable ignored) {
+        }
 
         if (TablePrescriptionItems != null) TablePrescriptionItems.refresh();
         toast("Item updated.", "info");
     }
-
 
 
     // ================== ComboBox population for medication ==================
@@ -2600,28 +2626,30 @@ public class DoctorController {
         // Populate combo boxes with appropriate options
         if (strength_combo != null) {
             strength_combo.getItems().setAll(
-                "125 mg", "250 mg", "500 mg", "750 mg", "1 g",
-                "2 g", "5 mg/ml", "10 mg/ml", "20 mg/ml"
+                    "125 mg", "250 mg", "500 mg", "750 mg", "1 g",
+                    "2 g", "5 mg/ml", "10 mg/ml", "20 mg/ml"
             );
         }
 
         if (formCombo != null) {
             formCombo.getItems().setAll(
-                "Tablet", "Capsule", "Syrup", "Injection", "Suspension",
-                "Ointment", "Cream", "Drops", "Inhaler", "Powder"
+                    "Tablet", "Capsule", "Syrup", "Injection", "Suspension",
+                    "Ointment", "Cream", "Drops", "Inhaler", "Powder"
             );
         }
 
         if (routeCombo != null) {
             routeCombo.getItems().setAll(
-                "Oral", "Intravenous (IV)", "Intramuscular (IM)", "Subcutaneous (SC)",
-                "Topical", "Inhalation", "Ophthalmic", "Otic", "Rectal", "Vaginal"
+                    "Oral", "Intravenous (IV)", "Intramuscular (IM)", "Subcutaneous (SC)",
+                    "Topical", "Inhalation", "Ophthalmic", "Otic", "Rectal", "Vaginal"
             );
         }
+        setupQtyLiveLabel();
     }
 
     // ==== Tiny toast on alertLabel (auto-hide) ====
     private Timeline toastTimeline;
+
     private void toast(String msg, String type) {
         if (alertLabel == null) return;
         Platform.runLater(() -> {
@@ -2630,10 +2658,10 @@ public class DoctorController {
             // simple styling by type
             String base = "-fx-background-radius: 6; -fx-padding: 6 10; -fx-text-fill: white;";
             switch (type == null ? "" : type) {
-                case "ok"   -> alertLabel.setStyle(base + "-fx-background-color: #28a745;");
+                case "ok" -> alertLabel.setStyle(base + "-fx-background-color: #28a745;");
                 case "warn" -> alertLabel.setStyle(base + "-fx-background-color: #ffc107; -fx-text-fill: #222;");
-                case "err"  -> alertLabel.setStyle(base + "-fx-background-color: #dc3545;");
-                default     -> alertLabel.setStyle(base + "-fx-background-color: #17a2b8;");
+                case "err" -> alertLabel.setStyle(base + "-fx-background-color: #dc3545;");
+                default -> alertLabel.setStyle(base + "-fx-background-color: #17a2b8;");
             }
             if (toastTimeline != null) toastTimeline.stop();
             alertLabel.setOpacity(1.0);
@@ -2652,7 +2680,9 @@ public class DoctorController {
         });
     }
 
-    /** Tiny press animation (visual feedback) for table action buttons. */
+    /**
+     * Tiny press animation (visual feedback) for table action buttons.
+     */
     private void playPressAnim(javafx.scene.control.Button b) {
         if (b == null) return;
         ScaleTransition st = new ScaleTransition(Duration.millis(120), b);
@@ -2670,7 +2700,11 @@ public class DoctorController {
     }
 
     private static int safeParseInt(String s, int def) {
-        try { return Integer.parseInt(s.trim()); } catch (Exception e) { return def; }
+        try {
+            return Integer.parseInt(s.trim());
+        } catch (Exception e) {
+            return def;
+        }
     }
 
     /* ================= Actions ================= */
@@ -2681,7 +2715,6 @@ public class DoctorController {
                         "\nNational ID: " + safe(row.getNationalId()) +
                         "\nMedical history:\n" + safe(row.getMedicalHistory()));
     }
-
 
 
     private void showPatientDetails(String name, String history) {
@@ -2712,10 +2745,54 @@ public class DoctorController {
     }
 
 
-
     private void openPrescription(AppointmentRow row) {
-        showInfo("Prescription", "Open prescription composer for: " + row.getPatientName() +
-                "\n(Status will be PENDING for pharmacy).");
+        try {
+            // 0) حضّر هيدر المريض (للاحتياط) حتى لو ما كان مُختار من قبل
+            try {
+                if (row != null) {
+                    String nid = row.getNationalId();
+                    String name = row.getPatientName();
+                    // استخدم دالة المساعدة مباشرة (تتحقق داخليًا من PatientNameTF)
+                    setPatientHeader(name, nid, true);
+                }
+            } catch (Throwable ignore) {}
+
+            // 1) تأكد من وجود وصفة مسودة في الداتابيز، واربطها كـ currentPrescriptionId
+            currentPrescriptionId = null; // أعد التقييم دائمًا بناءً على المريض الحالي
+            Long prescId = ensureDraftPrescription();
+            this.currentPrescriptionId = prescId;
+
+            // 2) Backfill اقتراحات التغليف قبل تحميل العناصر → يضمن أن عمود Pack لا يظهر "—"
+            try (Connection c = Database.get()) {
+                c.setAutoCommit(true);
+                new com.example.healthflow.dao.PrescriptionItemDAO().backfillSuggestions(c, prescId);
+            } catch (Exception ignored) {}
+
+            // 3) حمّل عناصر الوصفة واعرض شاشة الوصفة
+//            reloadPrescriptionItemsFromDb();
+            loadPrescriptionItemsFromDb(prescId);
+            showPrescriptionPane();
+//            reloadPrescriptionItemsFromDb();
+        } catch (Exception ex) {
+            showError("Open Prescription", ex);
+        }
+    }
+
+    /** Open prescription pane from the items table action.
+     *  Ensures backfill of suggestions so colPack shows values immediately. */
+    public void openPrescriptionFromItems() {
+        try {
+            Long prescId = (currentPrescriptionId == null || currentPrescriptionId <= 0)
+                    ? ensureDraftPrescription() : currentPrescriptionId;
+            try (java.sql.Connection c = Database.get()) {
+                c.setAutoCommit(true);
+                new com.example.healthflow.dao.PrescriptionItemDAO().backfillSuggestions(c, prescId);
+            } catch (Exception ignored) {}
+            reloadPrescriptionItemsFromDb();
+            showPrescriptionPane();
+        } catch (Exception ex) {
+            showError("Open Prescription", ex);
+        }
     }
 
     /* ================= Helpers ================= */
@@ -2723,11 +2800,15 @@ public class DoctorController {
         if (full == null || full.isBlank()) return "user";
         return full.trim().split("\\s+")[0];
     }
+
     private static int ageFromDob(LocalDate dob) {
         if (dob == null) return 0;
         return java.time.Period.between(dob, LocalDate.now()).getYears();
     }
-    private static String safe(String s) { return s == null ? "" : s; }
+
+    private static String safe(String s) {
+        return s == null ? "" : s;
+    }
 
     private void showError(String title, Exception ex) {
         ex.printStackTrace();
@@ -2737,6 +2818,7 @@ public class DoctorController {
         a.setContentText(ex.getMessage());
         a.showAndWait();
     }
+
     private void showWarn(String title, String msg) {
         Alert a = new Alert(Alert.AlertType.WARNING);
         a.setTitle(title);
@@ -2744,6 +2826,7 @@ public class DoctorController {
         a.setContentText(msg);
         a.showAndWait();
     }
+
     private void showInfo(String title, String msg) {
         Alert a = new Alert(Alert.AlertType.INFORMATION);
         a.setTitle(title);
@@ -2780,36 +2863,97 @@ public class DoctorController {
             return r;
         }
 
-        public long getId() { return id.get(); }
-        public void setId(long v) { id.set(v); }
-        public LongProperty idProperty() { return id; }
+        public long getId() {
+            return id.get();
+        }
 
-        public String getPatientName() { return patientName.get(); }
-        public void setPatientName(String v) { patientName.set(v); }
-        public StringProperty patientNameProperty() { return patientName; }
+        public void setId(long v) {
+            id.set(v);
+        }
 
-        public String getNationalId() { return nationalId.get(); }
-        public void setNationalId(String v) { nationalId.set(v); }
-        public StringProperty nationalIdProperty() { return nationalId; }
+        public LongProperty idProperty() {
+            return id;
+        }
 
-        public LocalDate getDate() { return date.get(); }
-        public void setDate(LocalDate v) { date.set(v); }
-        public ObjectProperty<LocalDate> dateProperty() { return date; }
+        public String getPatientName() {
+            return patientName.get();
+        }
 
-        public String getTimeStr() { return timeStr.get(); }
-        public void setTimeStr(String v) { timeStr.set(v); }
-        public StringProperty timeStrProperty() { return timeStr; }
+        public void setPatientName(String v) {
+            patientName.set(v);
+        }
 
-        public String getStatus() { return status.get(); }
-        public void setStatus(String v) { status.set(v); }
-        public StringProperty statusProperty() { return status; }
+        public StringProperty patientNameProperty() {
+            return patientName;
+        }
 
-        public long getPatientUserId() { return patientUserId.get(); }
-        public void setPatientUserId(long v) { patientUserId.set(v); }
+        public String getNationalId() {
+            return nationalId.get();
+        }
 
-        public String getMedicalHistory() { return medicalHistory.get(); }
-        public void setMedicalHistory(String v) { medicalHistory.set(v); }
-        public StringProperty medicalHistoryProperty() { return medicalHistory; }
+        public void setNationalId(String v) {
+            nationalId.set(v);
+        }
+
+        public StringProperty nationalIdProperty() {
+            return nationalId;
+        }
+
+        public LocalDate getDate() {
+            return date.get();
+        }
+
+        public void setDate(LocalDate v) {
+            date.set(v);
+        }
+
+        public ObjectProperty<LocalDate> dateProperty() {
+            return date;
+        }
+
+        public String getTimeStr() {
+            return timeStr.get();
+        }
+
+        public void setTimeStr(String v) {
+            timeStr.set(v);
+        }
+
+        public StringProperty timeStrProperty() {
+            return timeStr;
+        }
+
+        public String getStatus() {
+            return status.get();
+        }
+
+        public void setStatus(String v) {
+            status.set(v);
+        }
+
+        public StringProperty statusProperty() {
+            return status;
+        }
+
+        public long getPatientUserId() {
+            return patientUserId.get();
+        }
+
+        public void setPatientUserId(long v) {
+            patientUserId.set(v);
+        }
+
+        public String getMedicalHistory() {
+            return medicalHistory.get();
+        }
+
+        public void setMedicalHistory(String v) {
+            medicalHistory.set(v);
+        }
+
+        public StringProperty medicalHistoryProperty() {
+            return medicalHistory;
+        }
     }
 
     public static class PatientRow {
@@ -2828,29 +2972,133 @@ public class DoctorController {
             setMedicalHistory(history);
         }
 
-        public String getNationalId() { return nationalId.get(); }
-        public void setNationalId(String v) { nationalId.set(v); }
-        public StringProperty nationalIdProperty() { return nationalId; }
+        public String getNationalId() {
+            return nationalId.get();
+        }
 
-        public String getFullName() { return fullName.get(); }
-        public void setFullName(String v) { fullName.set(v); }
-        public StringProperty fullNameProperty() { return fullName; }
+        public void setNationalId(String v) {
+            nationalId.set(v);
+        }
 
-        public String getGender() { return gender.get(); }
-        public void setGender(String v) { gender.set(v); }
-        public StringProperty genderProperty() { return gender; }
+        public StringProperty nationalIdProperty() {
+            return nationalId;
+        }
 
-        public int getAge() { return age.get(); }
-        public void setAge(int v) { age.set(v); }
-        public IntegerProperty ageProperty() { return age; }
+        public String getFullName() {
+            return fullName.get();
+        }
 
-        public String getMedicalHistory() { return medicalHistory.get(); }
-        public void setMedicalHistory(String v) { medicalHistory.set(v); }
-        public StringProperty medicalHistoryProperty() { return medicalHistory; }
+        public void setFullName(String v) {
+            fullName.set(v);
+        }
 
-        public long getUserId() { return userId.get(); }
-        public void setUserId(long v) { userId.set(v); }
-        public LongProperty userIdProperty() { return userId; }
+        public StringProperty fullNameProperty() {
+            return fullName;
+        }
+
+        public String getGender() {
+            return gender.get();
+        }
+
+        public void setGender(String v) {
+            gender.set(v);
+        }
+
+        public StringProperty genderProperty() {
+            return gender;
+        }
+
+        public int getAge() {
+            return age.get();
+        }
+
+        public void setAge(int v) {
+            age.set(v);
+        }
+
+        public IntegerProperty ageProperty() {
+            return age;
+        }
+
+        public String getMedicalHistory() {
+            return medicalHistory.get();
+        }
+
+        public void setMedicalHistory(String v) {
+            medicalHistory.set(v);
+        }
+
+        public StringProperty medicalHistoryProperty() {
+            return medicalHistory;
+        }
+
+        public long getUserId() {
+            return userId.get();
+        }
+
+        public void setUserId(long v) {
+            userId.set(v);
+        }
+
+        public LongProperty userIdProperty() {
+            return userId;
+        }
     }
-}
 
+
+    // ===== Helper for live calculation of quantity label =====
+    private void setupQtyLiveLabel() {
+        System.out.println("[qty] label=" + (qtyLabelCulc != null) +
+                ", dose=" + (doseText != null) +
+                ", freq=" + (freq_day != null) +
+                ", dur=" + (duration != null) +
+                ", form=" + (formCombo != null));
+        if (qtyLabelCulc == null) return;
+        // Update now and on changes
+        Runnable updater = this::updateQtyLabel;
+        if (doseText != null) doseText.textProperty().addListener((obs, o, n) -> updater.run());
+        if (freq_day != null) freq_day.textProperty().addListener((obs, o, n) -> updater.run());
+        if (duration != null) duration.textProperty().addListener((obs, o, n) -> updater.run());
+        if (formCombo != null) formCombo.valueProperty().addListener((obs, o, n) -> updater.run());
+        updater.run();
+
+    }
+
+    private void updateQtyLabel() {
+        if (qtyLabelCulc == null) return;
+        int d = (doseText != null && doseText.getText() != null) ? safeParseInt(doseText.getText(), 0) : 0;
+        int f = (freq_day != null && freq_day.getText() != null) ? safeParseInt(freq_day.getText(), 0) : 0;
+        int g = (duration != null && duration.getText() != null) ? safeParseInt(duration.getText(), 0) : 0;
+        int total = (d > 0 && f > 0 && g > 0) ? d * f * g : 0;
+        String formVal = (formCombo != null && formCombo.getValue() != null) ? String.valueOf(formCombo.getValue()) : null;
+        String unit = unitFromForm(formVal);
+
+//        StringBuilder sb = new StringBuilder("Dose × Freq/day × Duration");
+//        if (d > 0 || f > 0 || g > 0) {
+//            sb.append(" = ")
+//                    .append(d > 0 ? d : "?")
+//                    .append(" × ")
+//                    .append(f > 0 ? f : "?")
+//                    .append(" × ")
+//                    .append(g > 0 ? g : "?");
+//        }
+        StringBuilder sb = new StringBuilder("");
+        if (total > 0) {
+            sb.append(" = ").append(total).append(" ").append(unit);
+        }
+        qtyLabelCulc.setText(sb.toString());
+    }
+
+    private String unitFromForm(String form) {
+        if (form == null) return "units";
+        String f = form.trim().toLowerCase();
+        if (f.equals("tablet") || f.equals("tab") || f.equals("tablets")) return "tabs";
+        if (f.equals("capsule") || f.equals("capsules") || f.equals("cap")) return "caps";
+        if (f.equals("syrup") || f.equals("suspension") || f.equals("injection") || f.equals("drops")) return "ml";
+        if (f.equals("cream") || f.equals("ointment")) return "g";
+        return "units";
+    }
+
+
+
+}

@@ -513,6 +513,16 @@
     -fx-bar-fill: #95a5a6;
 }
 
+/* Rounded top corners for BarChart bars */
+.chart-bar {
+    /* paint the bar using -fx-bar-fill, so radius applies */
+    -fx-background-color: -fx-bar-fill;
+    /* small layered insets for a clean edge */
+    -fx-background-insets: 0, 1, 2;
+    /* round TOP-LEFT and TOP-RIGHT only */
+    -fx-background-radius: 10 10 0 0, 10 10 0 0, 0 0 0 0;
+}
+
 /* تحسين المظهر العام */
 .chart-plot-background {
     -fx-background-color: transparent;

@@ -33,6 +33,32 @@ public class PrescItemRow {
     private final ObjectProperty<Integer> suggestedCount = new SimpleObjectProperty<>();
     private final ObjectProperty<Integer> suggestedUnitsTotal = new SimpleObjectProperty<>();
 
+    // Display-only: computed text for Pack column (Suggested/Approved)
+    private final StringProperty pack = new SimpleStringProperty("—");
+
+    private void recomputePack() {
+        StringBuilder sb = new StringBuilder();
+        // Suggested
+        if (getSuggestedUnit() != null && getSuggestedCount() != null && getSuggestedUnitsTotal() != null) {
+            sb.append("Sugg: ")
+              .append(getSuggestedCount()).append(' ')
+              .append(String.valueOf(getSuggestedUnit()))
+              .append(" = ").append(getSuggestedUnitsTotal());
+        }
+        // Approved
+        if (getApprovedUnit() != null && getApprovedCount() != null && getApprovedUnitsTotal() != null) {
+            if (sb.length() > 0) sb.append("  |  ");
+            sb.append("Appr: ")
+              .append(getApprovedCount()).append(' ')
+              .append(String.valueOf(getApprovedUnit()))
+              .append(" = ").append(getApprovedUnitsTotal());
+        }
+        pack.set(sb.length() == 0 ? "—" : sb.toString());
+    }
+
+    public String getPack() { return pack.get(); }
+    public StringProperty packProperty() { return pack; }
+
 
     // Approved packaging by pharmacist (what will be actually dispensed)
     private PackUnit approvedUnit;        // BLISTER / BOX / BOTTLE / TUBE / UNIT
@@ -131,25 +157,25 @@ public class PrescItemRow {
     public ObjectProperty<Integer> qtyUnitsRequestedProperty() { return qtyUnitsRequested; }
 
     public PackUnit getSuggestedUnit() { return suggestedUnit.get(); }
-    public void setSuggestedUnit(PackUnit v) { suggestedUnit.set(v); }
+    public void setSuggestedUnit(PackUnit v) { suggestedUnit.set(v); recomputePack(); }
     public ObjectProperty<PackUnit> suggestedUnitProperty() { return suggestedUnit; }
 
     public Integer getSuggestedCount() { return suggestedCount.get(); }
-    public void setSuggestedCount(Integer v) { suggestedCount.set(v); }
+    public void setSuggestedCount(Integer v) { suggestedCount.set(v); recomputePack(); }
     public ObjectProperty<Integer> suggestedCountProperty() { return suggestedCount; }
 
     public Integer getSuggestedUnitsTotal() { return suggestedUnitsTotal.get(); }
-    public void setSuggestedUnitsTotal(Integer v) { suggestedUnitsTotal.set(v); }
+    public void setSuggestedUnitsTotal(Integer v) { suggestedUnitsTotal.set(v); recomputePack(); }
     public ObjectProperty<Integer> suggestedUnitsTotalProperty() { return suggestedUnitsTotal; }
 
     // ===== Approved packaging (set by Pharmacist) =====
     public PackUnit getApprovedUnit() { return approvedUnit; }
-    public void setApprovedUnit(PackUnit v) { this.approvedUnit = v; }
+    public void setApprovedUnit(PackUnit v) { this.approvedUnit = v; recomputePack(); }
 
     public Integer getApprovedCount() { return approvedCount; }
-    public void setApprovedCount(Integer v) { this.approvedCount = v; }
+    public void setApprovedCount(Integer v) { this.approvedCount = v; recomputePack(); }
 
     public Integer getApprovedUnitsTotal() { return approvedUnitsTotal; }
-    public void setApprovedUnitsTotal(Integer v) { this.approvedUnitsTotal = v; }
+    public void setApprovedUnitsTotal(Integer v) { this.approvedUnitsTotal = v; recomputePack(); }
 
 }
