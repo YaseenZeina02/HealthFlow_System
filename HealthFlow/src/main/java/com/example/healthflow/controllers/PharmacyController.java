@@ -11,6 +11,7 @@ import com.example.healthflow.model.dto.PrescItemRow;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.time.Instant;
 import java.time.LocalDate;
 import javafx.application.Platform;
 import javafx.concurrent.Task;
@@ -21,20 +22,12 @@ import com.example.healthflow.net.ConnectivityMonitor;
 import com.example.healthflow.ui.ConnectivityBanner;
 import com.example.healthflow.ui.OnlineBindings;
 import javafx.fxml.FXML;
+import javafx.scene.control.*;
 import javafx.scene.layout.VBox;
-import javafx.scene.control.Button;
-import javafx.scene.control.DatePicker;
-import javafx.scene.control.Label;
-import javafx.scene.control.TableColumn;
-import javafx.scene.control.TableView;
-import javafx.scene.control.TextArea;
-import javafx.scene.control.TextField;
-import javafx.scene.control.ToggleButton;
 import javafx.scene.layout.AnchorPane;
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
 import javafx.util.Duration;
-import javafx.scene.control.ToggleGroup;
 import javafx.beans.value.ChangeListener;
 import org.controlsfx.control.SegmentedButton;
 import org.kordamp.ikonli.javafx.FontIcon;
@@ -321,6 +314,10 @@ public class PharmacyController {
     @FXML
     private Label welcomeUser;
 
+    private volatile java.time.Instant lastPrescItemsFp = null;   // fingerprint لعناصر الوصفة المفتوحة
+    private volatile java.time.Instant lastInventoryFp  = null;   // fingerprint للمخزون
+
+
     private static final class DashboardData {
         int total;
         int waiting;
@@ -514,17 +511,26 @@ public class PharmacyController {
     private void refreshPharmacyDashboardCounts() {
         if (PrescriptionsTodayTotal == null && PrescriptionsWatingNum == null && PrescriptionsCompleteNum == null) return;
         LocalDate day = getSelectedDateOrToday();
-        try (Connection c = Database.get()) {
-            PrescriptionDAO dao = new PrescriptionDAO();
-            int total = dao.countTotalOnDate(c, day);
-            int waiting = dao.countPendingOnDate(c, day);
-            int completed = dao.countCompletedOnDate(c, day);
-            if (PrescriptionsTodayTotal != null) PrescriptionsTodayTotal.setText(String.valueOf(total));
-            if (PrescriptionsWatingNum != null) PrescriptionsWatingNum.setText(String.valueOf(waiting));
-            if (PrescriptionsCompleteNum != null) PrescriptionsCompleteNum.setText(String.valueOf(completed));
+        try (Connection c = Database.get();
+             PreparedStatement ps = c.prepareStatement("""
+             SELECT
+                 COUNT(*) AS total,
+                 COUNT(*) FILTER (WHERE status = 'PENDING') AS waiting,
+                 COUNT(*) FILTER (WHERE status IN ('APPROVED','DISPENSED')) AS completed
+             FROM prescriptions
+             WHERE created_at::date = ?
+         """)) {
+            ps.setDate(1, java.sql.Date.valueOf(day));
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    if (PrescriptionsTodayTotal != null) PrescriptionsTodayTotal.setText(String.valueOf(rs.getInt("total")));
+                    if (PrescriptionsWatingNum != null) PrescriptionsWatingNum.setText(String.valueOf(rs.getInt("waiting")));
+                    if (PrescriptionsCompleteNum != null) PrescriptionsCompleteNum.setText(String.valueOf(rs.getInt("completed")));
+                }
+            }
         } catch (Exception ex) {
-            if (alertLabel != null) alertLabel.setText("Failed to load counts: " + ex.getMessage());
-            System.err.println("[PharmacyController] refresh counts error: " + ex);
+            System.err.println("[PharmacyController] refreshPharmacyDashboardCounts: " + ex);
+            if (alertLabel != null) alertLabel.setText("Failed to refresh counts: " + ex.getMessage());
         }
     }
 
@@ -581,6 +587,7 @@ public class PharmacyController {
         setVisibleManaged(PrescriptionAnchorPane, false);
         setVisibleManaged(InventoryAnchorPane, false);
         if (DashboardButton != null) markNavActive(DashboardButton);
+        startPharmacyAutoRefresh();
         loadDashboardAsync(false);
     }
     private void loadDashboardTable() {
@@ -662,11 +669,202 @@ public class PharmacyController {
     }
 
 
+    // ---- Auto-refresh (polling-based) for the pharmacy dashboard ----
+    private final java.util.concurrent.ScheduledExecutorService pharmAutoRefresher =
+            java.util.concurrent.Executors.newSingleThreadScheduledExecutor(r -> {
+                Thread t = new Thread(r, "pharm-auto-refresh");
+                t.setDaemon(true);
+                return t;
+            });
+    private volatile java.time.Instant lastDashFingerprint = null;
+    private volatile boolean autoRefreshStarted = false;
+
+    /** Start a lightweight background probe that refreshes the dashboard if data for the selected day changed. */
+    private void startPharmacyAutoRefresh() {
+        if (autoRefreshStarted) return;
+        autoRefreshStarted = true;
+
+        pharmAutoRefresher.scheduleWithFixedDelay(() -> {
+            try {
+                if (isDashboardVisible()) {
+                    java.time.LocalDate day = getSelectedDateOrToday();
+                    java.time.Instant fp = fetchDashboardFingerprint(day);
+                    if (fp != null && (lastDashFingerprint == null || fp.isAfter(lastDashFingerprint))) {
+                        lastDashFingerprint = fp;
+                        Platform.runLater(() -> loadDashboardAsync(false));
+                    }
+                } else if (isPrescriptionVisible()) {
+                    java.time.Instant fp = fetchCurrentPrescriptionFingerprint();
+                    if (fp != null && (lastPrescItemsFp == null || fp.isAfter(lastPrescItemsFp))) {
+                        lastPrescItemsFp = fp;
+                        Platform.runLater(this::reloadCurrentPrescriptionItems);
+                    }
+                } else if (isInventoryVisible()) {
+                    java.time.Instant fp = fetchInventoryFingerprint();
+                    if (fp != null && (lastInventoryFp == null || fp.isAfter(lastInventoryFp))) {
+                        lastInventoryFp = fp;
+                        Platform.runLater(this::reloadInventoryTable);
+                    }
+                }
+            } catch (Throwable t) {
+                System.err.println("[PharmacyController] auto-refresh probe failed: " + t);
+            }
+        }, 0, 5, java.util.concurrent.TimeUnit.SECONDS);
+    }
+    // لازم تتعدل عندما ننتهي من المخزن
+    private void reloadInventoryTable() {
+        // استعمل اللودر الموجود في المخزون
+    }
+
+    private boolean isDashboardVisible()   { return pharmacyDashboardAnchorPane != null && pharmacyDashboardAnchorPane.isVisible(); }
+    private boolean isPrescriptionVisible(){ return PrescriptionAnchorPane      != null && PrescriptionAnchorPane.isVisible(); }
+    private boolean isInventoryVisible()   { return InventoryAnchorPane         != null && InventoryAnchorPane.isVisible(); }
+
+    /**
+     * Returns a timestamp fingerprint (max of created/updated_at) for prescriptions of the selected date.
+     * Any change will advance the fingerprint and trigger a UI reload.
+     */
+    private java.time.Instant fetchDashboardFingerprint(java.time.LocalDate day) {
+        try (java.sql.Connection c = com.example.healthflow.db.Database.get();
+             java.sql.PreparedStatement ps = c.prepareStatement(
+                     "SELECT MAX(COALESCE(p.dispensed_at, p.approved_at, p.decision_at, p.created_at))\n" +
+                             "FROM prescriptions p\n" +
+                             "WHERE (p.created_at::date = ? OR p.decision_at::date = ? OR p.approved_at::date = ? OR p.dispensed_at::date = ?)")) {
+            ps.setDate(1, java.sql.Date.valueOf(day));
+            ps.setDate(2, java.sql.Date.valueOf(day));
+            ps.setDate(3, java.sql.Date.valueOf(day));
+            ps.setDate(4, java.sql.Date.valueOf(day));
+            try (java.sql.ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    java.sql.Timestamp ts = rs.getTimestamp(1);
+                    return ts == null ? null : ts.toInstant();
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("[PharmacyController] fetchDashboardFingerprint: " + e);
+        }
+        return null;
+    }
+    /** Fingerprint لعناصر الوصفة المفتوحة: أكبر (approved_at/dispensed_at/decision_at/created_at/items.count/qty_dispensed) */
+    private java.time.Instant fetchCurrentPrescriptionFingerprint() {
+        if (selectedRow == null || selectedRow.prescriptionId <= 0) return null;
+        long pid = selectedRow.prescriptionId;
+        try (java.sql.Connection c = com.example.healthflow.db.Database.get();
+             java.sql.PreparedStatement ps = c.prepareStatement(
+                     // أي تعديل على حالة الوصفة أو على عناصرها سيغيّر هذه البصمة
+                     "SELECT MAX(v) FROM ( " +
+                             "  SELECT COALESCE(p.dispensed_at, p.approved_at, p.decision_at, p.created_at) AS v " +
+                             "  FROM prescriptions p WHERE p.id = ? " +
+                             "  UNION ALL " +
+                             "  SELECT NOW() - make_interval(secs => (SELECT COUNT(*) FROM prescription_items i WHERE i.prescription_id = ?)) " +
+                             "  UNION ALL " +
+                             "  SELECT NOW() - make_interval(secs => (SELECT COALESCE(SUM(i.qty_dispensed),0) FROM prescription_items i WHERE i.prescription_id = ?)) " +
+                             ") t"
+             )) {
+            ps.setLong(1, pid);
+            ps.setLong(2, pid);
+            ps.setLong(3, pid);
+            try (java.sql.ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    java.sql.Timestamp ts = rs.getTimestamp(1);
+                    return ts == null ? null : ts.toInstant();
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("[PharmacyController] fetchCurrentPrescriptionFingerprint: " + e);
+        }
+        return null;
+    }
+
+    /** Fingerprint لواجهة الجرد: أي تغيير في inventory_transactions أو تحديث available_quantity للأدوية */
+    private java.time.Instant fetchInventoryFingerprint() {
+        try (java.sql.Connection c = com.example.healthflow.db.Database.get();
+             java.sql.PreparedStatement ps = c.prepareStatement(
+                     "SELECT GREATEST( " +
+                             "  COALESCE((SELECT MAX(created_at) FROM inventory_transactions), 'epoch'), " +
+                             "  COALESCE((SELECT MAX(updated_at) FROM medicines), 'epoch') " +
+                             ")"
+             )) {
+            try (java.sql.ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    java.sql.Timestamp ts = rs.getTimestamp(1);
+                    return ts == null ? null : ts.toInstant();
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("[PharmacyController] fetchInventoryFingerprint: " + e);
+        }
+        return null;
+    }
+    /** يعيد تحميل عناصر الوصفة المفتوحة (إن وُجدت). */
+    private void reloadCurrentPrescriptionItems() {
+        if (selectedRow != null && selectedRow.prescriptionId > 0) {
+            loadPrescriptionItems(selectedRow.prescriptionId);
+            // بعد ما نحمّل العناصر، حدّث العدّادات
+            refreshPrescriptionItemCounts(selectedRow.prescriptionId);
+        }
+    }
+    /** Update Total/Approved/Rejected/Pending counters for a given prescription. */
+    private void refreshPrescriptionItemCounts(long prescId) {
+        int total = 0, approved = 0, rejected = 0, pending = 0;
+
+        try (java.sql.Connection c = com.example.healthflow.db.Database.get();
+             java.sql.PreparedStatement ps = c.prepareStatement(
+                     """
+                     SELECT
+                         COUNT(*)                                     AS total,
+                         COUNT(*) FILTER (WHERE status = 'APPROVED')  AS approved,
+                         COUNT(*) FILTER (WHERE status = 'CANCELLED') AS rejected,
+                         COUNT(*) FILTER (WHERE status = 'PENDING')   AS pending
+                     FROM prescription_items
+                     WHERE prescription_id = ?
+                     """
+             )) {
+            ps.setLong(1, prescId);
+            try (java.sql.ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    total    = rs.getInt("total");
+                    approved = rs.getInt("approved");
+                    rejected = rs.getInt("rejected");
+                    pending  = rs.getInt("pending");
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("[PharmacyController] refreshPrescriptionItemCounts error: " + e);
+        }
+
+        if (TotalItemsNumber != null) TotalItemsNumber.setText(String.valueOf(total));
+        if (ApprovedNumber   != null) ApprovedNumber.setText(String.valueOf(approved));
+        if (RejectedNumber   != null) RejectedNumber.setText(String.valueOf(rejected));
+        if (PendingNumber    != null) PendingNumber.setText(String.valueOf(pending));
+    }
+
+
     private void setupDashboardTableColumns() {
         if (PresciptionsTable == null) return;
+        PresciptionsTable.setColumnResizePolicy(javafx.scene.control.TableView.UNCONSTRAINED_RESIZE_POLICY);
         // Serial #
+        // -------- Serial # --------
         if (colSerialPhDashboard != null) {
-            colSerialPhDashboard.setCellValueFactory(cd -> new javafx.beans.property.SimpleIntegerProperty(PresciptionsTable.getItems().indexOf(cd.getValue()) + 1));
+            colSerialPhDashboard.setCellFactory((TableColumn<DashboardRow, Number> col) ->
+                    new TableCell<DashboardRow, Number>() {
+                        @Override
+                        protected void updateItem(Number item, boolean empty) {
+                            super.updateItem(item, empty);
+                            if (empty) {
+                                setText(null);
+                            } else {
+                                // الترقيم بحسب الترتيب الحالي للجدول
+                                setText(Integer.toString(getIndex() + 1));
+                            }
+                        }
+                    }
+            );
+            // (اختياري) عرض صغير وثابت
+            colSerialPhDashboard.setStyle("-fx-alignment: CENTER;");
+            colSerialPhDashboard.setMinWidth(60);
+            colSerialPhDashboard.setPrefWidth(70);
+            colSerialPhDashboard.setMaxWidth(100);
         }
         // Names
         if (colPatientName != null) colPatientName.setCellValueFactory(cd -> new javafx.beans.property.SimpleStringProperty(cd.getValue().patientName));
@@ -824,6 +1022,8 @@ public class PharmacyController {
 
         if (items == null || items.isEmpty()) {
             if (TablePrescriptionItems != null) TablePrescriptionItems.setItems(itemRows);
+            refreshPrescriptionItemCounts(prescId);
+
             return;
         }
 
@@ -897,12 +1097,19 @@ public class PharmacyController {
         }
 
         if (TablePrescriptionItems != null) TablePrescriptionItems.setItems(itemRows);
-    }
+        refreshPrescriptionItemCounts(prescId);    }
 
     private void setupItemsTableColumns() {
         if (TablePrescriptionItems == null) return;
-        if (colIdx != null) colIdx.setCellValueFactory(cd -> new javafx.beans.property.SimpleIntegerProperty(TablePrescriptionItems.getItems().indexOf(cd.getValue()) + 1));
-        if (colMedicineName != null) colMedicineName.setCellValueFactory(new PropertyValueFactory<>("medicineName"));
+        if (colIdx != null) {
+            colIdx.setCellFactory(col -> new TableCell<PrescItemRow, Number>() {
+                @Override
+                protected void updateItem(Number item, boolean empty) {
+                    super.updateItem(item, empty);
+                    setText(empty ? null : Integer.toString(getIndex() + 1));
+                }
+            });
+        }        if (colMedicineName != null) colMedicineName.setCellValueFactory(new PropertyValueFactory<>("medicineName"));
         if (colStrength != null) colStrength.setCellValueFactory(new PropertyValueFactory<>("strength"));
         if (colForm != null) colForm.setCellValueFactory(new PropertyValueFactory<>("form"));
         if (colDose != null) colDose.setCellValueFactory(new PropertyValueFactory<>("dose"));
