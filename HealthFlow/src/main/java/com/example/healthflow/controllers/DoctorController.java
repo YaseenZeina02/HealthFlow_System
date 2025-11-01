@@ -14,6 +14,7 @@ import com.example.healthflow.service.AuthService.Session;
 import com.example.healthflow.service.DoctorDashboardService;
 import com.example.healthflow.service.DoctorDashboardService.Appt;
 import com.example.healthflow.service.DoctorDashboardService.Stats;
+import com.example.healthflow.ui.ComboAnimations;
 import com.example.healthflow.ui.ConnectivityBanner;
 import javafx.animation.ScaleTransition;
 import com.example.healthflow.ui.OnlineBindings;
@@ -199,6 +200,9 @@ public class DoctorController {
     @FXML
     private TableColumn<PrescItemRow, String> colRoute;
 
+    @FXML private Button clearSelectionDach;
+    @FXML private Button clearSelectionPatient;
+
 
     @FXML
     private TableColumn<PrescItemRow, String> colPresesStatus;
@@ -217,12 +221,11 @@ public class DoctorController {
     private String selectedPatientNationalId = null;
     private Long currentDoctorUserId = null;
     private String currentDoctorFullName = null;
+    // Live DB notifications (appointments/patients) for real-time refresh
+    private com.example.healthflow.db.notify.DbNotifications dbn;
 
     @FXML
     private AnchorPane rootPane;
-
-
-//    ------------------------------
 
     @FXML
     private TextArea DiagnosisTF;
@@ -232,10 +235,6 @@ public class DoctorController {
 
     @FXML
     private Label Dose;
-
-    @FXML
-    private Label PatientNameLabel;
-
     @FXML
     private TextField PatientNameTF;
 
@@ -369,6 +368,39 @@ public class DoctorController {
         buildAppointmentSearchIndex(); // تجهيز ال-AutoComplete من أول تحميل
 
         wirePrescriptionItemsTable();
+
+        ComboAnimations.applySmoothSelect(medicineName_combo, s -> s);
+        ComboAnimations.delayHideOnSelect(medicineName_combo, Duration.seconds(0.1));
+
+        ComboAnimations.applySmoothSelect(strength_combo, s -> s);
+        ComboAnimations.delayHideOnSelect(strength_combo, Duration.seconds(0.1));
+
+        ComboAnimations.applySmoothSelect(formCombo, s -> s);
+        ComboAnimations.delayHideOnSelect(formCombo, Duration.seconds(0.1));
+
+        ComboAnimations.applySmoothSelect(routeCombo, s -> s);
+        ComboAnimations.delayHideOnSelect(routeCombo, Duration.seconds(0.1));
+        strength_combo.setVisibleRowCount(6);   // أي ComboBox عندك
+        formCombo.setVisibleRowCount(6);
+        routeCombo.setVisibleRowCount(6);
+
+
+        if (clearSelectionDach != null) {
+            clearSelectionDach.setOnAction(e -> {
+                if (AppointmentsTable != null) {
+                    AppointmentsTable.getSelectionModel().clearSelection();
+                }
+            });
+        }
+
+        if (clearSelectionPatient != null) {
+            clearSelectionPatient.setOnAction(e -> {
+                if (patientTable != null) {
+                    patientTable.getSelectionModel().clearSelection();
+                }
+            });
+        }
+
         // === Dashboard-by-date: bind DatePicker to table + counters (no extra filtering) ===
         if (datePickerPatientsWithDoctorDash != null) {
             var todayGazaDash = java.time.ZonedDateTime.now(APP_TZ).toLocalDate();
@@ -899,7 +931,38 @@ public class DoctorController {
         }, "doc-patients-by-date").start();
     }
 
+    // --- Live refresh (doctor page) ---
+    private final java.util.concurrent.ScheduledExecutorService doctorAutoExec =
+            java.util.concurrent.Executors.newSingleThreadScheduledExecutor(r -> { var t = new Thread(r, "doc-autorefresh"); t.setDaemon(true); return t; });
+    private final java.util.concurrent.atomic.AtomicBoolean docRefreshPending = new java.util.concurrent.atomic.AtomicBoolean(false);
 
+    // تغيير آخر تحديث (fallback polling)
+    private volatile java.sql.Timestamp lastApptTs = null;
+    private volatile java.sql.Timestamp lastPatientTs = null;
+
+    // Coalesced & debounced refresh for the doctor dashboard
+    private void scheduleDoctorRefresh() {
+        if (!docRefreshPending.compareAndSet(false, true)) return; // already queued
+        doctorAutoExec.schedule(() -> {
+            javafx.application.Platform.runLater(() -> {
+                try { loadTodayAppointmentsAsync(); }
+                catch (Throwable t) { System.err.println("[DoctorController] loadTodayAppointmentsAsync error: " + t); }
+                try {
+                    java.time.LocalDate day = (datePickerPatientsWithDoctorDash != null && datePickerPatientsWithDoctorDash.getValue() != null)
+                            ? datePickerPatientsWithDoctorDash.getValue()
+                            : java.time.ZonedDateTime.now(APP_TZ).toLocalDate();
+                    loadStatsForDateAsync(day);
+                } catch (Throwable t) {
+                    System.err.println("[DoctorController] loadStatsForDateAsync error: " + t);
+                }
+                try {
+                    if (AppointmentsTable != null) AppointmentsTable.refresh();
+                    if (patientTable != null) patientTable.refresh();
+                } catch (Throwable ignore) { }
+                docRefreshPending.set(false);
+            });
+        }, 250, java.util.concurrent.TimeUnit.MILLISECONDS); // 250ms debounce
+    }
 
     /* ================= Tables wiring ================= */
 
@@ -913,10 +976,118 @@ public class DoctorController {
                 : java.time.ZonedDateTime.now(APP_TZ).toLocalDate();
         loadAppointmentsForDateAsync(date);
     }
+    // Coalesced UI refresh when DB notifies about appointments/patients changes
+//    private void onDbEventRefreshDoctor(String payload) {
+//        javafx.application.Platform.runLater(() -> {
+//            try {
+//                // 1)Appointments: إعادة تحميل لليوم الحالي/المختار
+//                loadTodayAppointmentsAsync();
+//            } catch (Throwable t) {
+//                System.err.println("[DoctorController] loadTodayAppointmentsAsync error: " + t);
+//            }
+//            try {
+//                // 2) إحصائيات/رسم اليوم
+//                java.time.LocalDate day = (datePickerPatientsWithDoctorDash != null &&
+//                        datePickerPatientsWithDoctorDash.getValue() != null)
+//                        ? datePickerPatientsWithDoctorDash.getValue()
+//                        : java.time.ZonedDateTime.now(APP_TZ).toLocalDate();
+//                loadStatsForDateAsync(day);
+//            } catch (Throwable t) {
+//                System.err.println("[DoctorController] loadStatsForDateAsync error: " + t);
+//            }
+//            try {
+//                if (AppointmentsTable != null) AppointmentsTable.refresh();
+//                if (patientTable != null) patientTable.refresh();
+//            } catch (Throwable ignore) { }
+//        });
+//    }
 
-    /**
-     * Load appointments for the dashboard table for a specific date (bound to datePickerPatientsWithDoctorDash).
-     */
+    private void onDbEventRefreshDoctor(String payload) {
+        scheduleDoctorRefresh();
+    }
+    // Start ultra-light polling so UI stays live even if NOTIFY is missed
+    private void startLightweightPollingDoctor() {
+        doctorAutoExec.scheduleAtFixedRate(() -> {
+            try {
+                java.time.LocalDate day = (datePickerPatientsWithDoctorDash != null && datePickerPatientsWithDoctorDash.getValue() != null)
+                        ? datePickerPatientsWithDoctorDash.getValue()
+                        : java.time.ZonedDateTime.now(APP_TZ).toLocalDate();
+
+                java.sql.Timestamp ts1 = fetchMaxApptUpdatedAtForDoctor(day);
+                if ((lastApptTs == null && ts1 != null) || (ts1 != null && lastApptTs != null && ts1.after(lastApptTs))) {
+                    lastApptTs = ts1;
+                    scheduleDoctorRefresh();
+                }
+
+                java.sql.Timestamp ts2 = fetchMaxPatientUpdatedAt();
+                if ((lastPatientTs == null && ts2 != null) || (ts2 != null && lastPatientTs != null && ts2.after(lastPatientTs))) {
+                    lastPatientTs = ts2;
+                    scheduleDoctorRefresh();
+                }
+            } catch (Throwable t) {
+                System.err.println("[DoctorController] polling error: " + t);
+            }
+        }, 1200, 3000, java.util.concurrent.TimeUnit.MILLISECONDS); // يبدأ بعد 1.2s ثم كل 3s
+    }
+
+    private java.sql.Timestamp fetchMaxApptUpdatedAtForDoctor(java.time.LocalDate day) {
+        final String sql = """
+        SELECT MAX(a.updated_at)
+        FROM appointments a
+        JOIN doctors d ON d.id = a.doctor_id
+        JOIN users   du ON du.id = d.user_id
+        WHERE a.appointment_date::date = ? AND du.id = ?
+        """;
+
+        var u = com.example.healthflow.service.AuthService.Session.get();
+        if (u == null || day == null) return null;
+
+        try (java.sql.Connection c = com.example.healthflow.db.Database.get();
+             java.sql.PreparedStatement ps = c.prepareStatement(sql)) {
+
+            ps.setDate(1, java.sql.Date.valueOf(day)); // أدق من setObject مع LocalDate
+            ps.setLong(2, u.getId());
+
+            try (java.sql.ResultSet rs = ps.executeQuery()) {
+                return rs.next() ? rs.getTimestamp(1) : null;
+            }
+        } catch (java.sql.SQLException e) {
+            System.err.println("[DoctorController] fetchMaxApptUpdatedAtForDoctor SQL error: " + e.getMessage());
+            return null;
+        }
+    }
+    private java.sql.Timestamp fetchMaxPatientUpdatedAt() {
+        final String sql = """
+        SELECT MAX(GREATEST(u.updated_at, p.updated_at))
+        FROM users u
+        JOIN patients p ON p.user_id = u.id
+        """;
+
+        try (java.sql.Connection c = com.example.healthflow.db.Database.get();
+             java.sql.PreparedStatement ps = c.prepareStatement(sql);
+             java.sql.ResultSet rs = ps.executeQuery()) {
+
+            return rs.next() ? rs.getTimestamp(1) : null;
+        } catch (java.sql.SQLException e) {
+            System.err.println("[DoctorController] fetchMaxPatientUpdatedAt SQL error: " + e.getMessage());
+            return null;
+        }
+    }
+
+    /** Start durable LISTEN/NOTIFY for doctor page (safe, idempotent). */
+    private void startDbNotificationsForDoctor() {
+        try {
+            if (dbn != null) return;
+            dbn = new com.example.healthflow.db.notify.DbNotifications();
+            // أي تغيّر على المواعيد أو المرضى يهم شاشة الدكتور
+            dbn.listen("appointments_changed", this::onDbEventRefreshDoctor);
+            dbn.listen("patients_changed",     this::onDbEventRefreshDoctor);
+            System.out.println("[DoctorController] DbNotifications wired.");
+        } catch (Throwable t) {
+            System.err.println("[DoctorController] DbNotifications init error: " + t);
+        }
+    }
+
     private void loadAppointmentsForDateAsync(LocalDate date) {
         var u = Session.get();
         if (u == null || date == null) return;
@@ -1161,6 +1332,10 @@ public class DoctorController {
         AppointmentsTable.setItems(apptData);
         // سياسة القياس: سياسة غير مقيدة لتمكين سكرول أفقي عند تجاوز العرض
         AppointmentsTable.setColumnResizePolicy(TableView.UNCONSTRAINED_RESIZE_POLICY);
+        startDbNotificationsForDoctor();
+        startLightweightPollingDoctor();
+
+
     }
 
     // === Appointment actions: Complete, Cancel, Edit ===
@@ -3072,16 +3247,6 @@ private void wirePrescriptionItemsTable() {
         int total = (d > 0 && f > 0 && g > 0) ? d * f * g : 0;
         String formVal = (formCombo != null && formCombo.getValue() != null) ? String.valueOf(formCombo.getValue()) : null;
         String unit = unitFromForm(formVal);
-
-//        StringBuilder sb = new StringBuilder("Dose × Freq/day × Duration");
-//        if (d > 0 || f > 0 || g > 0) {
-//            sb.append(" = ")
-//                    .append(d > 0 ? d : "?")
-//                    .append(" × ")
-//                    .append(f > 0 ? f : "?")
-//                    .append(" × ")
-//                    .append(g > 0 ? g : "?");
-//        }
         StringBuilder sb = new StringBuilder("");
         if (total > 0) {
             sb.append(" = ").append(total).append(" ").append(unit);

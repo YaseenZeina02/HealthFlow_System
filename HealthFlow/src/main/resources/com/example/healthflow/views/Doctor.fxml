@@ -254,7 +254,7 @@
                               </TableView>
                               <TextField fx:id="search" layoutX="650.0" layoutY="5.0" prefHeight="30.0" prefWidth="130.0" promptText="search" styleClass="box" AnchorPane.rightAnchor="85.20000000000005" />
                               <DatePicker fx:id="datePickerPatientsWithDoctorDash" cache="true" layoutX="507.0" layoutY="9.0" minHeight="-Infinity" prefHeight="30.0" prefWidth="130.0" styleClass="boxDataPickar" AnchorPane.rightAnchor="228.20000000000005" />
-                              <Button fx:id="clearSelectionDach1" layoutX="790.0" layoutY="9.0" mnemonicParsing="false" prefHeight="20.0" prefWidth="60.0" styleClass="btn-2" stylesheets="@../Design/ReceptionDesign.css" text="Clear" />
+                              <Button fx:id="clearSelectionDach" layoutX="790.0" layoutY="9.0" mnemonicParsing="false" prefHeight="20.0" prefWidth="60.0" styleClass="btn-2" stylesheets="@../Design/ReceptionDesign.css" text="Clear" />
                            </children>
                         </AnchorPane>
                      </children>
@@ -284,7 +284,7 @@
                               </TableView>
                               <TextField fx:id="searchLabel" layoutX="651.0" layoutY="9.0" prefHeight="30.0" prefWidth="130.0" promptText="search" styleClass="box" AnchorPane.rightAnchor="85.0" />
                               <DatePicker fx:id="datePickerPatientsWithDoctor" cache="true" layoutX="510.0" layoutY="11.0" minHeight="-Infinity" prefHeight="30.0" prefWidth="130.0" styleClass="boxDataPickar" AnchorPane.rightAnchor="226.0" />
-                              <Button fx:id="clearSelectionDach" layoutX="792.0" layoutY="12.0" mnemonicParsing="false" prefHeight="20.0" prefWidth="60.0" styleClass="btn-2" stylesheets="@../Design/ReceptionDesign.css" text="Clear" AnchorPane.rightAnchor="14.399999999999977" />
+                              <Button fx:id="clearSelectionPatient" layoutX="792.0" layoutY="12.0" mnemonicParsing="false" prefHeight="20.0" prefWidth="60.0" styleClass="btn-2" stylesheets="@../Design/ReceptionDesign.css" text="Clear" AnchorPane.rightAnchor="14.399999999999977" />
                            </children>
                            <styleClass>
                               <String fx:value="radius" />
@@ -391,8 +391,8 @@
                                     <Font name="System Bold Italic" size="20.0" />
                                  </font>
                               </Label>
-                              <ComboBox fx:id="medicineName_combo" layoutX="116.0" layoutY="77.0" prefHeight="30.0" prefWidth="150.0" styleClass="box" />
-                              <ComboBox fx:id="strength_combo" layoutX="116.0" layoutY="146.0" prefHeight="30.0" prefWidth="150.0" styleClass="box" />
+                              <ComboBox fx:id="medicineName_combo" layoutX="116.0" layoutY="77.0" prefHeight="30.0" prefWidth="150.0" stylesheets="@../Design/combobox.css" />
+                              <ComboBox fx:id="strength_combo" layoutX="116.0" layoutY="146.0" prefHeight="30.0" prefWidth="150.0" stylesheets="@../Design/combobox.css" />
                               <Label layoutX="18.0" layoutY="150.0" prefHeight="20.0" prefWidth="70.0" styleClass="text-gradient" stylesheets="@../Design/ReceptionDesign.css" text="Strength:">
                                  <font>
                                     <Font name="System Bold Italic" size="20.0" />
@@ -403,13 +403,13 @@
                                     <Font name="System Bold Italic" size="20.0" />
                                  </font>
                               </Label>
-                              <ComboBox fx:id="formCombo" layoutX="113.0" layoutY="207.0" prefHeight="30.0" prefWidth="150.0" styleClass="box" />
+                              <ComboBox fx:id="formCombo" layoutX="113.0" layoutY="207.0" prefHeight="30.0" prefWidth="150.0" stylesheets="@../Design/combobox.css" />
                               <Label layoutX="18.0" layoutY="276.0" prefHeight="20.0" prefWidth="70.0" styleClass="text-gradient" stylesheets="@../Design/ReceptionDesign.css" text="Route:">
                                  <font>
                                     <Font name="System Bold Italic" size="20.0" />
                                  </font>
                               </Label>
-                              <ComboBox fx:id="routeCombo" layoutX="113.0" layoutY="266.0" prefHeight="30.0" prefWidth="150.0" styleClass="box" />
+                              <ComboBox fx:id="routeCombo" layoutX="113.0" layoutY="266.0" prefHeight="30.0" prefWidth="150.0" stylesheets="@../Design/combobox.css" />
                               <Label fx:id="Dose" layoutX="331.0" layoutY="85.0" prefHeight="20.0" prefWidth="70.0" styleClass="text-gradient" stylesheets="@../Design/ReceptionDesign.css" text="Dose: ">
                                  <font>
                                     <Font name="System Bold Italic" size="20.0" />

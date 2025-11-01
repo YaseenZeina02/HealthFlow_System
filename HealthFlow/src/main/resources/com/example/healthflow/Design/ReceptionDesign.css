@@ -523,6 +523,18 @@
     -fx-background-radius: 10 10 0 0, 10 10 0 0, 0 0 0 0;
 }
 
+.info-banner {
+    -fx-background-color: #e9f1ff;
+    -fx-text-fill: #0d47a1;
+    -fx-padding: 10 14;
+    -fx-border-color: #90caf9;
+    -fx-border-width: 1;
+    -fx-border-radius: 10;
+    -fx-background-radius: 10;
+    -fx-font-weight: bold;
+    -fx-effect: dropshadow(gaussian, rgba(13,71,161,0.08), 6, 0.2, 0, 1);
+}
+
 /* تحسين المظهر العام */
 .chart-plot-background {
     -fx-background-color: transparent;

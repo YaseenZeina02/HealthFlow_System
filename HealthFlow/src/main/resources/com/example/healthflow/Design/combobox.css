@@ -1,0 +1,103 @@
+/* === ComboBox Style (HealthFlow Theme) === */
+.combo-box {
+    -fx-background-color: white;
+    -fx-border-color: #1aa3a8;
+    -fx-border-width: 1.3;
+    -fx-border-radius: 10;
+    -fx-background-radius: 10;
+    -fx-font-size: 13px;
+    -fx-font-family: "Segoe UI", sans-serif;
+    -fx-text-fill: #2a2a2a;
+    /*-fx-padding: 3 6 3 6;*/
+    /*-fx-pref-height: 34;*/
+}
+
+/* النص داخل حقل الإدخال */
+.combo-box .list-cell {
+    -fx-background-color: transparent;
+    -fx-text-fill: #1a1a1a;
+}
+
+/* عند تمرير الماوس فوق الـ ComboBox */
+.combo-box:hover {
+    -fx-border-color: #148c91;
+    -fx-effect: dropshadow(gaussian, rgba(26,163,168,0.25), 4, 0.3, 0, 1);
+}
+
+/* عند التركيز (focus) */
+.combo-box:focused {
+    /*-fx-border-color: #11878b;*/
+    /*-fx-text-fill: #148c91;*/
+    /*-fx-background-color: #f4ffff;*/
+    -fx-background-color: #F4FFFF;
+    -fx-text-fill: #0E6C70;
+}
+
+/* السهم الصغير */
+.combo-box .arrow {
+    -fx-background-color: #1aa3a8;
+}
+.combo-box:hover .arrow {
+    -fx-background-color: #11878b;
+}
+
+/* قائمة العناصر المنسدلة */
+.combo-box-popup .list-view {
+    -fx-background-color: #ffffff;
+    -fx-border-color: #1aa3a8;
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+}
+
+/* كل عنصر داخل القائمة */
+.combo-box-popup .list-cell {
+    -fx-background-color: white;
+    -fx-text-fill: #222;
+    -fx-padding: 6 10 6 10;
+    -fx-font-size: 13px;
+}
+
+ عند تمرير الماوس على عنصر
+/*.combo-box-popup .list-cell:hover {*/
+/*    -fx-background-color: #e0f7f8;*/
+/*    -fx-text-fill: #0e6c70;*/
+/*}*/
+
+.combo-box-popup .list-cell:hover {
+ -fx-background-color: #F4FFFF;
+ -fx-text-fill: #0E6C70;
+}
+
+/* عند تحديد العنصر */
+.combo-box-popup .list-cell:selected {
+    -fx-background-color: #F4FFFF;
+    -fx-border-color: #1aa3a8;
+    -fx-border-width: 1;
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+    -fx-font-size: 16px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #11878b;
+    -fx-text-alignment: center;
+}
+
+/*!* عند تحديد العنصر *!*/
+/*.combo-box-popup .list-cell:selected {*/
+/*    -fx-background-color: null;*/
+/*    !*-fx-border-color: rgba(228, 219, 219, 0.45);*!*/
+/*    !*-fx-border-width:1;*!*/
+/*    !*-fx-border-radius: 8;*!*/
+/*    !*-fx-background-radius: 8;*!*/
+/*    !*-fx-padding: 6 10 6 10;*!*/
+/*    -fx-font-size: 16px;*/
+/*    -fx-font-weight: bold;*/
+/*    -fx-text-fill: #148c91;*/
+/*    -fx-text-alignment: center;*/
+/*    !*-fx-text-fill: white;*!*/
+/*}*/
+
+/*.combo-item {*/
+/*    -fx-font-size: 13px;*/
+/*    -fx-text-fill: #148c91;*/
+/*    -fx-font-weight: bold;*/
+/*}*/
