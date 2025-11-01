@@ -45,6 +45,7 @@ import java.io.IOException;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 
@@ -1178,7 +1179,33 @@ public class DoctorController {
         // أعمدة البيانات
         if (colPatientName != null) colPatientName.setCellValueFactory(new PropertyValueFactory<>("patientName"));
         if (colDate != null) colDate.setCellValueFactory(new PropertyValueFactory<>("date"));
-        if (colTime != null) colTime.setCellValueFactory(new PropertyValueFactory<>("timeStr"));
+
+        if (colTime != null) {
+            // 12-hour formatter
+            final java.time.format.DateTimeFormatter fmt12 =
+                    java.time.format.DateTimeFormatter.ofPattern("hh:mm a");
+            colTime.setCellValueFactory(cd -> {
+                String t24 = null;
+                try {
+                    t24 = cd.getValue().getTimeStr();
+                } catch (Throwable ignore) { }
+
+                String shown = "";
+                if (t24 != null && !t24.isBlank()) {
+                    try {
+                        java.time.LocalTime lt = java.time.LocalTime.parse(
+                                t24,
+                                java.time.format.DateTimeFormatter.ofPattern("H:mm")
+                        );
+                        shown = lt.format(fmt12);
+                    } catch (Exception e) {
+                        shown = t24;
+                    }
+                }
+                return new javafx.beans.property.ReadOnlyStringWrapper(shown);
+            });
+        }
+
         if (colStatus != null) colStatus.setCellValueFactory(new PropertyValueFactory<>("status"));
 
         // Doctor name column: always show current doctor full name
@@ -3129,6 +3156,8 @@ private void wirePrescriptionItemsTable() {
         public StringProperty medicalHistoryProperty() {
             return medicalHistory;
         }
+
+
     }
 
     public static class PatientRow {

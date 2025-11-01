@@ -1,4 +1,6 @@
 package com.example.healthflow.dao;
+import com.example.healthflow.core.packaging.PackagingSupport;
+import com.example.healthflow.db.Database;
 import com.example.healthflow.model.Medicine;
 import com.example.healthflow.model.MedicineBatch;
 import com.example.healthflow.model.InventoryTransaction;
@@ -35,6 +37,28 @@ public class MedicineBatchDAO {
             }
         }
         throw new SQLException("Failed to create batch");
+    }
+
+    public PackagingSupport.PackagingInfo fetchPackaging(long medId) {
+        final String sql = """
+        SELECT base_unit, tablets_per_blister, blisters_per_box,
+               ml_per_bottle, grams_per_tube, split_allowed
+        FROM medicines WHERE id=?
+    """;
+        try (var c = Database.get(); var ps = c.prepareStatement(sql)) {
+            ps.setLong(1, medId);
+            try (var rs = ps.executeQuery()) {
+                if (!rs.next()) return null;
+                return new PackagingSupport.PackagingInfo(
+                        rs.getString("base_unit"),
+                        (Integer)rs.getObject("tablets_per_blister"),
+                        (Integer)rs.getObject("blisters_per_box"),
+                        (Integer)rs.getObject("ml_per_bottle"),
+                        (Integer)rs.getObject("grams_per_tube"),
+                        (Boolean)rs.getObject("split_allowed")
+                );
+            }
+        } catch (Exception e) { return null; }
     }
 }
 

@@ -17,12 +17,18 @@ import javafx.application.Platform;
 import javafx.concurrent.Task;
 import javafx.animation.PauseTransition;
 import javafx.scene.Cursor;
+import com.example.healthflow.core.packaging.PackagingSupport;
+import com.example.healthflow.core.packaging.PackagingSupport.PackagingInfo;
+import com.example.healthflow.core.packaging.PackagingSupport.PackSuggestion;
+import com.example.healthflow.db.notify.DbNotifications;
 
+import javafx.util.Duration;
 import com.example.healthflow.net.ConnectivityMonitor;
 import com.example.healthflow.ui.ConnectivityBanner;
 import com.example.healthflow.ui.OnlineBindings;
 import javafx.fxml.FXML;
 import javafx.scene.control.*;
+import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.scene.layout.AnchorPane;
 import javafx.animation.KeyFrame;
@@ -255,6 +261,10 @@ public class PharmacyController {
 
     @FXML
     private TableColumn<PrescItemRow, Number> colQuantity;
+    @FXML
+    private TableColumn<PrescItemRow, Number> colSuggestionQty;
+    // (display helper; we render text inside colSuggestionQty via cellFactory)
+    private static final String SUGG_PLACEHOLDER = "—";
 
     @FXML
     private TableColumn<?, ?> colQuantityInentory;
@@ -316,6 +326,12 @@ public class PharmacyController {
 
     private volatile java.time.Instant lastPrescItemsFp = null;   // fingerprint لعناصر الوصفة المفتوحة
     private volatile java.time.Instant lastInventoryFp  = null;   // fingerprint للمخزون
+
+
+    private com.example.healthflow.db.notify.DbNotifications dbn;
+    private final javafx.animation.PauseTransition dashCoalesce  = new javafx.animation.PauseTransition(javafx.util.Duration.millis(200));
+    private final javafx.animation.PauseTransition itemsCoalesce = new javafx.animation.PauseTransition(javafx.util.Duration.millis(200));
+    private final javafx.animation.PauseTransition invCoalesce   = new javafx.animation.PauseTransition(javafx.util.Duration.millis(200));
 
 
     private static final class DashboardData {
@@ -559,35 +575,13 @@ public class PharmacyController {
     }
 
     /* ====== Section switching (Dashboard / Prescriptions / Inventory) ====== */
-    //    private void showDashboardPane() {
-    //        setVisibleManaged(pharmacyDashboardAnchorPane, true);
-    //        setVisibleManaged(PrescriptionAnchorPane, false);
-    //        setVisibleManaged(InventoryAnchorPane, false);
-    //        if (DashboardButton != null) markNavActive(DashboardButton);
-    //        refreshPharmacyDashboardCounts();
-    //        loadDashboardTable();
-    //    }
-
-
-    //    private void loadDashboardTable() {
-    //        if (PresciptionsTable == null) return;
-    //        dashboardRows.clear();
-    //        LocalDate day = getSelectedDateOrToday();
-    //        try (Connection c = Database.get()) {
-    //            PrescriptionDAO dao = new PrescriptionDAO();
-    //            dashboardRows.addAll(dao.listDashboardRowsByDate(c, day));
-    //        } catch (Exception ex) {
-    //            System.err.println("[PharmacyController] loadDashboardTable error: " + ex);
-    //        }
-    //        PresciptionsTable.setItems(dashboardRows);
-    //    }
-
     private void showDashboardPane() {
         setVisibleManaged(pharmacyDashboardAnchorPane, true);
         setVisibleManaged(PrescriptionAnchorPane, false);
         setVisibleManaged(InventoryAnchorPane, false);
-        if (DashboardButton != null) markNavActive(DashboardButton);
-        startPharmacyAutoRefresh();
+        markNavActive(DashboardButton);
+        System.out.println("[PharmacyController] showDashboardPane -> ensure listeners running");
+        startPharmacyDbNotifications();
         loadDashboardAsync(false);
     }
     private void loadDashboardTable() {
@@ -679,46 +673,23 @@ public class PharmacyController {
     private volatile java.time.Instant lastDashFingerprint = null;
     private volatile boolean autoRefreshStarted = false;
 
-    /** Start a lightweight background probe that refreshes the dashboard if data for the selected day changed. */
-    private void startPharmacyAutoRefresh() {
-        if (autoRefreshStarted) return;
-        autoRefreshStarted = true;
 
-        pharmAutoRefresher.scheduleWithFixedDelay(() -> {
-            try {
-                if (isDashboardVisible()) {
-                    java.time.LocalDate day = getSelectedDateOrToday();
-                    java.time.Instant fp = fetchDashboardFingerprint(day);
-                    if (fp != null && (lastDashFingerprint == null || fp.isAfter(lastDashFingerprint))) {
-                        lastDashFingerprint = fp;
-                        Platform.runLater(() -> loadDashboardAsync(false));
-                    }
-                } else if (isPrescriptionVisible()) {
-                    java.time.Instant fp = fetchCurrentPrescriptionFingerprint();
-                    if (fp != null && (lastPrescItemsFp == null || fp.isAfter(lastPrescItemsFp))) {
-                        lastPrescItemsFp = fp;
-                        Platform.runLater(this::reloadCurrentPrescriptionItems);
-                    }
-                } else if (isInventoryVisible()) {
-                    java.time.Instant fp = fetchInventoryFingerprint();
-                    if (fp != null && (lastInventoryFp == null || fp.isAfter(lastInventoryFp))) {
-                        lastInventoryFp = fp;
-                        Platform.runLater(this::reloadInventoryTable);
-                    }
-                }
-            } catch (Throwable t) {
-                System.err.println("[PharmacyController] auto-refresh probe failed: " + t);
-            }
-        }, 0, 5, java.util.concurrent.TimeUnit.SECONDS);
-    }
     // لازم تتعدل عندما ننتهي من المخزن
     private void reloadInventoryTable() {
         // استعمل اللودر الموجود في المخزون
     }
 
-    private boolean isDashboardVisible()   { return pharmacyDashboardAnchorPane != null && pharmacyDashboardAnchorPane.isVisible(); }
-    private boolean isPrescriptionVisible(){ return PrescriptionAnchorPane      != null && PrescriptionAnchorPane.isVisible(); }
-    private boolean isInventoryVisible()   { return InventoryAnchorPane         != null && InventoryAnchorPane.isVisible(); }
+    private boolean isDashboardVisible() {
+        return pharmacyDashboardAnchorPane != null && pharmacyDashboardAnchorPane.isVisible();
+    }
+
+    private boolean isPrescriptionVisible() {
+        return PrescriptionAnchorPane != null && PrescriptionAnchorPane.isVisible();
+    }
+
+    private boolean isInventoryVisible() {
+        return InventoryAnchorPane != null && InventoryAnchorPane.isVisible();
+    }
 
     /**
      * Returns a timestamp fingerprint (max of created/updated_at) for prescriptions of the selected date.
@@ -804,6 +775,183 @@ public class PharmacyController {
             refreshPrescriptionItemCounts(selectedRow.prescriptionId);
         }
     }
+
+
+    /** حوار صرف ذكي: عبوات/أشرطة أو وحدات (فراطة) مع حساب تلقائي وإشارة إن كانت كاملة أو فراطة */
+    private DispenseDecision showPackAwareDispenseDialog(PrescItemRow r) {
+        int prescribed = Math.max(0, r.getQuantity());
+        int inStock    = Math.max(0, r.getStockAvailable());
+        int requested  = prescribed;
+
+        PackagingSupport.PackagingInfo p =
+                (r.getMedicineId() > 0) ? fetchPackaging(r.getMedicineId()) : null;
+
+        // suggested to preselect
+        PackagingSupport.PackSuggestion sugg = PackagingSupport.suggestPackFor(requested, p);
+
+        Dialog<DispenseDecision> dlg = new Dialog<>();
+        dlg.setTitle("Dispense quantity");
+        dlg.setHeaderText("How do you want to dispense? (packs or units)");
+
+        ButtonType okType = new ButtonType("OK", ButtonBar.ButtonData.OK_DONE);
+        dlg.getDialogPane().getButtonTypes().addAll(ButtonType.CANCEL, okType);
+
+        ToggleGroup mode = new ToggleGroup();
+        RadioButton byPack  = new RadioButton("By pack");
+        RadioButton byUnits = new RadioButton("By units (فراطة)");
+        byPack.setToggleGroup(mode); byUnits.setToggleGroup(mode); byPack.setSelected(true);
+
+        // limits
+        Label limits = new Label("Prescribed: " + prescribed + "  |  In stock: " + inStock);
+
+        // pack choice
+        ChoiceBox<String> unitChoice = new ChoiceBox<>();
+        java.util.List<String> opts = new java.util.ArrayList<>();
+        if (p != null) {
+            if (p.mlPerBottle != null)      opts.add("BOTTLE");
+            else if (p.gramsPerTube != null) opts.add("TUBE");
+            else {
+                if (p.blistersPerBox != null && p.tabletsPerBlister != null) opts.add("BOX");
+                if (p.tabletsPerBlister != null)                              opts.add("BLISTER");
+            }
+        }
+        opts.add("UNIT");
+        unitChoice.setItems(FXCollections.observableArrayList(opts));
+        String defaultUnit = (sugg != null && opts.contains(sugg.unit)) ? sugg.unit : opts.get(0);
+        unitChoice.getSelectionModel().select(defaultUnit);
+
+        Spinner<Integer> packCount = new Spinner<>(1, 10_000, Math.max(1, (sugg != null ? sugg.count : 1)));
+        packCount.setEditable(true);
+
+        // breakdown
+        Label breakdown = new Label();
+        breakdown.setWrapText(true);
+
+        // units (free) +/-
+        TextField unitsField = new TextField(String.valueOf(requested));
+        Button btnMinus = new Button("–");
+        Button btnPlus  = new Button("+");
+        unitsField.setDisable(true); btnMinus.setDisable(true); btnPlus.setDisable(true);
+        HBox unitsRow = new HBox(6, new Label("Units:"), btnMinus, unitsField, btnPlus);
+        unitsRow.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+
+        // result + warnings
+        Label calc = new Label(); calc.setWrapText(true);
+        Label warn = new Label(); warn.getStyleClass().add("text-danger");
+
+        VBox box = new VBox(8,
+                limits,
+                new HBox(10, byPack, byUnits),
+                new HBox(10, new Label("Pack:"), unitChoice, new Label("Count:"), packCount),
+                breakdown,
+                unitsRow,
+                calc,
+                warn
+        );
+        dlg.getDialogPane().setContent(box);
+
+        // helper: units per selected pack
+        java.util.function.Function<String, Integer> unitsPerPack = u -> {
+            if (p == null) return 1;
+            if ("BOX".equals(u) && p.tabletsPerBlister != null && p.blistersPerBox != null)
+                return p.tabletsPerBlister * p.blistersPerBox;
+            if ("BLISTER".equals(u) && p.tabletsPerBlister != null)
+                return p.tabletsPerBlister;
+            if ("BOTTLE".equals(u) || "TUBE".equals(u))
+                return 1;
+            return 1;
+        };
+
+        final Button okBtn = (Button) dlg.getDialogPane().lookupButton(okType);
+
+        Runnable recompute = () -> {
+            boolean free = byUnits.isSelected();
+            unitsField.setDisable(!free);
+            btnMinus.setDisable(!free);
+            btnPlus.setDisable(!free);
+            unitChoice.setDisable(free);
+            packCount.setDisable(free);
+
+            String u = unitChoice.getSelectionModel().getSelectedItem();
+            String btxt = "";
+            if (p != null) {
+                if ("BOX".equals(u) && p.tabletsPerBlister != null && p.blistersPerBox != null) {
+                    btxt = "1 BOX = " + p.blistersPerBox + " BLISTER × " + p.tabletsPerBlister + " UNIT = "
+                            + (p.blistersPerBox * p.tabletsPerBlister) + " units";
+                } else if ("BLISTER".equals(u) && p.tabletsPerBlister != null) {
+                    btxt = "1 BLISTER = " + p.tabletsPerBlister + " UNIT";
+                } else if ("BOTTLE".equals(u) && p.mlPerBottle != null) {
+                    btxt = "1 BOTTLE = " + p.mlPerBottle + " ml";
+                } else if ("TUBE".equals(u) && p.gramsPerTube != null) {
+                    btxt = "1 TUBE = " + p.gramsPerTube + " g";
+                } else if ("UNIT".equals(u)) {
+                    btxt = "UNIT = single piece";
+                }
+            }
+            breakdown.setText(btxt);
+
+            int units;
+            if (free) {
+                try { units = Math.max(0, Integer.parseInt(unitsField.getText().trim())); }
+                catch (Exception e) { units = 0; }
+            } else {
+                int cnt = packCount.getValue();
+                int per = unitsPerPack.apply(u);
+                units = cnt * Math.max(1, per);
+            }
+
+            String note;
+            if (!free && p != null && p.tabletsPerBlister != null) {
+                int perBlister = Math.max(1, p.tabletsPerBlister);
+                note = (units % perBlister == 0) ? "Full pack" : "فراطة (not a full blister)";
+            } else {
+                note = "فراطة";
+            }
+            calc.setText("Will dispense " + units + " units — " + note);
+
+            String w = "";
+            boolean ok = true;
+            if (units > prescribed) { w = "Exceeds prescribed (" + prescribed + ")."; ok = false; }
+            if (units > inStock)     { w = (w.isEmpty()? "" : w + " ") + "Exceeds stock (" + inStock + ")."; ok = false; }
+            warn.setText(w);
+            okBtn.setDisable(!ok);
+
+            final int unitsFinal = units;
+            dlg.setResultConverter(btn -> (btn == okType)
+                    ? new DispenseDecision(
+                    free ? null : u,
+                    free ? 0    : packCount.getValue(),
+                    unitsFinal,
+                    free
+            )
+                    : null);
+        };
+
+        unitChoice.getSelectionModel().selectedItemProperty().addListener((obs,a,b) -> recompute.run());
+        packCount.valueProperty().addListener((obs,a,b) -> recompute.run());
+        unitsField.textProperty().addListener((obs,a,b) -> recompute.run());
+        byPack.setOnAction(e -> recompute.run());
+        byUnits.setOnAction(e -> recompute.run());
+
+        btnMinus.setOnAction(e -> {
+            try { int v = Integer.parseInt(unitsField.getText().trim()); if (v > 0) unitsField.setText(String.valueOf(v - 1)); }
+            catch (Exception ignored) {}
+        });
+        btnPlus.setOnAction(e -> {
+            try { int v = Integer.parseInt(unitsField.getText().trim()); unitsField.setText(String.valueOf(v + 1)); }
+            catch (Exception ignored) {}
+        });
+
+        recompute.run();
+        return dlg.showAndWait().orElse(null);
+    }
+
+    /** بديل بسيط للاستخدام داخل زر Accept */
+    private int promptDispenseQuantity(PrescItemRow r) {
+        DispenseDecision d = showPackAwareDispenseDialog(r);
+        return (d == null) ? -1 : d.unitsTotal;
+    }
+
     /** Update Total/Approved/Rejected/Pending counters for a given prescription. */
     private void refreshPrescriptionItemCounts(long prescId) {
         int total = 0, approved = 0, rejected = 0, pending = 0;
@@ -839,8 +987,63 @@ public class PharmacyController {
         if (PendingNumber    != null) PendingNumber.setText(String.valueOf(pending));
     }
 
+    /** Query packaging for a given medicine id. Safe to call per-row; tiny select. */
+    private PackagingInfo fetchPackaging(long medId) {
+        try (java.sql.Connection c = com.example.healthflow.db.Database.get();
+             java.sql.PreparedStatement ps = c.prepareStatement(
+                     "SELECT base_unit::text, tablets_per_blister, blisters_per_box, ml_per_bottle, grams_per_tube, split_allowed " +
+                             "FROM medicines WHERE id = ?")) {
+            ps.setLong(1, medId);
+            try (java.sql.ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return new PackagingInfo(
+                            rs.getString(1),
+                            (Integer)rs.getObject(2),
+                            (Integer)rs.getObject(3),
+                            (Integer)rs.getObject(4),
+                            (Integer)rs.getObject(5),
+                            (Boolean)rs.getObject(6)
+                    );
+                }
+            }
+        } catch (Exception ignore) {}
+        return null;
+    }
+
+    // --- ضع هاتين الدالتين داخل PharmacyController ---
+
+    private static final class DispenseDecision {
+        final String approvedUnit;   // UNIT/BLISTER/BOX/BOTTLE/TUBE أو null لو "فراطة"
+        final int approvedCount;     // عدد العبوات لو بالعبوات
+        final int unitsTotal;        // إجمالي الوحدات الفعلية للصرف
+        final boolean isFreeUnits;   // فراطة؟
+        DispenseDecision(String unit, int count, int unitsTotal, boolean free) {
+            this.approvedUnit = unit; this.approvedCount = count; this.unitsTotal = unitsTotal; this.isFreeUnits = free;
+        }
+    }
 
     private void setupDashboardTableColumns() {
+        // --- Suggested pack/quantity column (renders text with tooltip, stays read-only) ---
+        if (colSuggestionQty != null) {
+            colSuggestionQty.setCellFactory(col -> new TableCell<PrescItemRow, Number>() {
+                private final Tooltip tip = new Tooltip();
+                @Override protected void updateItem(Number item, boolean empty) {
+                    super.updateItem(item, empty);
+                    if (empty) { setText(null); setTooltip(null); return; }
+                    PrescItemRow r = getTableView().getItems().get(getIndex());
+                    int req = Math.max(0, r.getQuantity());
+                    long medId = r.getMedicineId();
+                    PackagingInfo p = (medId > 0) ? fetchPackaging(medId) : null;
+                    PackSuggestion s = PackagingSupport.suggestPackFor(req, p);
+                    String txt = PackagingSupport.formatSuggestionText(s);
+                    setText(txt);
+                    tip.setText(txt);
+                    setTooltip(tip);
+                }
+            });
+            colSuggestionQty.setStyle("-fx-alignment: CENTER-LEFT;");
+            colSuggestionQty.setPrefWidth(180);
+        }
         if (PresciptionsTable == null) return;
         PresciptionsTable.setColumnResizePolicy(javafx.scene.control.TableView.UNCONSTRAINED_RESIZE_POLICY);
         // Serial #
@@ -915,29 +1118,6 @@ public class PharmacyController {
         }
     }
 
-
-//    private void showPrescriptionDetails(DashboardRow row) {
-//        if (row == null) return;
-//        this.selectedRow = row;
-//        // Switch to prescription pane
-//        showPrescriptionsPane();
-//        // Header labels
-//        if (PatientNameTF != null) {
-//            String nid = row.patientNid == null ? "" : (" (" + row.patientNid + ")");
-//            PatientNameTF.setText(row.patientName + nid);
-//            PatientNameTF.setEditable(false);
-//        }
-//        if (DoctorNameLabel != null) DoctorNameLabel.setText(row.doctorName);
-//        if (PharmacistNameLabel != null) PharmacistNameLabel.setText(UsernameLabel != null ? UsernameLabel.getText() : "");
-//        if (AppointmentDate != null) {
-//            var df = java.time.format.DateTimeFormatter.ofPattern("MM/dd/yyyy hh:mm a");
-//            String appt = row.appointmentDateTime == null ? "—" : row.appointmentDateTime.atZoneSameInstant(APP_TZ).toLocalDateTime().format(df);
-//            AppointmentDate.setText(appt);
-//        }
-//        if (DiagnosisView != null) DiagnosisView.setText(row.diagnosisNote == null ? "" : row.diagnosisNote);
-//        // Load items
-//        loadPrescriptionItems(row.prescriptionId);
-//    }
     private void showPrescriptionDetails(DashboardRow row) {
         if (row == null) return;
         this.selectedRow = row;
@@ -1169,37 +1349,26 @@ public class PharmacyController {
 
         // 1) Ask pharmacist how many to dispense (allow partial)
         int prescribed = Math.max(0, r.getQuantity());
-        int inStock = Math.max(0, r.getStockAvailable()); // 0 if null
-        int suggested = Math.min(prescribed, inStock);
-        if (suggested < 0) suggested = 0;
+        int inStock    = Math.max(0, r.getStockAvailable()); // 0 if null
 
-        javafx.scene.control.TextInputDialog dlg = new javafx.scene.control.TextInputDialog(String.valueOf(suggested));
-        dlg.setTitle("Dispense quantity");
-        dlg.setHeaderText("How many units do you want to dispense?");
-        dlg.setContentText("Dispense (0–" + prescribed + ", stock=" + inStock + "): ");
+        int units = promptDispenseQuantity(r);
+        if (units < 0) return; // Cancel
 
-        java.util.Optional<String> ans = dlg.showAndWait();
-        if (ans.isEmpty()) return; // cancelled
+        int dispense = units;   // اسم موحّد للمتغيّر
 
-        int dispense;
-        try {
-            dispense = Integer.parseInt(ans.get().trim());
-        } catch (NumberFormatException ex) {
-            new javafx.scene.control.Alert(javafx.scene.control.Alert.AlertType.ERROR, "Please enter a valid integer.").showAndWait();
-            return;
-        }
-
-        // 2) Validate bounds
+        // 2) Validate bounds (مرة واحدة فقط)
         if (dispense < 0) {
             new javafx.scene.control.Alert(javafx.scene.control.Alert.AlertType.ERROR, "Dispense must be >= 0").showAndWait();
             return;
         }
         if (dispense > prescribed) {
-            new javafx.scene.control.Alert(javafx.scene.control.Alert.AlertType.ERROR, "Cannot dispense more than prescribed (" + prescribed + ")").showAndWait();
+            new javafx.scene.control.Alert(javafx.scene.control.Alert.AlertType.ERROR,
+                    "Cannot dispense more than prescribed (" + prescribed + ")").showAndWait();
             return;
         }
         if (dispense > inStock) {
-            new javafx.scene.control.Alert(javafx.scene.control.Alert.AlertType.ERROR, "Not enough stock (available: " + inStock + ")").showAndWait();
+            new javafx.scene.control.Alert(javafx.scene.control.Alert.AlertType.ERROR,
+                    "Not enough stock (available: " + inStock + ")").showAndWait();
             return;
         }
 
@@ -1216,7 +1385,8 @@ public class PharmacyController {
                 Long medId = r.getMedicineId();
                 if (medId == null) {
                     // Try to resolve medicine id by name (case-insensitive)
-                    try (PreparedStatement ps = c.prepareStatement("SELECT id FROM medicines WHERE LOWER(name)=LOWER(?) LIMIT 1")) {
+                    try (PreparedStatement ps = c.prepareStatement(
+                            "SELECT id FROM medicines WHERE LOWER(name)=LOWER(?) LIMIT 1")) {
                         ps.setString(1, r.getMedicineName());
                         try (ResultSet rs = ps.executeQuery()) {
                             if (rs.next()) medId = rs.getLong(1);
@@ -1226,12 +1396,12 @@ public class PharmacyController {
                 if (medId != null && dispense > 0) {
                     try (PreparedStatement ps = c.prepareStatement(
                             "INSERT INTO inventory_transactions (medicine_id, qty_change, reason, ref_type, ref_id)\n" +
-                            "VALUES (?, ?, ?, ?, ?)")) {
+                                    "VALUES (?, ?, ?, ?, ?)")) {
                         ps.setLong(1, medId);
-                        ps.setInt(2, -dispense);                       // negative = outflow
-                        ps.setString(3, "DISPENSE");                  // reason
-                        ps.setString(4, "prescription_item");        // ref_type
-                        ps.setLong(5, r.getId());                      // ref_id = item id
+                        ps.setInt(2, -dispense);                 // negative = outflow
+                        ps.setString(3, "DISPENSE");              // reason
+                        ps.setString(4, "prescription_item");     // ref_type
+                        ps.setLong(5, r.getId());                 // ref_id = item id
                         ps.executeUpdate();
                     }
                 }
@@ -1257,7 +1427,8 @@ public class PharmacyController {
             }
         } catch (Exception ex) {
             System.err.println("[PharmacyController] approve item error: " + ex);
-            new javafx.scene.control.Alert(javafx.scene.control.Alert.AlertType.ERROR, "Failed to update item: " + ex.getMessage()).showAndWait();
+            new javafx.scene.control.Alert(javafx.scene.control.Alert.AlertType.ERROR,
+                    "Failed to update item: " + ex.getMessage()).showAndWait();
         }
     }
 
@@ -1327,34 +1498,18 @@ public class PharmacyController {
         setVisibleManaged(InventoryAnchorPane, false);
         markNavActive(PrescriptionsButton);
         // Show the details area only when a prescription is selected later
-        if (PrescriptionMedicationAnchorPane != null)
+        if (PrescriptionMedicationAnchorPane != null){
             setVisibleManaged(PrescriptionMedicationAnchorPane, true);
+        }
+        startPharmacyDbNotifications();
     }
-
-    //    private void showInventoryPane() {
-    //        setVisibleManaged(pharmacyDashboardAnchorPane, false);
-    //        setVisibleManaged(PrescriptionAnchorPane, false);
-    //        setVisibleManaged(InventoryAnchorPane, true);
-    //        markNavActive(InventoryButton);
-    //        // Ensure a default inventory mode
-    //        if (btnReceive != null) {
-    //            btnReceive.setSelected(true);
-    ////            showInventoryMode(true);
-    //            lastSelectedInvBtn = btnReceive;
-    //        }
-    //        if (segInv != null) {
-    //            // ensure the segmented control actually contains our toggles
-    //            if (!segInv.getButtons().contains(btnReceive) && btnReceive != null) segInv.getButtons().add(btnReceive);
-    //            if (!segInv.getButtons().contains(btnDeduct)  && btnDeduct  != null) segInv.getButtons().add(btnDeduct);
-    //        }
-    //    }
 
     private void showInventoryPane() {
         setVisibleManaged(pharmacyDashboardAnchorPane, false);
         setVisibleManaged(PrescriptionAnchorPane, false);
         setVisibleManaged(InventoryAnchorPane, true);
         markNavActive(InventoryButton);
-        // تأكد أن التوصيلات سليمة وتنعكس على الواجهة
+        startPharmacyDbNotifications();
         wireInventoryToggles();
     }
 
@@ -1372,55 +1527,6 @@ public class PharmacyController {
         ReceivePane.setVisible(false);
         deductPane.setVisible(true);
     }
-
-
-    //    private void wireInventoryToggles() {
-    //        invToggleGroup = new ToggleGroup();
-    //        if (btnReceive != null) btnReceive.setToggleGroup(invToggleGroup);
-    //        if (btnDeduct != null)  btnDeduct.setToggleGroup(invToggleGroup);
-    //
-    //        // Prevent deselection of the currently selected toggle by clicking it again
-    //        if (btnReceive != null) {
-    //            btnReceive.addEventFilter(MouseEvent.MOUSE_PRESSED, e -> {
-    //                if (btnReceive.isSelected()) e.consume();
-    //            });
-    //        }
-    //        if (btnDeduct != null) {
-    //            btnDeduct.addEventFilter(MouseEvent.MOUSE_PRESSED, e -> {
-    //                if (btnDeduct.isSelected()) e.consume();
-    //            });
-    //        }
-    //
-    //        // default & listener
-    //        if (btnReceive != null) {
-    //            btnReceive.setSelected(true);
-    ////            showInventoryMode(true);
-    //        }
-    //
-    //        if (btnDeduct != null) {
-    //            btnDeduct.setSelected(true);
-    ////            showInventoryMode(false);
-    //        }
-    //
-    ////
-    //        // Remember last selected; if selection becomes null, restore last
-    //        if (invToggleGroup != null) {
-    //            lastSelectedInvBtn = btnReceive != null ? btnReceive : btnDeduct;
-    //            invToggleGroup.selectedToggleProperty().addListener((obs, oldT, newT) -> {
-    //                if (newT == null) {
-    //                    if (lastSelectedInvBtn != null) invToggleGroup.selectToggle(lastSelectedInvBtn);
-    //                    return;
-    //                }
-    //                if (newT instanceof ToggleButton tb) {
-    //                    lastSelectedInvBtn = tb;
-    //                }
-    //            });
-    //        }
-    //        if (segInv != null) {
-    //            if (btnReceive != null && !segInv.getButtons().contains(btnReceive)) segInv.getButtons().add(btnReceive);
-    //            if (btnDeduct  != null && !segInv.getButtons().contains(btnDeduct))  segInv.getButtons().add(btnDeduct);
-    //        }
-    //    }
 
 private void wireInventoryToggles() {
     invToggleGroup = new ToggleGroup();
@@ -1502,8 +1608,6 @@ private void wireInventoryToggles() {
         resolveLoggedInUserLabels();
 
         if (rootPane != null) {
-    //            ConnectivityBanner banner = new ConnectivityBanner(monitor);
-    //            rootPane.getChildren().add(0, banner);
             ensureConnectivityBannerOnce();
 
             // attach shared CSS defensively
@@ -1527,16 +1631,6 @@ private void wireInventoryToggles() {
 
         // Start header clock & date (12h, Asia/Gaza)
         startClock();
-
-
-        //        // Default the date picker to today (Asia/Gaza) and listen for changes
-        //        if (PrescriptionDatePicker != null) {
-        //            PrescriptionDatePicker.setValue(java.time.ZonedDateTime.now(APP_TZ).toLocalDate());
-        //            PrescriptionDatePicker.valueProperty().addListener((obs, oldV, newV) -> {
-        //                refreshPharmacyDashboardCounts();
-        //                loadDashboardTable();
-        //            });
-        //        }
 
         if (PrescriptionDatePicker != null) {
             PrescriptionDatePicker.setValue(java.time.ZonedDateTime.now(APP_TZ).toLocalDate());
@@ -1602,6 +1696,8 @@ private void wireInventoryToggles() {
 
         // Initial section
         showDashboardPane();
+        System.out.println("[PharmacyController] init -> startPharmacyDbNotifications()");
+        startPharmacyDbNotifications();
 
         // Hard fallback: enforce Dashboard default if panes exist
         if (pharmacyDashboardAnchorPane != null && InventoryAnchorPane != null) {
@@ -1621,5 +1717,49 @@ private void wireInventoryToggles() {
             );
         }
         loadDashboardTable();
+    }
+    private void startPharmacyDbNotifications() {
+        if (dbn != null) return; // already started
+        System.out.println("[PharmacyController] starting DbNotifications listeners...");
+        dbn = new com.example.healthflow.db.notify.DbNotifications();
+
+        dashCoalesce.setOnFinished(e  -> { System.out.println("[Pharm] dashCoalesce -> loadDashboardAsync(true)"); loadDashboardAsync(true); });
+        itemsCoalesce.setOnFinished(e -> { System.out.println("[Pharm] itemsCoalesce -> reloadCurrentPrescriptionItems()"); reloadCurrentPrescriptionItems(); });
+        invCoalesce.setOnFinished(e   -> { System.out.println("[Pharm] invCoalesce   -> reloadInventoryTable()"); reloadInventoryTable(); });
+
+        dbn.listen("prescriptions_changed", p -> Platform.runLater(() -> {
+            dashCoalesce.playFromStart();
+            if (isPrescriptionVisible()) itemsCoalesce.playFromStart();
+        }));
+
+        dbn.listen("prescription_items_changed", p -> Platform.runLater(() -> {
+            itemsCoalesce.playFromStart();
+            dashCoalesce.playFromStart();
+        }));
+
+        dbn.listen("inventory_changed", p -> Platform.runLater(() -> {
+            invCoalesce.playFromStart();
+            itemsCoalesce.playFromStart();
+            dashCoalesce.playFromStart();
+        }));
+
+
+        // أغلق المستمع عند إغلاق النافذة
+        javafx.application.Platform.runLater(() -> {
+            var hook = (rootPane != null) ? rootPane : pharmacyDashboardAnchorPane;
+            if (hook != null && hook.getScene() != null) {
+                var win = hook.getScene().getWindow();
+                if (win != null) {
+                    win.addEventHandler(javafx.stage.WindowEvent.WINDOW_CLOSE_REQUEST, e -> stopPharmacyDbNotifications());
+                    win.addEventHandler(javafx.stage.WindowEvent.WINDOW_HIDDEN, e -> stopPharmacyDbNotifications());
+                }
+            }
+        });
+    }
+
+    private void stopPharmacyDbNotifications() {
+        try { if (dbn != null) dbn.close(); } catch (Exception ignore) {}
+        dbn = null;
+//        System.out.println("[PharmacyController] DbNotifications stopped.");
     }
 }

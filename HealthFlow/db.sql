@@ -830,3 +830,67 @@ ALTER TABLE prescription_items
 
 
 ALTER TABLE patients ENABLE TRIGGER trg_patients_notify_insupddel;
+
+-- prescriptions
+CREATE OR REPLACE FUNCTION notify_prescriptions_changed()
+RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  PERFORM pg_notify('prescriptions_changed',
+                    json_build_object('op', TG_OP,
+                                      'prescription_id', COALESCE(NEW.id, OLD.id))::text);
+RETURN COALESCE(NEW, OLD);
+END $$;
+DROP TRIGGER IF EXISTS trg_prescriptions_notify ON prescriptions;
+CREATE TRIGGER trg_prescriptions_notify
+    AFTER INSERT OR UPDATE OR DELETE ON prescriptions
+    FOR EACH ROW EXECUTE FUNCTION notify_prescriptions_changed();
+
+-- prescription_items
+CREATE OR REPLACE FUNCTION notify_prescription_items_changed()
+RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  PERFORM pg_notify('prescription_items_changed',
+                    json_build_object('op', TG_OP,
+                                      'prescription_id', COALESCE(NEW.prescription_id, OLD.prescription_id),
+                                      'item_id', COALESCE(NEW.id, OLD.id))::text);
+RETURN COALESCE(NEW, OLD);
+END $$;
+DROP TRIGGER IF EXISTS trg_presc_items_notify ON prescription_items;
+CREATE TRIGGER trg_presc_items_notify
+    AFTER INSERT OR UPDATE OR DELETE ON prescription_items
+    FOR EACH ROW EXECUTE FUNCTION notify_prescription_items_changed();
+
+-- inventory (لو بتعرض المخزون)
+CREATE OR REPLACE FUNCTION notify_inventory_changed()
+RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  PERFORM pg_notify('inventory_changed',
+                    json_build_object('op', TG_OP,
+                                      'medicine_id', COALESCE(NEW.medicine_id, OLD.medicine_id))::text);
+RETURN COALESCE(NEW, OLD);
+END $$;
+DROP TRIGGER IF EXISTS trg_inv_notify_ins ON inventory_transactions;
+CREATE TRIGGER trg_inv_notify_ins
+    AFTER INSERT ON inventory_transactions FOR EACH ROW EXECUTE FUNCTION notify_inventory_changed();
+DROP TRIGGER IF EXISTS trg_inv_notify_upd ON inventory_transactions;
+CREATE TRIGGER trg_inv_notify_upd
+    AFTER UPDATE ON inventory_transactions FOR EACH ROW EXECUTE FUNCTION notify_inventory_changed();
+DROP TRIGGER IF EXISTS trg_inv_notify_del ON inventory_transactions;
+CREATE TRIGGER trg_inv_notify_del
+    AFTER DELETE ON inventory_transactions FOR EACH ROW EXECUTE FUNCTION notify_inventory_changed();
+
+
+-- إشعار عند أي UPDATE على medicines
+CREATE OR REPLACE FUNCTION notify_medicines_changed()
+RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  PERFORM pg_notify('inventory_changed',
+                    json_build_object('op', TG_OP,
+                                      'medicine_id', COALESCE(NEW.id, OLD.id))::text);
+RETURN COALESCE(NEW, OLD);
+END $$;
+
+DROP TRIGGER IF EXISTS trg_meds_notify_upd ON medicines;
+CREATE TRIGGER trg_meds_notify_upd
+    AFTER UPDATE ON medicines
+    FOR EACH ROW EXECUTE FUNCTION notify_medicines_changed();

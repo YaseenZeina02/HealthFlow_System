@@ -19,7 +19,7 @@
 <?import org.controlsfx.control.SegmentedButton?>
 <?import org.kordamp.ikonli.javafx.FontIcon?>
 
-<VBox fx:id="rootPane" fillWidth="true" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" spacing="0" xmlns="http://javafx.com/javafx/23.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.example.healthflow.controllers.PharmacyController">
+<VBox fx:id="rootPane" fillWidth="true" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" spacing="0" xmlns="http://javafx.com/javafx/19" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.example.healthflow.controllers.PharmacyController">
    <children>
       <BorderPane prefHeight="600.0" prefWidth="1100.0" stylesheets="@../Design/ReceptionDesign.css" VBox.vgrow="ALWAYS">
          <top>
@@ -244,7 +244,8 @@
                                     <TableColumn fx:id="colDose" prefWidth="75.0" text="Dose" />
                                     <TableColumn fx:id="colDosage" prefWidth="75.0" text="Dosage" />
                                     <TableColumn fx:id="colQuantity" prefWidth="75.0" text="Quantity" />
-                                    <TableColumn fx:id="colStock" prefWidth="100.0" text="Stock" />
+                                    <TableColumn fx:id="colSuggestionQty" prefWidth="82.0" text="Suggestion Qty" />
+                                    <TableColumn fx:id="colStock" prefWidth="45.0" text="Stock" />
                                     <TableColumn fx:id="colItemStatus" prefWidth="100.0" text="Item Status" />
                                     <TableColumn fx:id="colPresesItemAction" prefWidth="58.0" text="Action" />
                                  </columns>
@@ -275,7 +276,7 @@
                                           <Font name="System Bold Italic" size="22.0" />
                                        </font>
                                     </Label>
-                                    <Label layoutX="18.0" layoutY="94.0" prefHeight="25.0" prefWidth="100.0" styleClass="text-gradient" stylesheets="@../Design/ReceptionDesign.css" text="Completed : ">
+                                    <Label layoutX="18.0" layoutY="94.0" prefHeight="25.0" prefWidth="100.0" styleClass="text-gradient" stylesheets="@../Design/ReceptionDesign.css" text="Approved : ">
                                        <font>
                                           <Font name="System Bold Italic" size="22.0" />
                                        </font>

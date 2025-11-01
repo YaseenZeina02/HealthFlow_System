@@ -72,6 +72,7 @@ public final class DbNotifications implements AutoCloseable {
     }
 
     private void connect() throws SQLException {
+        System.out.println("[DbNotifications] connecting to " + pgUrl() + " as " + pgUser());
         closeConnQuietly();
         conn = DriverManager.getConnection(pgUrl(), pgUser(), pgPassword()); // NOT from pool
         conn.setAutoCommit(true);
@@ -79,7 +80,11 @@ public final class DbNotifications implements AutoCloseable {
 
         try (Statement st = conn.createStatement()) {
             for (String ch : channels) {
-                try { st.execute("LISTEN " + ch); }
+                try { st.execute(
+                        "LISTEN " + ch);
+                    System.out.println("[DbNotifications] LISTEN " + ch);
+
+                }
                 catch (SQLException e) { System.err.println("[DbNotifications] LISTEN failed for " + ch + " : " + e); }
             }
             // Proactive resync after (re)connect
@@ -111,12 +116,20 @@ public final class DbNotifications implements AutoCloseable {
                 // Wake the socket so notifications get delivered
                 try (Statement st = conn.createStatement(); ResultSet rs = st.executeQuery("SELECT 1")) { /* no-op */ }
 
+
                 var notifications = pgConn.getNotifications();
+
+                if (notifications != null && notifications.length > 0)
+                    System.out.println("[DbNotifications] received " + notifications.length + " notification(s)");
+
                 if (notifications != null) {
                     for (var n : notifications) {
                         var h = handlers.get(n.getName());
                         if (h != null) {
-                            try { h.accept(n.getParameter()); }
+                            try {
+                                System.out.println("[DbNotifications] NOTIFY " + n.getName() + " payload=" + n.getParameter());
+                                h.accept(n.getParameter());
+                            }
                             catch (Throwable t) { System.err.println("[DbNotifications] handler error: " + t); }
                         }
                     }
@@ -135,6 +148,7 @@ public final class DbNotifications implements AutoCloseable {
                 try { Thread.sleep(1000); } catch (InterruptedException ignored) { Thread.currentThread().interrupt(); }
             }
         }
+
         closeConnQuietly();
     }
 
@@ -149,139 +163,3 @@ public final class DbNotifications implements AutoCloseable {
         closeConnQuietly();
     }
 }
-
-
-
-
-
-
-
-//package com.example.healthflow.db.notify;
-//
-//import com.example.healthflow.db.Database;
-//import org.postgresql.PGConnection;
-//import org.postgresql.PGNotification;
-//
-//import java.sql.*;
-//import java.time.Duration;
-//import java.util.Map;
-//import java.util.Objects;
-//import java.util.concurrent.*;
-//import java.util.function.Consumer;
-//
-///**
-// * Durable LISTEN/NOTIFY helper:
-// * - Dedicated connection kept open
-// * - LISTEN multiple channels
-// * - Periodic keep-alive (SELECT 1) to avoid serverless idle timeouts
-// * - Auto-reconnect on EOF / network errors
-// */
-//public final class DbNotifications implements AutoCloseable {
-//
-//    private final Map<String, Consumer<String>> handlers = new ConcurrentHashMap<>();
-//    private final ScheduledExecutorService exec =
-//            Executors.newSingleThreadScheduledExecutor(r -> {
-//                Thread t = new Thread(r, "pg-listen");
-//                t.setDaemon(true);
-//                return t;
-//            });
-//
-//    private volatile Connection conn;        // dedicated connection
-//    private volatile PGConnection pg;
-//    private volatile boolean running;
-//
-//    /** ابدأ الاستماع لقناة معينة. يمكن استدعاؤها عدة مرات لقنوات مختلفة. */
-//    public synchronized void listen(String channel, Consumer<String> onPayload) {
-//        Objects.requireNonNull(channel, "channel");
-//        handlers.put(channel, onPayload);
-//        ensureConnected();
-//        exec.execute(() -> doListen(channel));           // نفّذ LISTEN للقناة الآن
-//    }
-//
-//    /** تأكد من وجود اتصال حي، وإلا أعد الاتصال وأطلق مهام القراءة والكيبالايف. */
-//    private synchronized void ensureConnected() {
-//        if (running && conn != null) return;
-//        reconnectLoop();
-//        // polling خفيف لقراءة الإشعارات + keep-alive؛ تكفي كل 20-25 ثانية على Neon
-//        exec.scheduleWithFixedDelay(this::pumpNotificationsSafe, 0, 25, TimeUnit.SECONDS);
-//    }
-//
-//    /** نفّذ أمر LISTEN للقناة المعطاة. */
-//    private void doListen(String channel) {
-//        try (Statement st = conn.createStatement()) {
-//            st.execute("LISTEN " + channel);
-//        } catch (SQLException e) {
-//            // لو فشل لأن الاتصال انقطع، أعد الاتصال وجرّب مرة أخرى
-//            reconnectLoop();
-//            try (Statement st = conn.createStatement()) {
-//                st.execute("LISTEN " + channel);
-//            } catch (SQLException ex) {
-//                ex.printStackTrace();
-//            }
-//        }
-//    }
-//
-//    /** حاول إنشاء اتصال مخصص وإعداده، مع إعادة المحاولة عند الفشل. */
-//    private void reconnectLoop() {
-//        closeSilently();
-//        while (true) {
-//            try {
-//                conn = Database.get();                 // خذ اتصال من الـ pool واستخدمه مخصصًا لهذا الكلاس
-//                conn.setAutoCommit(true);              // ضروري لـ NOTIFY
-//                // (اختياري) سهّل تتبع الاتصال في لوحة Neon
-//                try (Statement s = conn.createStatement()) {
-//                    s.execute("SET application_name = 'HealthFlow-Listener'");
-//                } catch (SQLException ignore) {}
-//
-//                pg = conn.unwrap(PGConnection.class);
-//                running = true;
-//                System.out.println("[DbNotifications] connected");
-//                // أعد LISTEN لكل القنوات المسجلة سابقًا
-//                for (String ch : handlers.keySet()) doListen(ch);
-//                break;
-//            } catch (SQLException e) {
-//                System.err.println("[DbNotifications] reconnect failed: " + e.getMessage());
-//                sleep(Duration.ofSeconds(3));
-//            }
-//        }
-//    }
-//
-//    /** اقرأ الإشعارات + أبقِ الاتصال حيًا عبر SELECT 1. */
-//    private void pumpNotificationsSafe() {
-//        if (!running || conn == null) return;
-//        try (Statement st = conn.createStatement()) {
-//            // keep-alive خفيف يمنع غلق الاتصال للخمول
-//            st.execute("SELECT 1");
-//            // اسحب أي إشعارات متراكمة
-//            PGNotification[] ns = pg.getNotifications();
-//            if (ns != null) {
-//                for (PGNotification n : ns) {
-//                    Consumer<String> h = handlers.get(n.getName());
-//                    if (h != null) {
-//                        try { h.accept(n.getParameter()); } catch (Throwable ignore) {}
-//                    }
-//                }
-//            }
-//        } catch (SQLException e) {
-//            System.err.println("[DbNotifications] pump error: " + e.getMessage());
-//            reconnectLoop(); // أي EOF/IO → أعد الاتصال
-//        }
-//    }
-//
-//    private static void sleep(Duration d) {
-//        try { Thread.sleep(d.toMillis()); } catch (InterruptedException ignored) {}
-//    }
-//
-//    private synchronized void closeSilently() {
-//        running = false;
-//        if (conn != null) {
-//            try { conn.close(); } catch (Exception ignore) {}
-//        }
-//        conn = null; pg = null;
-//    }
-//
-//    @Override public synchronized void close() {
-//        exec.shutdownNow();
-//        closeSilently();
-//    }
-//}
