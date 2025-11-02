@@ -1344,7 +1344,7 @@ public class ReceptionController {
     /* ===== Appointments table wiring & search (minimal) ===== */
     private void wireAppointmentsTables() {
         if (TableINAppointment == null) return;
-        TableINAppointment.setColumnResizePolicy(TableView.UNCONSTRAINED_RESIZE_POLICY);
+       //TableINAppointment.setColumnResizePolicy(TableView.UNCONSTRAINED_RESIZE_POLICY);
         TableINAppointment.setItems(sortedAppt);
         sortedAppt.comparatorProperty().bind(TableINAppointment.comparatorProperty());
         // === تفعيل التحرير داخل جدول المواعيد ===
@@ -1374,10 +1374,11 @@ public class ReceptionController {
         // -------- Serial Number Column (#) --------
         if (colAppointmentSerialNUm != null) {
             colAppointmentSerialNUm.setStyle("-fx-alignment: CENTER;");
+            /*
             colAppointmentSerialNUm.setMinWidth(60);
             colAppointmentSerialNUm.setPrefWidth(70);
             colAppointmentSerialNUm.setMaxWidth(100);
-
+            */
             // لا نحتاج Data من الموديل؛ نستخدم خلية تعرض getIndex()+1
             colAppointmentSerialNUm.setCellFactory(col -> new TableCell<ApptRow, Number>() {
                 @Override
@@ -2441,7 +2442,7 @@ public class ReceptionController {
         }
 
         // --- 1) Table wiring (idempotent) ---
-        TableAppInDashboard.setColumnResizePolicy(TableView.UNCONSTRAINED_RESIZE_POLICY);
+        //TableAppInDashboard.setColumnResizePolicy(TableView.UNCONSTRAINED_RESIZE_POLICY);
         try { dashSorted.comparatorProperty().bind(TableAppInDashboard.comparatorProperty()); } catch (Throwable ignore) {}
         if (TableAppInDashboard.getItems() != dashSorted) {
             TableAppInDashboard.setItems(dashSorted);
@@ -2453,11 +2454,12 @@ public class ReceptionController {
         // -------- Appointment ID (index shown 1..n) --------
         if (colAppointmentID != null) {
             colAppointmentID.setStyle("-fx-alignment: CENTER;");
-            colAppointmentID.setMinWidth(60);
-            colAppointmentID.setPrefWidth(70);
-            colAppointmentID.setMaxWidth(120);
-            colAppointmentID.setResizable(true);
+            /*
+            colAppointmentID.setMinWidth(10);
+            colAppointmentID.setPrefWidth(30);
+            colAppointmentID.setMaxWidth(30);
 
+             */
             colAppointmentID.setCellFactory(col -> new TableCell<DoctorDAO.AppointmentRow, Number>() {
                 @Override
                 protected void updateItem(Number item, boolean empty) {
@@ -2471,22 +2473,34 @@ public class ReceptionController {
         // -------- Patient Name --------
         if (colPatientNameDash != null) {
             colPatientNameDash.setCellValueFactory(cd -> new SimpleStringProperty(cd.getValue().patientName));
-            colPatientNameDash.setMinWidth(140);
-            colPatientNameDash.setPrefWidth(200);
+            /*
+            colPatientNameDash.setMinWidth(160);
+            colPatientNameDash.setPrefWidth(160);
+            //colPatientNameDash.setMaxWidth(250);
+
+             */
         }
 
         // -------- Doctor Name --------
         if (colDoctorNameDash != null) {
             colDoctorNameDash.setCellValueFactory(cd -> new SimpleStringProperty(cd.getValue().doctorName));
-            colDoctorNameDash.setMinWidth(140);
-            colDoctorNameDash.setPrefWidth(200);
+            /*
+            colDoctorNameDash.setMinWidth(160);
+            colDoctorNameDash.setPrefWidth(160);
+            //colDoctorNameDash.setMaxWidth(250);
+
+             */
         }
 
         // -------- Specialty --------
         if (colSpecialtyDash != null) {
             colSpecialtyDash.setCellValueFactory(cd -> new SimpleStringProperty(cd.getValue().specialty));
+            /*
             colSpecialtyDash.setMinWidth(120);
-            colSpecialtyDash.setPrefWidth(140);
+            colSpecialtyDash.setPrefWidth(120);
+            //colSpecialtyDash.setMaxWidth(140);
+
+             */
         }
 
         // -------- Date --------
@@ -2497,8 +2511,12 @@ public class ReceptionController {
             });
             colAppintementDateDash.setEditable(false);
             colAppintementDateDash.setStyle("-fx-alignment: CENTER;");
-            colAppintementDateDash.setMinWidth(120);
-            colAppintementDateDash.setPrefWidth(130);
+            /*
+            colAppintementDateDash.setMinWidth(100);
+            colAppintementDateDash.setPrefWidth(100);
+            //colAppintementDateDash.setMaxWidth(120);
+
+             */
         }
 
         // -------- Time --------
@@ -2511,25 +2529,36 @@ public class ReceptionController {
                 return new SimpleStringProperty(from.format(SLOT_FMT_12H) + " \u2192 " + to.format(SLOT_FMT_12H));
             });
             colAppintementTimeDash.setStyle("-fx-alignment: CENTER;");
-            colAppintementTimeDash.setMinWidth(160);
+            /*
+            colAppintementTimeDash.setMinWidth(180);
             colAppintementTimeDash.setPrefWidth(180);
+            //colAppintementTimeDash.setMaxWidth(260);
+
+             */
+
         }
 
         // -------- Room --------
         if (colRoomDash != null) {
             colRoomDash.setCellValueFactory(cd -> new SimpleStringProperty(cd.getValue().location));
             colRoomDash.setStyle("-fx-alignment: CENTER;");
+            /*
             colRoomDash.setMinWidth(100);
-            colRoomDash.setPrefWidth(120);
+            colRoomDash.setPrefWidth(100);
+
+             */
         }
 
         // -------- Action (button) --------
         if (colActionDash != null) {
             colActionDash.setStyle("-fx-alignment: CENTER;");
+            /*
             colActionDash.setMinWidth(100);
-            colActionDash.setPrefWidth(110);
-            colActionDash.setMaxWidth(150);
+            colActionDash.setPrefWidth(100);
+            //colActionDash.setMaxWidth(100);
             colActionDash.setResizable(true);
+
+             */
 
             colActionDash.setCellFactory(col -> new TableCell<DoctorDAO.AppointmentRow, Void>() {
                 private final Button btn = new Button("Open");
