@@ -100,6 +100,7 @@ public final class Database {
             cfg.setConnectionTestQuery("SELECT 1");
             // إبقِاء الاتصال حيًا لتفادي إغلاق السيرفرات الحصيفة
             cfg.setKeepaliveTime(Duration.ofMinutes(5).toMillis());
+            cfg.setMaxLifetime(Duration.ofMinutes(10).toMillis()); // ← 10 دقائق عمر الاتصال
 
             // (أحيانًا يفيد مع JPMS)
             cfg.setDriverClassName("org.postgresql.Driver");

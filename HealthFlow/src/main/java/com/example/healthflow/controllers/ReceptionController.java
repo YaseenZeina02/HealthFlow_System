@@ -460,6 +460,7 @@ public class ReceptionController {
     private final DoctorDAO doctorDAO = new DoctorDAO();
     private final String cssPath = "/com/example/healthflow/Design/ReceptionDesign.css";
 
+
     // When booking from patient, auto-pick nearest future slot once
     private volatile boolean selectNearestSlotOnNextRefresh = false;
 
@@ -2904,6 +2905,7 @@ public class ReceptionController {
         // CSS attach (safe if scene null at init)
         if (rootPane != null) {
             var cssUrl = getClass().getResource("/com/example/healthflow/Design/ReceptionDesign.css");
+            attachComboCss(rootPane);
             if (cssUrl != null) {
                 String css = cssUrl.toExternalForm();
                 if (rootPane.getScene() != null) {
@@ -3285,5 +3287,50 @@ public class ReceptionController {
                 updateNoAppointmentsBanner();
             });
         }, "load-appts-filtered").start();
+    }
+
+
+    /**
+     * Attach /com/example/healthflow/Design/combobox.css to the current scene
+     * and add the "hf-combo" style class to all ComboBox controls (including those inside tables).
+     */
+    private void attachComboCss(javafx.scene.Parent root) {
+        if (root == null) return;
+        final String cssPath = "/com/example/healthflow/Design/combobox.css";
+        var url = getClass().getResource(cssPath);
+        if (url != null) {
+            String css = url.toExternalForm();
+            if (root.getScene() != null) {
+                var list = root.getScene().getStylesheets();
+                if (!list.contains(css)) list.add(css);
+            } else {
+                root.sceneProperty().addListener((obs, oldS, newS) -> {
+                    if (newS != null && !newS.getStylesheets().contains(css)) {
+                        newS.getStylesheets().add(css);
+                    }
+                });
+            }
+        }
+        // وسّم كل الـ ComboBox بـ "hf-combo" (الحاليّة والتي ستُنشأ لاحقًا في خلايا الجداول)
+        javafx.application.Platform.runLater(() -> {
+            try {
+                for (javafx.scene.Node n : root.lookupAll(".combo-box")) {
+                    if (n.getStyleClass() != null && !n.getStyleClass().contains("hf-combo")) {
+                        n.getStyleClass().add("hf-combo");
+                    }
+                }
+                // كرر الوسم بعد كل layout pulse (للكومبوبوكس المتولدة من CellFactory لاحقًا)
+                root.sceneProperty().addListener((o, oldS, newS) -> {
+                    if (newS == null) return;
+                    newS.addPostLayoutPulseListener(() -> {
+                        for (javafx.scene.Node n : root.lookupAll(".combo-box")) {
+                            if (n.getStyleClass() != null && !n.getStyleClass().contains("hf-combo")) {
+                                n.getStyleClass().add("hf-combo");
+                            }
+                        }
+                    });
+                });
+            } catch (Throwable ignore) { }
+        });
     }
 }

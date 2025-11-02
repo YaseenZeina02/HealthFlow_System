@@ -894,3 +894,37 @@ DROP TRIGGER IF EXISTS trg_meds_notify_upd ON medicines;
 CREATE TRIGGER trg_meds_notify_upd
     AFTER UPDATE ON medicines
     FOR EACH ROW EXECUTE FUNCTION notify_medicines_changed();
+
+
+-- أضِف قيمة DRAFT لنوع prescription_status إن مش موجودة
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_enum
+    WHERE enumlabel='DRAFT' AND enumtypid='prescription_status'::regtype
+  ) THEN
+ALTER TYPE prescription_status ADD VALUE 'DRAFT' BEFORE 'PENDING';
+END IF;
+END $$;
+
+-- خلّي الافتراضي للوصفات الجديدة DRAFT
+ALTER TABLE prescriptions
+    ALTER COLUMN status SET DEFAULT 'DRAFT';
+
+-- 1) احذف الـ CHECK القديم إن وُجد
+ALTER TABLE prescriptions
+DROP CONSTRAINT IF EXISTS presc_decision_guard;
+
+-- 2) أضف واحد جديد يسمح بـ DRAFT أو PENDING بلا متطلبات إضافية
+ALTER TABLE prescriptions
+    ADD CONSTRAINT presc_decision_guard
+        CHECK (
+            status IN ('DRAFT','PENDING')
+                OR (status IN ('APPROVED','REJECTED','DISPENSED')
+                AND pharmacist_id IS NOT NULL
+                AND decision_at  IS NOT NULL)
+            );
+
+-- (اختياري) تأكيد الـ default على DRAFT
+ALTER TABLE prescriptions
+    ALTER COLUMN status SET DEFAULT 'DRAFT';

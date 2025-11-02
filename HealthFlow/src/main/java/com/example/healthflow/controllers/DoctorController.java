@@ -4,6 +4,9 @@ import com.example.healthflow.dao.DoctorDAO;
 import com.example.healthflow.db.Database;
 import com.example.healthflow.model.Role;
 import com.example.healthflow.model.User;
+import com.example.healthflow.model.PatientRow;
+import javafx.beans.property.ReadOnlyStringWrapper;
+import javafx.beans.property.ReadOnlyIntegerWrapper;
 import com.example.healthflow.model.dto.MedicineRow;
 import com.example.healthflow.model.dto.PrescItemRow;
 import com.example.healthflow.dao.PrescriptionItemDAO;
@@ -43,7 +46,9 @@ import org.kordamp.ikonli.javafx.FontIcon;
 
 import java.io.IOException;
 import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.sql.SQLException;
+import java.sql.Types;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
@@ -85,6 +90,8 @@ public class DoctorController {
     private Button InsertMedicine; // to insert medicine to database
     @FXML
     private Button sendToPharmacy;
+    @FXML
+    private Button searchDB;
 
     @FXML
     private Button Update_Medication;
@@ -169,7 +176,9 @@ public class DoctorController {
     private DatePicker datePickerPatientsWithDoctor;
     private FilteredList<PatientRow> filtered;
     private SortedList<PatientRow> sorted;
-
+    // ---- Hybrid Search (patients) ----
+    private final Timeline patientSearchDebounce = new Timeline();
+    private volatile String lastPatientSearchText = "";
 
     /* ====== Medicine tab ====== */
     @FXML
@@ -357,6 +366,11 @@ public class DoctorController {
 
         BackButton.setOnAction(e -> goBackToLogin());
 
+        if (searchDB != null) {
+//            searchDB.setOnAction(e -> hybridPatientSearchNow());
+            searchDB.setOnAction(e -> loadAllPatientsForDoctorAsync());
+        }
+
         try {
             OnlineBindings.disableWhenOffline(monitor, DachboardButton, PatientsButton);
         } catch (Throwable ignored) {
@@ -364,6 +378,8 @@ public class DoctorController {
 
         wireAppointmentsTable();
         wirePatientsTable();
+        wirePatientHybridSearch();
+
         wireSearch();
 
         buildAppointmentSearchIndex(); // تجهيز ال-AutoComplete من أول تحميل
@@ -484,6 +500,90 @@ public class DoctorController {
         }
     }
 
+    // Test
+    /**
+     * Load all patients who ever had an appointment with the logged-in doctor (no date filter).
+     */
+    private void loadAllPatientsForDoctorAsync() {
+        var u = Session.get();
+        if (u == null) return;
+
+        new Thread(() -> {
+            java.util.ArrayList<PatientRow> rows = new java.util.ArrayList<>();
+            Exception err = null;
+
+            try (Connection c = Database.get()) {
+//                String sql = """
+//                SELECT DISTINCT
+//                     pu.national_id,
+//                     pu.full_name AS patient_name,
+//                     pu.gender,
+//                     p.date_of_birth,
+//                     p.medical_history,
+//                     p.user_id AS patient_user_id
+//                FROM appointments a
+//                JOIN doctors d  ON d.id = a.doctor_id
+//                JOIN users   du ON du.id = d.user_id      -- doctor user
+//                JOIN patients p ON p.id = a.patient_id
+//                JOIN users   pu ON pu.id = p.user_id      -- patient user
+//                WHERE du.id = ?
+//                ORDER BY pu.full_name;
+//                """;
+                String sql = """
+    WITH last_appt AS (
+        SELECT a.patient_id, MAX(a.appointment_date) AS last_dt
+        FROM appointments a
+        JOIN doctors d  ON d.id = a.doctor_id
+        JOIN users   du ON du.id = d.user_id
+        WHERE du.id = ?                -- الدكتور الحالي
+        GROUP BY a.patient_id
+    )
+    SELECT
+         pu.national_id,
+         pu.full_name AS patient_name,
+         pu.gender,
+         p.date_of_birth,
+         p.medical_history,
+         p.user_id AS patient_user_id
+    FROM last_appt la
+    JOIN patients p ON p.id = la.patient_id
+    JOIN users   pu ON pu.id = p.user_id
+    ORDER BY la.last_dt DESC
+    LIMIT 5;
+""";
+
+                try (var ps = c.prepareStatement(sql)) {
+                    ps.setLong(1, u.getId());
+                    try (var rs = ps.executeQuery()) {
+                        while (rs.next()) {
+                            String nid    = rs.getString("national_id");
+                            String name   = rs.getString("patient_name");
+                            String gender = rs.getString("gender");
+                            java.sql.Date dob = rs.getDate("date_of_birth");
+                            String mh     = rs.getString("medical_history");
+                            int age = (dob == null) ? 0 : ageFromDob(dob.toLocalDate());
+                            rows.add(new PatientRow(name, nid, gender, age, mh));
+                        }
+                    }
+                }
+            } catch (Exception ex) {
+                err = ex;
+            }
+
+            // لمس الـ UI داخل الـ FX thread فقط
+            Exception finalErr = err;
+            Platform.runLater(() -> {
+                if (finalErr != null) {
+                    showWarn("Patients", "Failed to load patients: " + finalErr.getMessage());
+                    return;
+                }
+                // حدّث المصدر فقط (مش table.getItems())
+                patientData.setAll(rows);
+            });
+        }, "doc-all-patients").start();
+    }
+
+
     /* ================= Header time & date (12h) ================= */
     private static final java.time.ZoneId APP_TZ = java.time.ZoneId.of("Asia/Gaza");
 
@@ -545,31 +645,73 @@ public class DoctorController {
      * Clear the draft prescription items table and return to Dashboard.
      * Triggered by the doctor pressing the "sendToPharmacy" button.
      */
+    /**
+     * عند الإرسال للصيدلية: ننشئ الوصفة فعليًا (status=PENDING) ونحفظ عناصرها.
+     */
     private void handleSendToPharmacy() {
-        try {
-            // Clear the TableView content (visible rows)
-            if (TablePrescriptionItems != null) {
-                TablePrescriptionItems.getItems().clear();
-                TablePrescriptionItems.getSelectionModel().clearSelection();
-            }
-            // Clear the in-memory draft list (data source)
-            if (prescItemsEditable != null) {
-                prescItemsEditable.clear();
-            }
-            // Reset transient editing context
-            editingRow = null;
-            currentPrescriptionId = null;
-            selectedPatientUserId = null;
-            selectedPatientName = null;
-            selectedPatientNationalId = null;
-        } catch (Exception ex) {
-            // Non-fatal: show a small warning and continue to dashboard
-            showWarn("Prescription", "Failed to reset draft items: " + ex.getMessage());
+        // لازم نعرف لأي وصفة نشتغل
+        if (currentPrescriptionId == null) {
+            showWarn("Prescription", "No draft prescription. Please open/create a prescription first.");
+            return;
         }
-        // Navigate back to the dashboard view
-        showDashboardPane();
+        // تأكيد أن فيه بنود أصلاً (اختياري لكن مفيد)
+        try (Connection c = Database.get()) {
+            // هل فيها عناصر؟
+            int itemCount = 0;
+            try (var ps = c.prepareStatement(
+                    "SELECT COUNT(*) FROM prescription_items WHERE prescription_id = ?")) {
+                ps.setLong(1, currentPrescriptionId);
+                try (var rs = ps.executeQuery()) { if (rs.next()) itemCount = rs.getInt(1); }
+            }
+            if (itemCount == 0) {
+                showWarn("Prescription", "No items yet. Please add at least one medicine.");
+                return;
+            }
+
+            // ارفع الحالة من DRAFT إلى PENDING (لو كانت أصلاً PENDING ما بصير شيء)
+            int updated;
+            try (var ps = c.prepareStatement(
+                    "UPDATE prescriptions " +
+                            "   SET status = 'PENDING' " +
+                            " WHERE id = ? AND status = 'DRAFT'")) {
+                ps.setLong(1, currentPrescriptionId);
+                updated = ps.executeUpdate();
+            }
+
+            if (updated > 0) {
+                toast("Prescription is now PENDING and visible to Pharmacy.", "ok");
+            } else {
+                // غالبًا كانت PENDING أصلًا
+                toast("Prescription already sent (PENDING).", "info");
+            }
+
+            // تنظيف واجهة (اختياري)
+            showDashboardPane();
+
+        } catch (Exception ex) {
+            showWarn("Prescription", "Failed to send: " + ex.getMessage());
+        }
     }
 
+    private static int safeGetInt(java.util.concurrent.Callable<Integer> getter) {
+        try {
+            Integer v = getter.call();          // لو عندك getter يرجع Integer
+            return (v == null ? 0 : v);
+        } catch (Exception ignore) {
+            return 0;                           // لو getter يرجع primitive int أو رمى خطأ
+        }
+    }
+
+    private static void setNullableInt(java.sql.PreparedStatement ps, int idx, int value) throws java.sql.SQLException {
+        if (value == 0) {
+            ps.setNull(idx, java.sql.Types.INTEGER);  // اعتبر 0 = غير مُدخل
+        } else {
+            ps.setInt(idx, value);
+        }
+    }
+    private static void setNullableInt(PreparedStatement ps, int idx, Integer value) throws SQLException {
+        if (value == null) ps.setNull(idx, Types.INTEGER); else ps.setInt(idx, value);
+    }
     private void goBackToLogin() {
         Stage stage = (Stage) BackButton.getScene().getWindow();
         try {
@@ -1175,6 +1317,8 @@ public class DoctorController {
 
     private void wireAppointmentsTable() {
         if (AppointmentsTable == null) return;
+        // Ensure combobox.css is loaded and all ComboBoxes get "hf-combo" class
+        attachComboCss(AppointmentsTable);
 //        AppointmentsTable
         // أعمدة البيانات
         if (colPatientName != null) colPatientName.setCellValueFactory(new PropertyValueFactory<>("patientName"));
@@ -1326,14 +1470,35 @@ public class DoctorController {
                     btnCancel.setDisable(true);
                 });
 
+//                btnPresc.setOnAction(e -> {
+//                    playPressAnim(btnPresc);
+//                    AppointmentRow r = getItem();
+//                    if (r == null) return;
+//
+//                    // لا تنشئ وصفة في الداتابيز هنا
+//                    currentPrescriptionId = null;                              // مسودة فقط
+//
+//                    // احفظ سياق المريض من سطر الموعد
+//                    selectedPatientUserId      = (r.getPatientUserId() > 0) ? r.getPatientUserId() : null;
+//                    selectedPatientName        = r.getPatientName();
+//                    selectedPatientNationalId  = r.getNationalId();
+//
+//                    // نظافة لمسودة العناصر
+//                    if (prescItemsEditable != null) prescItemsEditable.clear();
+//
+//                    // افتح واجهة الوصفة (بدون تحميل عناصر من DB لأنها مسودة)
+//                    showPrescriptionPane();
+//
+//                    // حدِّث الهيدر
+//                    Platform.runLater(() -> setPatientHeader(r.getPatientName(), r.getNationalId(), false));
+//                });
                 btnPresc.setOnAction(e -> {
                     playPressAnim(btnPresc);
-                    AppointmentRow r = getItem();
-                    if (r == null) return;
-                    // يفتح واجهة الوصفة ويعرض الأصناف إن وُجدت
-                    openPrescriptionForAppointment(r);
-//                    openPrescription(r);
+                    AppointmentRow row = getItem();
+                    if (row == null) return;
+                    openPrescriptionForAppointment(row);
                 });
+
             }
 
             @Override
@@ -1387,30 +1552,97 @@ public class DoctorController {
             showWarn("Complete", "Failed to update DB: " + ex.getMessage());
         }
     }
+    /** Wire searchLabel to a hybrid (local + DB) search for patientTable with debounce. */
+    private void wirePatientHybridSearch() {
+        if (searchLabel == null) return;
 
-    //    private void cancelAppointment(AppointmentRow row) {
-    //        if (row == null) return;
-    //        try {
-    //            boolean ok = doctorDAO.cancelAppointment(row.getId());
-    //            if (ok) {
-    //                // remove from UI list entirely as requested
-    //                apptData.remove(row);
-    //                // Reload table for the currently selected dashboard date
-    //                loadTodayAppointmentsAsync();
-    //                if (AppointmentsTable != null) AppointmentsTable.refresh();
-    //                toast("Appointment cancelled.", "ok");
-    //                var _dashDate = (datePickerPatientsWithDoctorDash != null && datePickerPatientsWithDoctorDash.getValue() != null)
-    //                        ? datePickerPatientsWithDoctorDash.getValue()
-    //                        : java.time.ZonedDateTime.now(APP_TZ).toLocalDate();
-    //                loadStatsForDateAsync(_dashDate);
-    //            } else {
-    //                showWarn("Cancel", "Could not cancel appointment.");
-    //            }
-    //        } catch (Exception ex) {
-    //            showWarn("Cancel", "Failed to update DB: " + ex.getMessage());
-    //        }
-    //    }
+        // 350ms debounce single keyframe
+        patientSearchDebounce.getKeyFrames().setAll(new KeyFrame(Duration.millis(350), ev -> {
+            hybridPatientSearchNow();
+        }));
 
+        // Text change triggers debounce — تعمل حتى لو بحثت وانت على تبويب المرضى
+        searchLabel.textProperty().addListener((obs, ov, nv) -> {
+            lastPatientSearchText = (nv == null) ? "" : nv.trim();
+            patientSearchDebounce.playFromStart();
+        });
+
+        // ENTER triggers immediate search
+        searchLabel.setOnAction(e -> hybridPatientSearchNow());
+    }
+
+    /** Run the hybrid search immediately using current searchLabel text. */
+    private void hybridPatientSearchNow() {
+        final String q = (searchLabel == null) ? "" : searchLabel.getText().trim();
+        if (q.isEmpty()) {
+            // لا تغيّر binding — فقط أعد الفلتر للوضع الافتراضي
+            if (filtered != null) {
+                filtered.setPredicate(r -> true);
+            }
+            return;
+        }
+
+        // 1) فلترة محلية أولًا
+        List<PatientRow> local = filterLocalPatients(q);
+        if (!local.isEmpty()) {
+            if (patientTable != null) patientData.setAll(local);
+            return;
+        }
+
+        // 2) لو ما في نتائج محلية أو الاستعلام طويل → DB
+        if (q.length() < 3) {
+            // نتجنّب ضرب الداتابيز باستعلامات قصيرة جدًا إلا إذا ما في محلي
+            return;
+        }
+        runDbPatientSearchAsync(q, 50);
+    }
+
+    /** Filter current in-memory patients (patientData) by query. */
+    private List<PatientRow> filterLocalPatients(String q) {
+        String needle = (q == null) ? "" : q.trim().toLowerCase();
+        if (needle.isEmpty()) return List.of();
+
+        List<PatientRow> out = new java.util.ArrayList<>();
+        for (PatientRow r : patientData) {
+            if (r == null) continue;
+            String name = nullToEmpty(r.getFullName()).toLowerCase();
+            String nid  = nullToEmpty(r.getNationalId()).toLowerCase();
+            String phone = nullToEmpty(r.getPhone()).toLowerCase();
+            if (name.contains(needle) || nid.contains(needle) || phone.contains(needle)) {
+                out.add(r);
+            }
+        }
+        return out;
+    }
+
+    /** Execute DB search on background thread and update patientTable on FX thread. */
+    private void runDbPatientSearchAsync(String q, int limit) {
+        new Thread(() -> {
+            Exception err = null;
+            List<com.example.healthflow.model.PatientRow> rows = java.util.Collections.emptyList();
+            try {
+                com.example.healthflow.dao.PatientJdbcDAO dao = new com.example.healthflow.dao.PatientJdbcDAO();
+                rows = dao.searchByQuery(q, Math.max(1, limit));
+            } catch (Exception ex) {
+                err = ex;
+            }
+            final List<com.example.healthflow.model.PatientRow> result = rows;
+            final Exception fErr = err;
+            Platform.runLater(() -> {
+                if (patientTable != null) {
+                    if (!result.isEmpty()) {
+                        patientData.setAll(result);
+                        if (filtered != null) filtered.setPredicate(r -> true); // رجّع الفلتر للوضع الطبيعي
+                    } else if (fErr != null) {
+                        toast("DB search failed: " + fErr.getMessage(), "warn");
+                    } else {
+                        // No matches
+                        patientData.clear();
+                    }
+                }
+            });
+        }, "patients-db-search").start();
+    }
     /**
      * Cancel appointment in DB then update UI; leaves Prescription enabled.
      */
@@ -1448,61 +1680,61 @@ public class DoctorController {
                 + "\nPatient: " + safe(row.getPatientName()));
     }
 
-    /**
-     * Open prescription page for the selected appointment: ensures prescription exists and fills header.
-     */
     private void openPrescriptionForAppointment(AppointmentRow row) {
         if (row == null) return;
+
         try (Connection c = Database.get()) {
-            // Resolve doctor id (doctors.id) from current user
             var u = com.example.healthflow.service.AuthService.Session.get();
-            if (u == null) {
-                showWarn("Prescription", "No logged-in user.");
-                return;
-            }
+            if (u == null) { showWarn("Prescription", "No logged-in user."); return; }
+
             Long doctorId = doctorDAO.findDoctorIdByUserId(c, u.getId());
             if (doctorId == null) {
                 doctorDAO.ensureProfileForUser(c, u.getId());
                 doctorId = doctorDAO.findDoctorIdByUserId(c, u.getId());
             }
-            if (doctorId == null) {
-                showWarn("Prescription", "Doctor profile missing.");
-                return;
-            }
+            if (doctorId == null) { showWarn("Prescription", "Doctor profile missing."); return; }
 
-            // Translate patient user id -> patients.id; fallback by national id if user id is missing
+            // resolve patient_user_id (by id, or fallback by NID)
             Long patientUserId = (row.getPatientUserId() > 0) ? row.getPatientUserId() : null;
             if (patientUserId == null && row.getNationalId() != null && !row.getNationalId().isBlank()) {
                 patientUserId = doctorDAO.findPatientUserIdByNationalId(c, row.getNationalId());
             }
-            if (patientUserId == null) {
-                showWarn("Prescription", "Patient user id not found for this appointment.");
-                return;
-            }
+            if (patientUserId == null) { showWarn("Prescription", "Patient user id not found."); return; }
+
             Long patientId = doctorDAO.findPatientIdByUserId(c, patientUserId);
-            if (patientId == null) {
-                showWarn("Prescription", "Patient profile not found.");
-                return;
+            if (patientId == null) { showWarn("Prescription", "Patient profile not found."); return; }
+
+            // ❶ ابحث فقط عن وصفة موجودة لهذا الموعد – لا تُنشئ إن لم توجد
+            Long existingPrescId = null;
+            try (var ps = c.prepareStatement(
+                    "SELECT id FROM prescriptions " +
+                            "WHERE appointment_id = ? AND doctor_id = ? AND patient_id = ? " +
+                            "ORDER BY id DESC LIMIT 1")) {
+                ps.setLong(1, row.getId());
+                ps.setLong(2, doctorId);
+                ps.setLong(3, patientId);
+                try (var rs = ps.executeQuery()) {
+                    if (rs.next()) existingPrescId = rs.getLong(1);
+                }
             }
 
-            // Ensure prescription for this appointment, then cache context and navigate to the pane
-            long prescId = new PrescriptionDAO().ensurePrescriptionForAppointment(c, row.getId(), doctorId, patientId);
-            this.currentPrescriptionId = prescId;
+            // خزّن سياق المريض
             this.selectedPatientUserId = patientUserId;
-            this.selectedPatientName = row.getPatientName();
+            this.selectedPatientName   = row.getPatientName();
             this.selectedPatientNationalId = row.getNationalId();
 
-            // Ensure pack suggestions exist before loading items so colPack won't show "—"
-            try (Connection c2 = Database.get()) {
-                c2.setAutoCommit(true);
-                new com.example.healthflow.dao.PrescriptionItemDAO().backfillSuggestions(c2, this.currentPrescriptionId);
-            } catch (Exception ignore) {
+            // ❷ إن وُجدت وصفة، حمّل عناصرها – وإلا اذهب لمسودة فارغة
+            if (existingPrescId != null) {
+                this.currentPrescriptionId = existingPrescId;
+                showPrescriptionPane();
+                loadPrescriptionItemsFromDb(existingPrescId);
+            } else {
+                this.currentPrescriptionId = null;   // مسودة فقط
+                if (prescItemsEditable != null) prescItemsEditable.clear();
+                showPrescriptionPane();
             }
 
-            showPrescriptionPane();
-            loadPrescriptionItemsFromDb(currentPrescriptionId);
             Platform.runLater(() -> setPatientHeader(row.getPatientName(), row.getNationalId(), false));
-//            toast("Prescription #" + prescId + " ready.", "ok");
         } catch (Exception ex) {
             showError("Open Prescription", ex);
         }
@@ -1796,54 +2028,38 @@ public class DoctorController {
                         }
                     });
 
+//                    btnPresc.setOnAction(e -> {
+//                        PatientRow row = getItem();
+//                        if (row == null) return;
+//
+//                        // مسودة: لا تنشئ وصفة في الداتابيز
+//                        currentPrescriptionId = null;
+//
+//                        // سياق المريض
+//                        selectedPatientUserId      = (row.getUserId() > 0) ? row.getUserId() : null;
+//                        selectedPatientName        = row.getFullName();
+//                        selectedPatientNationalId  = row.getNationalId();
+//
+//                        // نظافة للمسودة
+//                        if (prescItemsEditable != null) prescItemsEditable.clear();
+//
+//                        // افتح واجهة الوصفة كمسودة
+//                        showPrescriptionPane();
+//
+//                        // حدِّث الهيدر + تحسين تجربة الكتابة في الاسم
+//                        Platform.runLater(() -> {
+//                            setPatientHeader(row.getFullName(), row.getNationalId(), false);
+//                            if (PatientNameTF != null) {
+//                                PatientNameTF.positionCaret(PatientNameTF.getText().length());
+//                            }
+//                        });
+//                    });
                     btnPresc.setOnAction(e -> {
                         PatientRow row = getItem();
                         if (row == null) return;
-                        // persist selection
-                        Long pid = null;
-                        if (row.getUserId() > 0) {
-                            pid = Long.valueOf(row.getUserId());
-                        } else {
-                            pid = fallbackResolvePatientIdFromAppointments(row);
-                        }
-                        selectedPatientUserId = pid; // may be null -> handled later in ensureDraftPrescription()
-                        selectedPatientName = row.getFullName();
-                        selectedPatientNationalId = row.getNationalId();
-
-//                        System.out.println("[PRESCRIPTION BUTTON] Stored -> userId=" + selectedPatientUserId
-//                                + ", name=" + selectedPatientName
-//                                + ", NID=" + selectedPatientNationalId);
-
-                        // If userId is still null, try DB lookup by national id immediately
-                        if (selectedPatientUserId == null && selectedPatientNationalId != null && !selectedPatientNationalId.isBlank()) {
-                            try (Connection c = Database.get()) {
-                                Long uid = doctorDAO.findPatientUserIdByNationalId(c, selectedPatientNationalId);
-                                if (uid != null && uid > 0) {
-                                    selectedPatientUserId = uid;
-//                                    System.out.println("[PRESCRIPTION BUTTON] DB lookup by NID succeeded -> userId=" + selectedPatientUserId);
-                                } else {
-//                                    System.out.println("[PRESCRIPTION BUTTON] DB lookup by NID failed (no match).");
-                                }
-                            } catch (Exception ex) {
-//                                System.out.println("[PRESCRIPTION BUTTON] DB lookup by NID error: " + ex.getMessage());
-                            }
-                        }
-
-                        // reset any previous draft so a new one is created for this patient
-                        currentPrescriptionId = null;
-                        // افتح واجهة الوصفة عبر الدالة التي تعمل backfill قبل التحميل
-                        openPrescriptionFromItems();
-                        // ثم حدّث الهيدر بعد العرض
-                        Platform.runLater(() -> {
-                            setPatientHeader(row.getFullName(), row.getNationalId(), false);
-                            if (PatientNameTF != null) {
-                                PatientNameTF.positionCaret(PatientNameTF.getText().length());
-                            }
-                        });
-                        if (selectedPatientUserId == null) {
-                            toast("Patient selected (no user id yet). If add fails, choose from Appointments or type National ID in header.", "warn");
-                        }
+                        openPrescriptionForPatient(row);   // دالة جديدة بالأسفل
                     });
+
                 }
 
                 @Override
@@ -1853,6 +2069,8 @@ public class DoctorController {
                     setGraphic(empty ? null : box);
                 }
             });
+
+            loadAllPatientsForDoctorAsync();
         }
         // توزيع أبعاد الأعمدة كنِسَب من عرض الجدول ليتكيّف مع الشاشة
 //        if (patientTable != null) {
@@ -1869,6 +2087,16 @@ public class DoctorController {
 //                colAction2.setMinWidth(90);
 //            }
 //        }
+
+        // --- Bind patients table to filtered/sorted wrappers (one-time) ---
+        if (filtered == null) {
+            filtered = new javafx.collections.transformation.FilteredList<>(patientData, r -> true);
+        }
+        if (sorted == null) {
+            sorted = new javafx.collections.transformation.SortedList<>(filtered);
+            patientTable.setItems(sorted);
+            sorted.comparatorProperty().bind(patientTable.comparatorProperty());
+        }
         // سياسة توزيع الأعمدة بحيث تملأ العرض وتُفَعِّل سكرول تلقائي
         patientTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
 
@@ -1884,6 +2112,69 @@ public class DoctorController {
         patientTable.setMinHeight(120);      // حد أدنى حتى لا يتمدّد بلا داعٍ
 
         patientTable.setItems(patientData);
+    }
+
+    /**
+     * افتح واجهة الوصفة للمريض (من جدول المرضى) بدون إنشاء وصفة جديدة.
+     * يبحث عن آخر وصفة "اليوم" لنفس الدكتور والمريض؛ إن لم توجد يفتح مسودة فارغة.
+     */
+    private void openPrescriptionForPatient(PatientRow row) {
+        try (Connection c = Database.get()) {
+            var u = Session.get();
+            if (u == null) { showWarn("Prescription", "No logged-in user."); return; }
+
+            Long doctorId = doctorDAO.findDoctorIdByUserId(c, u.getId());
+            if (doctorId == null) {
+                doctorDAO.ensureProfileForUser(c, u.getId());
+                doctorId = doctorDAO.findDoctorIdByUserId(c, u.getId());
+            }
+            if (doctorId == null) { showWarn("Prescription", "Doctor profile missing."); return; }
+
+            // resolve patient_user_id
+            Long patientUserId = (row.getUserId() > 0) ? row.getUserId() : null;
+            if (patientUserId == null && row.getNationalId() != null && !row.getNationalId().isBlank()) {
+                patientUserId = doctorDAO.findPatientUserIdByNationalId(c, row.getNationalId());
+            }
+            if (patientUserId == null) { showWarn("Prescription", "Patient user id not found."); return; }
+
+            Long patientId = doctorDAO.findPatientIdByUserId(c, patientUserId);
+            if (patientId == null) { showWarn("Prescription", "Patient profile not found."); return; }
+
+            // ابحث عن وصفة موجودة اليوم لنفس الدكتور والمريض (اختياري: ORDER BY id DESC)
+            Long existingPrescId = null;
+            try (var ps = c.prepareStatement(
+                    "SELECT id FROM prescriptions " +
+                            "WHERE doctor_id=? AND patient_id=? AND created_at::date = CURRENT_DATE " +
+                            "ORDER BY id DESC LIMIT 1")) {
+                ps.setLong(1, doctorId);
+                ps.setLong(2, patientId);
+                try (var rs = ps.executeQuery()) {
+                    if (rs.next()) existingPrescId = rs.getLong(1);
+                }
+            }
+
+            // خزّن سياق المريض للـ UI
+            this.selectedPatientUserId     = patientUserId;
+            this.selectedPatientName       = row.getFullName();
+            this.selectedPatientNationalId = row.getNationalId();
+
+            if (existingPrescId != null) {
+                this.currentPrescriptionId = existingPrescId;
+                showPrescriptionPane();
+                loadPrescriptionItemsFromDb(existingPrescId);
+            } else {
+                this.currentPrescriptionId = null;          // مسودة
+                if (prescItemsEditable != null) prescItemsEditable.clear();
+                showPrescriptionPane();
+            }
+
+            Platform.runLater(() -> {
+                setPatientHeader(row.getFullName(), row.getNationalId(), false);
+                if (PatientNameTF != null) PatientNameTF.positionCaret(PatientNameTF.getText().length());
+            });
+        } catch (Exception ex) {
+            showWarn("Prescription", "Open failed: " + ex.getMessage());
+        }
     }
 
     private void wireSearch() {
@@ -2383,15 +2674,16 @@ private void wirePrescriptionItemsTable() {
     /**
      * Ensure draft prescription exists in DB and return its id (creates one if missing).
      */
+    // بديل مباشر بدون تغيير التوقيع ولا أماكن الاستدعاء
     private Long ensureDraftPrescription() throws Exception {
         if (currentPrescriptionId != null) return currentPrescriptionId;
 
         var u = Session.get();
         if (u == null) throw new IllegalStateException("No logged-in user.");
-        Long patientId = resolveCurrentPatientId();
 
-        // If not resolved, try to create a minimal patient from header "name • NID"
-        if (patientId == null) {
+        // 1) حدد المريض من السياق الحالي أو أنشئه من الهيدر (name • NID)
+        Long patientUserId = resolveCurrentPatientId();
+        if (patientUserId == null) {
             Long maybeCreatedUserId;
             try {
                 maybeCreatedUserId = ensurePatientFromHeaderIfPossible(Database.get());
@@ -2399,16 +2691,19 @@ private void wirePrescriptionItemsTable() {
                 maybeCreatedUserId = null;
             }
             if (maybeCreatedUserId != null) {
-                patientId = maybeCreatedUserId;
+                patientUserId = maybeCreatedUserId;
             }
+        }
+        if (patientUserId == null) {
+            toast("Enter patient National ID in the header field or choose a patient from the list.", "warn");
+            throw new IllegalStateException("No patient selected.");
         }
 
         try (Connection c = Database.get()) {
             c.setAutoCommit(true);
-            PrescriptionDAO pDao = new PrescriptionDAO();
-            DoctorDAO dDao = new DoctorDAO();
 
-            // resolve doctors.id (NOT users.id). Create profile if missing.
+            // 2) resolve doctors.id (مش users.id)
+            DoctorDAO dDao = new DoctorDAO();
             Long doctorId = dDao.findDoctorIdByUserId(c, u.getId());
             if (doctorId == null) {
                 dDao.ensureProfileForUser(c, u.getId());
@@ -2418,25 +2713,31 @@ private void wirePrescriptionItemsTable() {
                 throw new IllegalStateException("Doctor profile not found/created for user " + u.getId());
             }
 
-            // translate patient user id -> patients.id
-            if (patientId == null) {
-                toast("Enter patient National ID in the header field or choose a patient from the list.", "warn");
-                throw new IllegalStateException("No patient selected.");
-            }
-            Long realPatientId = dDao.findPatientIdByUserId(c, patientId);
+            // 3) ترجم user_id -> patients.id
+            Long realPatientId = dDao.findPatientIdByUserId(c, patientUserId);
             if (realPatientId == null) {
-                throw new IllegalStateException("Patient profile not found for userId=" + patientId + " (patients.id lookup failed)");
+                throw new IllegalStateException("Patient profile not found for userId=" + patientUserId + " (patients.id lookup failed)");
             }
 
+            // 4) خُذ التشخيص من الهيدر (نخزّنه في prescriptions.notes)
             String diagnosisText = (DiagnosisTF != null) ? DiagnosisTF.getText() : null;
 
-            // pass doctors.id and patients.id (FK-safe)
-            var p = pDao.create(c, null, doctorId, realPatientId, diagnosisText);
-            currentPrescriptionId = p.getId();
+            // 5) أنشئ وصفة بحالة DRAFT (بدون موعد)
+            try (var ps = c.prepareStatement(
+                    "INSERT INTO prescriptions (appointment_id, doctor_id, patient_id, pharmacist_id, status, notes) " +
+                            "VALUES (NULL, ?, ?, NULL, 'DRAFT', ?) RETURNING id")) {
+                ps.setLong(1, doctorId);
+                ps.setLong(2, realPatientId);
+                ps.setString(3, (diagnosisText == null || diagnosisText.isBlank()) ? null : diagnosisText.trim());
+                try (var rs = ps.executeQuery()) {
+                    rs.next();
+                    currentPrescriptionId = rs.getLong(1);
+                }
+            }
+
             toast("Draft prescription #" + currentPrescriptionId + " created.", "ok");
             return currentPrescriptionId;
         }
-
     }
 
     /**
@@ -3160,96 +3461,6 @@ private void wirePrescriptionItemsTable() {
 
     }
 
-    public static class PatientRow {
-        private final StringProperty nationalId = new SimpleStringProperty();
-        private final StringProperty fullName = new SimpleStringProperty();
-        private final StringProperty gender = new SimpleStringProperty();
-        private final IntegerProperty age = new SimpleIntegerProperty();
-        private final StringProperty medicalHistory = new SimpleStringProperty();
-        private final LongProperty userId = new SimpleLongProperty(0);
-
-        public PatientRow(String nid, String name, String gender, int age, String history) {
-            setNationalId(nid);
-            setFullName(name);
-            setGender(gender);
-            setAge(age);
-            setMedicalHistory(history);
-        }
-
-        public String getNationalId() {
-            return nationalId.get();
-        }
-
-        public void setNationalId(String v) {
-            nationalId.set(v);
-        }
-
-        public StringProperty nationalIdProperty() {
-            return nationalId;
-        }
-
-        public String getFullName() {
-            return fullName.get();
-        }
-
-        public void setFullName(String v) {
-            fullName.set(v);
-        }
-
-        public StringProperty fullNameProperty() {
-            return fullName;
-        }
-
-        public String getGender() {
-            return gender.get();
-        }
-
-        public void setGender(String v) {
-            gender.set(v);
-        }
-
-        public StringProperty genderProperty() {
-            return gender;
-        }
-
-        public int getAge() {
-            return age.get();
-        }
-
-        public void setAge(int v) {
-            age.set(v);
-        }
-
-        public IntegerProperty ageProperty() {
-            return age;
-        }
-
-        public String getMedicalHistory() {
-            return medicalHistory.get();
-        }
-
-        public void setMedicalHistory(String v) {
-            medicalHistory.set(v);
-        }
-
-        public StringProperty medicalHistoryProperty() {
-            return medicalHistory;
-        }
-
-        public long getUserId() {
-            return userId.get();
-        }
-
-        public void setUserId(long v) {
-            userId.set(v);
-        }
-
-        public LongProperty userIdProperty() {
-            return userId;
-        }
-    }
-
-
     // ===== Helper for live calculation of quantity label =====
     private void setupQtyLiveLabel() {
         System.out.println("[qty] label=" + (qtyLabelCulc != null) +
@@ -3293,6 +3504,45 @@ private void wirePrescriptionItemsTable() {
         return "units";
     }
 
+    private void attachComboCss(javafx.scene.Parent root) {
+        if (root == null) return;
+        final String cssPath = "/com/example/healthflow/Design/combobox.css";
+        var url = getClass().getResource(cssPath);
+        if (url != null) {
+            String css = url.toExternalForm();
+            if (root.getScene() != null) {
+                var list = root.getScene().getStylesheets();
+                if (!list.contains(css)) list.add(css);
+            } else {
+                root.sceneProperty().addListener((obs, oldS, newS) -> {
+                    if (newS != null && !newS.getStylesheets().contains(css)) {
+                        newS.getStylesheets().add(css);
+                    }
+                });
+            }
+        }
+        // وسّم كل الـ ComboBox بـ "hf-combo" (الحاليّة والتي ستُنشأ لاحقًا في خلايا الجداول)
+        javafx.application.Platform.runLater(() -> {
+            try {
+                for (javafx.scene.Node n : root.lookupAll(".combo-box")) {
+                    if (n.getStyleClass() != null && !n.getStyleClass().contains("hf-combo")) {
+                        n.getStyleClass().add("hf-combo");
+                    }
+                }
+                // كرر الوسم بعد كل layout pulse (للكومبوبوكس المتولدة من CellFactory لاحقًا)
+                root.sceneProperty().addListener((o, oldS, newS) -> {
+                    if (newS == null) return;
+                    newS.addPostLayoutPulseListener(() -> {
+                        for (javafx.scene.Node n : root.lookupAll(".combo-box")) {
+                            if (n.getStyleClass() != null && !n.getStyleClass().contains("hf-combo")) {
+                                n.getStyleClass().add("hf-combo");
+                            }
+                        }
+                    });
+                });
+            } catch (Throwable ignore) { }
+        });
+    }
 
 
 }

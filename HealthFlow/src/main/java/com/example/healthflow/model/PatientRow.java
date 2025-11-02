@@ -15,6 +15,18 @@ public class PatientRow {
     private final ObjectProperty<LocalDate> dateOfBirth = new SimpleObjectProperty<>();
     private final StringProperty gender = new SimpleStringProperty();
     private final StringProperty medicalHistory = new SimpleStringProperty();
+    private final IntegerProperty age = new SimpleIntegerProperty();
+
+    public int getAge() {
+        return age.get();
+    }
+    private void setAge(int age) {
+        this.age.set(Math.max(0, age)); // يمنع القيم السالبة
+    }
+
+    public IntegerProperty ageProperty() {
+        return age;
+    }
 
     public PatientRow(Long patientId, Long userId, String fullName, String nationalId,
                       String phone, LocalDate dob, String gender, String medicalHistory) {
@@ -27,6 +39,16 @@ public class PatientRow {
         setGender(gender);
         setMedicalHistory(medicalHistory);
     }
+
+    public PatientRow(String nid, String name, String gender, int age, String history) {
+            setNationalId(nid);
+            setFullName(name);
+            setGender(gender);
+            setAge(age);
+            setMedicalHistory(history);
+        }
+
+
 
     public long getPatientId() { return patientId.get(); }
     public void setPatientId(long v) { patientId.set(v); }
