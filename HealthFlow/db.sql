@@ -971,3 +971,5 @@ ALTER TABLE medicines
             ) STORED;
 END IF;
 END $$;
+
+ALTER TYPE med_unit ADD VALUE IF NOT EXISTS 'SPRAY';

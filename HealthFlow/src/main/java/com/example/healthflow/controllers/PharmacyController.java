@@ -11,17 +11,17 @@ import com.example.healthflow.model.dto.PrescItemRow;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
-import java.time.Instant;
 import java.time.LocalDate;
 import javafx.application.Platform;
+import javafx.beans.property.SimpleStringProperty;
 import javafx.concurrent.Task;
 import javafx.animation.PauseTransition;
 import javafx.scene.Cursor;
 import com.example.healthflow.core.packaging.PackagingSupport;
 import com.example.healthflow.core.packaging.PackagingSupport.PackagingInfo;
 import com.example.healthflow.core.packaging.PackagingSupport.PackSuggestion;
-import com.example.healthflow.db.notify.DbNotifications;
 
+import javafx.scene.layout.GridPane;
 import javafx.util.Duration;
 import com.example.healthflow.net.ConnectivityMonitor;
 import com.example.healthflow.ui.ConnectivityBanner;
@@ -33,12 +33,9 @@ import javafx.scene.layout.VBox;
 import javafx.scene.layout.AnchorPane;
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
-import javafx.util.Duration;
-import javafx.beans.value.ChangeListener;
 import org.controlsfx.control.SegmentedButton;
 import org.kordamp.ikonli.javafx.FontIcon;
 import javafx.scene.input.MouseEvent;
-import javafx.event.ActionEvent;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.scene.control.cell.PropertyValueFactory;
@@ -313,9 +310,19 @@ public class PharmacyController {
 
     @FXML
     private TextField searchOnInentory;
+    @FXML
+    private TextArea descriptionTf;
 
     @FXML
     private SegmentedButton segInv;
+    @FXML private AnchorPane suggestPane;
+    @FXML private TableView<MedicineSuggestion> tblMedSuggest;
+    @FXML private TableColumn<MedicineSuggestion, String> colSuggName;
+    @FXML private TableColumn<MedicineSuggestion, String> colSuggStrength;
+
+    private final ObservableList<MedicineSuggestion> medSuggestions = FXCollections.observableArrayList();
+    private Long selectedMedicineId = null;
+    private final PauseTransition medDebounce = new PauseTransition(Duration.millis(200));
 
     @FXML
     private Label time;
@@ -334,7 +341,7 @@ public class PharmacyController {
     private final javafx.animation.PauseTransition dashCoalesce  = new javafx.animation.PauseTransition(javafx.util.Duration.millis(200));
     private final javafx.animation.PauseTransition itemsCoalesce = new javafx.animation.PauseTransition(javafx.util.Duration.millis(200));
     private final javafx.animation.PauseTransition invCoalesce   = new javafx.animation.PauseTransition(javafx.util.Duration.millis(200));
-
+    private volatile javafx.concurrent.Task<java.util.List<MedicineSuggestion>> currentMedTask;
 
     private static final class DashboardData {
         int total;
@@ -1531,6 +1538,11 @@ public class PharmacyController {
         if (ReceivePane != null) ReceivePane.setVisible(true);
         if (deductPane  != null) deductPane.setVisible(false);
         if (InventoryPane != null) InventoryPane.setVisible(false);
+        hideSuggest();
+        if (MedicineNameRecive != null) {
+            String t = MedicineNameRecive.getText();
+            if (t != null && t.trim().length() >= 2) queryMedSuggestions(t);
+        }
     }
 
     private void showInventoryDeductMode() {
@@ -1748,6 +1760,91 @@ public class PharmacyController {
             );
         }
         loadDashboardTable();
+
+    // This in Inventory
+    // Recive
+        if (tblMedSuggest != null) {
+            colSuggName.setCellValueFactory(c -> new javafx.beans.property.SimpleStringProperty(c.getValue().name));
+            colSuggStrength.setCellValueFactory(c -> new javafx.beans.property.SimpleStringProperty(c.getValue().strength));
+            tblMedSuggest.setItems(medSuggestions);
+
+            tblMedSuggest.setOnMouseClicked(e -> { if (e.getClickCount()==2) pickSelectedMedicine(); });
+            tblMedSuggest.setOnKeyPressed(e -> {
+                switch (e.getCode()) {
+                    case ENTER -> { pickSelectedMedicine(); e.consume(); }
+                    case ESCAPE -> hideSuggest();
+                }
+            });
+        }
+        // Ensure the suggestions table has a visible height
+        if (tblMedSuggest != null) {
+            tblMedSuggest.setPrefHeight(180);
+            tblMedSuggest.setMaxHeight(javafx.scene.layout.Region.USE_PREF_SIZE);
+            // If inside AnchorPane, anchor to all sides (safe even if not AnchorPane)
+            try {
+                javafx.scene.layout.AnchorPane.setTopAnchor(tblMedSuggest, 0.0);
+                javafx.scene.layout.AnchorPane.setLeftAnchor(tblMedSuggest, 0.0);
+                javafx.scene.layout.AnchorPane.setRightAnchor(tblMedSuggest, 0.0);
+                javafx.scene.layout.AnchorPane.setBottomAnchor(tblMedSuggest, 0.0);
+            } catch (Throwable ignored) {}
+        }
+
+        if (tblMedSuggest != null) {
+            colSuggName.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().name));
+            colSuggStrength.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().strength));
+            tblMedSuggest.setItems(medSuggestions);
+        }
+        hideSuggest(); // البداية مخفي
+
+    // إظهار/إخفاء الجدول بحسب النص
+        if (MedicineNameRecive != null) {
+            MedicineNameRecive.textProperty().addListener((obs, oldText, newText) -> {
+                String t = (newText == null) ? "" : newText.trim();
+
+                if (t.length() >= 1) {
+                    // أظهر القائمة فورًا
+                    showSuggest();
+                    // صف مؤقّت في الأعلى لحين رجوع نتائج الداتابيز
+                    java.util.ArrayList<MedicineSuggestion> pre = new java.util.ArrayList<>();
+                    pre.add(new MedicineSuggestion(-1, "➕ Add new: " + t, "", true));
+                    medSuggestions.setAll(pre);
+                } else {
+                    medSuggestions.clear();
+                    hideSuggest();
+                }
+
+                // شغّل البحث المؤجل (debounce)
+                medDebounce.stop();
+                medDebounce.setOnFinished(ev -> queryMedSuggestions(t));
+                medDebounce.playFromStart();
+            });
+
+            // اختصارات الكيبورد
+            MedicineNameRecive.setOnKeyPressed(e -> {
+                switch (e.getCode()) {
+                    case DOWN -> {
+                        showSuggest();
+                        if (tblMedSuggest != null) {
+                            tblMedSuggest.requestFocus();
+                            tblMedSuggest.getSelectionModel().selectFirst();
+                        }
+                    }
+                    case ENTER -> {
+                        if (tblMedSuggest != null && !medSuggestions.isEmpty()) {
+                            tblMedSuggest.getSelectionModel().selectFirst();
+                            pickSelectedMedicine();
+                            e.consume();
+                        }
+                    }
+                }
+            });
+        }
+
+
+        if (saveBtnReceive != null) {
+            saveBtnReceive.setOnAction(e -> onSaveReceive());
+        }
+
     }
     private void startPharmacyDbNotifications() {
         if (dbn != null) return; // already started
@@ -1793,4 +1890,514 @@ public class PharmacyController {
         dbn = null;
 //        System.out.println("[PharmacyController] DbNotifications stopped.");
     }
+
+    private void showSuggest()  {
+        if (suggestPane != null) {
+            suggestPane.setVisible(true);
+            suggestPane.setManaged(true);
+            suggestPane.toFront();
+            // Do NOT request focus to tblMedSuggest here (so typing doesn't stop)
+        }
+    }
+    private void hideSuggest()  {
+        if (suggestPane != null) {
+            suggestPane.setVisible(false);
+            suggestPane.setManaged(false);
+        }
+    }
+
+    private void pickSelectedMedicine() {
+        MedicineSuggestion s = tblMedSuggest.getSelectionModel().getSelectedItem();
+        if (s == null) return;
+
+        if (s.addNew) {
+            hideSuggest();
+            openAddMedicineDialog(MedicineNameRecive.getText().trim());
+            return;
+        }
+
+        selectedMedicineId = s.id;
+        MedicineNameRecive.setText(s.display());
+        hideSuggest();
+
+    }
+
+    // استعلام الاقتراحات (Async)
+    // يُنادى عليها عند الكتابة في MedicineNameRecive (مع debounce)
+    private void queryMedSuggestions(String q) {
+        if (q == null) q = "";
+        final String query = q.trim();
+        if (query.length() < 1) { medSuggestions.clear(); hideSuggest(); return; }
+
+        final String batchFilter = (batchNum != null && batchNum.getText()!=null) ? batchNum.getText().trim() : "";
+
+        // ألغِ أي مهمة سابقة لتفادي اللّاج على الكتابة السريعة
+        if (currentMedTask != null && currentMedTask.isRunning()) {
+            currentMedTask.cancel();
+        }
+
+        javafx.concurrent.Task<java.util.List<MedicineSuggestion>> task = new javafx.concurrent.Task<>() {
+            @Override protected java.util.List<MedicineSuggestion> call() throws Exception {
+                java.util.List<MedicineSuggestion> list = new java.util.ArrayList<>();
+                String like = "%" + query + "%";
+
+                boolean useBatch = !batchFilter.isBlank();
+                String sql = useBatch ? """
+                SELECT DISTINCT m.id,
+                       COALESCE(m.display_name, m.name) AS dn,
+                       COALESCE(m.strength,'') AS st
+                FROM medicines m
+                JOIN medicine_batches b ON b.medicine_id = m.id
+                WHERE (COALESCE(m.display_name, m.name) ILIKE ? OR m.name ILIKE ?)
+                  AND b.batch_no ILIKE ?
+                ORDER BY
+                  POSITION(LOWER(?) IN LOWER(COALESCE(m.display_name,m.name))) NULLS LAST,
+                  LENGTH(COALESCE(m.display_name,m.name)),
+                  COALESCE(m.display_name,m.name)
+                LIMIT 20
+            """ : """
+                SELECT m.id,
+                       COALESCE(m.display_name, m.name) AS dn,
+                       COALESCE(m.strength,'') AS st
+                FROM medicines m
+                WHERE (COALESCE(m.display_name, m.name) ILIKE ? OR m.name ILIKE ?)
+                ORDER BY
+                  POSITION(LOWER(?) IN LOWER(COALESCE(m.display_name,m.name))) NULLS LAST,
+                  LENGTH(COALESCE(m.display_name,m.name)),
+                  COALESCE(m.display_name,m.name)
+                LIMIT 20
+            """;
+
+                try (Connection c = Database.get();
+                     PreparedStatement ps = c.prepareStatement(sql)) {
+                    if (useBatch) {
+                        ps.setString(1, like);
+                        ps.setString(2, like);
+                        ps.setString(3, "%" + batchFilter + "%");
+                        ps.setString(4, query);
+                    } else {
+                        ps.setString(1, like);
+                        ps.setString(2, like);
+                        ps.setString(3, query);
+                    }
+                    try (ResultSet rs = ps.executeQuery()) {
+                        while (!isCancelled() && rs.next()) {
+                            list.add(new MedicineSuggestion(
+                                    rs.getLong("id"),
+                                    rs.getString("dn"),
+                                    rs.getString("st"),
+                                    false
+                            ));
+                        }
+                    }
+                }
+
+                // ثبت "Add new" كأول صف دائمًا
+                java.util.ArrayList<MedicineSuggestion> out = new java.util.ArrayList<>();
+                out.add(new MedicineSuggestion(-1, "➕ Add new: " + query, "", true));
+                out.addAll(list);
+                return out;
+            }
+        };
+
+        currentMedTask = task;
+
+        task.setOnSucceeded(ev -> {
+            if (task.isCancelled()) return;
+            medSuggestions.setAll(task.getValue());
+            showSuggest(); // يظهر من أول حرف
+            if (!medSuggestions.isEmpty()) {
+                tblMedSuggest.getSelectionModel().selectFirst();
+            }
+        });
+        task.setOnFailed(ev -> {
+            if (task.isCancelled()) return;
+            medSuggestions.clear();
+            // حتى لو فشل، خلّي "Add new" متاح بالأعلى
+            medSuggestions.add(new MedicineSuggestion(-1, "➕ Add new: " + query, "", true));
+            showSuggest();
+        });
+
+        new Thread(task, "med-suggest").start();
+    }
+
+    private void openAddMedicineDialog(String prefill) {
+        Dialog<Void> dlg = new Dialog<>();
+        dlg.setTitle("Add Medicine");
+        dlg.getDialogPane().getButtonTypes().addAll(ButtonType.CANCEL, ButtonType.OK);
+
+        TextField name      = new TextField(prefill);
+        TextField strength  = new TextField();
+        TextField form      = new TextField();
+
+        ChoiceBox<String> baseUnit = new ChoiceBox<>(FXCollections.observableArrayList(
+                "TABLET","CAPSULE","SYRUP","SUSPENSION","INJECTION","CREAM","OINTMENT","DROPS","SPRAY"
+        ));
+        baseUnit.getSelectionModel().select("TABLET");
+
+        // Packaging controls
+        Spinner<Integer> tabletsPerBlister = new Spinner<>(1, 1000, 10);
+        Spinner<Integer> blistersPerBox    = new Spinner<>(1, 1000, 1);
+        Spinner<Integer> mlPerBottle       = new Spinner<>(1, 5000, 100);
+        Spinner<Integer> gramsPerTube      = new Spinner<>(1, 1000, 20);
+        CheckBox splitAllowed              = new CheckBox("Split allowed");
+
+        // Enable/disable depending on base unit
+        Runnable updatePackaging = () -> {
+            String u = baseUnit.getSelectionModel().getSelectedItem();
+            boolean isTabOrCap = "TABLET".equals(u) || "CAPSULE".equals(u);
+            boolean isSyr      = "SYRUP".equals(u) || "SUSPENSION".equals(u) || "DROPS".equals(u);
+            boolean isCream    = "CREAM".equals(u) || "OINTMENT".equals(u);
+
+            tabletsPerBlister.setDisable(!isTabOrCap);
+            blistersPerBox.setDisable(!isTabOrCap);
+            splitAllowed.setDisable(!isTabOrCap);
+
+            mlPerBottle.setDisable(!isSyr);
+            gramsPerTube.setDisable(!isCream);
+        };
+        baseUnit.getSelectionModel().selectedItemProperty().addListener((o, a, b) -> updatePackaging.run());
+        updatePackaging.run();
+
+        GridPane gp = new GridPane();
+        gp.setHgap(8); gp.setVgap(8);
+        int r = 0;
+        gp.addRow(r++, new Label("Name:"),     name);
+        gp.addRow(r++, new Label("Strength:"), strength);
+        gp.addRow(r++, new Label("Form:"),     form);
+        gp.addRow(r++, new Label("Base Unit:"),baseUnit);
+        gp.addRow(r++, new Label("Tablets/Blister:"), tabletsPerBlister);
+        gp.addRow(r++, new Label("Blisters/Box:"),    blistersPerBox);
+        gp.addRow(r++, new Label("mL/Bottle:"),       mlPerBottle);
+        gp.addRow(r++, new Label("g/Tube:"),          gramsPerTube);
+        gp.add(splitAllowed, 1, r++);
+
+        dlg.getDialogPane().setContent(gp);
+
+        Button ok = (Button) dlg.getDialogPane().lookupButton(ButtonType.OK);
+        ok.disableProperty().bind(name.textProperty().isEmpty());
+
+        dlg.setResultConverter(btn -> null);
+        var res = dlg.showAndWait();
+        if (res.isEmpty() || res.get() != null) {
+            // do nothing with the Dialog's return, we read the controls directly below
+        }
+
+        // Prepare draft without touching DB
+        NewMedicineDraft draft = new NewMedicineDraft();
+        draft.name = name.getText().trim();
+        draft.strength = strength.getText().trim();
+        draft.form = form.getText().trim();
+        draft.baseUnit = baseUnit.getValue();
+        draft.tabletsPerBlister = tabletsPerBlister.isDisabled()? null : tabletsPerBlister.getValue();
+        draft.blistersPerBox    = blistersPerBox.isDisabled()?    null : blistersPerBox.getValue();
+        draft.mlPerBottle       = mlPerBottle.isDisabled()?       null : mlPerBottle.getValue();
+        draft.gramsPerTube      = gramsPerTube.isDisabled()?      null : gramsPerTube.getValue();
+        draft.splitAllowed      = splitAllowed.isDisabled()?      null : splitAllowed.isSelected();
+
+        pendingNewMedicine = draft;          // mark as pending create
+        selectedMedicineId = null;           // ensure we create on Save
+        // Fill the text box for user clarity
+        String disp = draft.name
+                + (draft.strength == null || draft.strength.isBlank()? "" : " " + draft.strength)
+                + (draft.form == null || draft.form.isBlank()? "" : " " + draft.form);
+        if (MedicineNameRecive != null) MedicineNameRecive.setText(disp);
+        hideSuggest();
+        showInfo("Medicine details captured. It will be saved together with the batch.");
+    }
+
+    /**
+     * Opens the Add Medicine dialog with all relevant fields, including Description.
+     */
+//    private void openAddMedicineDialog(String trim) {
+//        Dialog<Void> dialog = new Dialog<>();
+//        dialog.setTitle("Add Medicine");
+//        dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
+//
+//        // Fields for medicine properties
+//        TextField nameTf = new TextField();
+//        TextField strengthTf = new TextField();
+//        TextField formTf = new TextField();
+//        ChoiceBox<String> baseUnit = new ChoiceBox<>(FXCollections.observableArrayList(
+//                "TABLET", "CAPSULE", "SYRUP", "SUSPENSION", "INJECTION", "CREAM", "OINTMENT", "DROPS", "SPRAY"
+//        ));
+//        TextField tabletsPerBlisterTf = new TextField();
+//        TextField blistersPerBoxTf = new TextField();
+//        TextField mlPerBottleTf = new TextField();
+//        TextField gramsPerTubeTf = new TextField();
+//        // Description field (TextArea)
+//        TextArea descriptionTf = new TextArea();
+//        descriptionTf.setPromptText("Description...");
+//        descriptionTf.setPrefRowCount(3);
+//        descriptionTf.setPrefColumnCount(25);
+//
+//        GridPane grid = new GridPane();
+//        grid.setHgap(10);
+//        grid.setVgap(8);
+//
+//        int row = 0;
+//        grid.add(new Label("Name:"), 0, row); grid.add(nameTf, 1, row++);
+//        grid.add(new Label("Strength:"), 0, row); grid.add(strengthTf, 1, row++);
+//        grid.add(new Label("Form:"), 0, row); grid.add(formTf, 1, row++);
+//        grid.add(new Label("Base Unit:"), 0, row); grid.add(baseUnit, 1, row++);
+//        grid.add(new Label("Tablets/Blister:"), 0, row); grid.add(tabletsPerBlisterTf, 1, row++);
+//        grid.add(new Label("Blisters/Box:"), 0, row); grid.add(blistersPerBoxTf, 1, row++);
+//        grid.add(new Label("mL/Bottle:"), 0, row); grid.add(mlPerBottleTf, 1, row++);
+//        grid.add(new Label("g/Tube:"), 0, row); grid.add(gramsPerTubeTf, 1, row++);
+//        grid.add(new Label("Description:"), 0, row); grid.add(descriptionTf, 1, row++);
+//
+//        dialog.getDialogPane().setContent(grid);
+//
+//        dialog.setResultConverter(btn -> {
+//            if (btn == ButtonType.OK) {
+//                String name = nameTf.getText().trim();
+//                String strength = strengthTf.getText().trim();
+//                String form = formTf.getText().trim();
+//                String baseUnitVal = baseUnit.getValue();
+//                Integer tabletsPerBlister = tabletsPerBlisterTf.getText().isEmpty() ? null : Integer.valueOf(tabletsPerBlisterTf.getText());
+//                Integer blistersPerBox = blistersPerBoxTf.getText().isEmpty() ? null : Integer.valueOf(blistersPerBoxTf.getText());
+//                Integer mlPerBottle = mlPerBottleTf.getText().isEmpty() ? null : Integer.valueOf(mlPerBottleTf.getText());
+//                Integer gramsPerTube = gramsPerTubeTf.getText().isEmpty() ? null : Integer.valueOf(gramsPerTubeTf.getText());
+//                String description = descriptionTf.getText();
+//
+//                // Save to DB
+//                saveMedicineToDb(name, strength, form, baseUnitVal, tabletsPerBlister, blistersPerBox, mlPerBottle, gramsPerTube, description);
+//            }
+//            return null;
+//        });
+//
+//        dialog.showAndWait();
+//    }
+
+    /**
+     * Save the new medicine to the medicines table, including the description.
+     */
+    private void saveMedicineToDb(String name, String strength, String form, String baseUnit,
+                                  Integer tabletsPerBlister, Integer blistersPerBox,
+                                  Integer mlPerBottle, Integer gramsPerTube,
+                                  String description) {
+        try (Connection c = Database.get();
+             PreparedStatement ps = c.prepareStatement(
+                     "INSERT INTO medicines " +
+                             "(name, strength, form, base_unit, tablets_per_blister, blisters_per_box, ml_per_bottle, grams_per_tube, description) " +
+                             "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")) {
+            ps.setString(1, name);
+            ps.setString(2, strength);
+            ps.setString(3, form);
+            ps.setString(4, baseUnit);
+            if (tabletsPerBlister != null) ps.setInt(5, tabletsPerBlister); else ps.setNull(5, java.sql.Types.INTEGER);
+            if (blistersPerBox != null) ps.setInt(6, blistersPerBox); else ps.setNull(6, java.sql.Types.INTEGER);
+            if (mlPerBottle != null) ps.setInt(7, mlPerBottle); else ps.setNull(7, java.sql.Types.INTEGER);
+            if (gramsPerTube != null) ps.setInt(8, gramsPerTube); else ps.setNull(8, java.sql.Types.INTEGER);
+            ps.setString(9, description);
+            ps.executeUpdate();
+        } catch (Exception ex) {
+            ex.printStackTrace();
+            if (alertLabel != null) alertLabel.setText("Failed to add medicine: " + ex.getMessage());
+        }
+    }
+
+    @FXML
+    private void onSaveReceive() {
+        // 1) اجمع المدخلات
+        final String medText = (MedicineNameRecive != null) ? MedicineNameRecive.getText().trim() : "";
+        if ((selectedMedicineId == null) && medText.isBlank()) {
+            showWarn("Receive", "Select a medicine or type its name."); return;
+        }
+
+        Integer qty = null;
+        try { qty = Integer.valueOf(quantity.getText().trim()); } catch (Exception ignore) {}
+        if (qty == null || qty <= 0) {
+            showWarn("Receive", "Quantity must be a positive integer."); return;
+        }
+
+        final LocalDate exp = (ExpiryDate != null) ? ExpiryDate.getValue() : null;
+        if (exp == null) { showWarn("Receive", "Expiry date is required."); return; }
+
+        String batch = (batchNum != null && batchNum.getText() != null) ? batchNum.getText().trim() : "";
+        if (batch.isBlank()) {
+            batch = "AUTO-" + java.time.LocalDateTime.now()
+                    .format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"));
+        }
+
+        // 2) Resolve/Create medicine ID
+        Long medId = selectedMedicineId;
+
+        // If the user filled the Add Medicine dialog, insert the medicine now (single flow)
+        if (medId == null && pendingNewMedicine != null) {
+            try (Connection c = Database.get();
+                 PreparedStatement ps = c.prepareStatement("""
+                INSERT INTO medicines
+                  (name, strength, form, base_unit,
+                   tablets_per_blister, blisters_per_box, ml_per_bottle, grams_per_tube, split_allowed)
+                VALUES
+                  (?, NULLIF(?,''), NULLIF(?,''), ?::med_unit,
+                   ?, ?, ?, ?, ?)
+                ON CONFLICT DO NOTHING
+                RETURNING id
+             """)) {
+                ps.setString(1, pendingNewMedicine.name);
+                ps.setString(2, pendingNewMedicine.strength);
+                ps.setString(3, pendingNewMedicine.form);
+                ps.setString(4, pendingNewMedicine.baseUnit);
+                ps.setObject(5, pendingNewMedicine.tabletsPerBlister);
+                ps.setObject(6, pendingNewMedicine.blistersPerBox);
+                ps.setObject(7, pendingNewMedicine.mlPerBottle);
+                ps.setObject(8, pendingNewMedicine.gramsPerTube);
+                ps.setObject(9, pendingNewMedicine.splitAllowed);
+
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) medId = rs.getLong(1);
+                }
+            } catch (Exception ex) {
+                showError("Failed to create medicine: " + ex.getMessage());
+                return;
+            }
+
+            // If conflict (already exists), resolve by display text as fallback
+            if (medId == null) {
+                medId = resolveMedicineIdByDisplayOrName(MedicineNameRecive != null ? MedicineNameRecive.getText().trim() : pendingNewMedicine.name);
+            }
+            selectedMedicineId = medId;
+            pendingNewMedicine = null; // consumed
+        }
+
+        if (medId == null) medId = resolveMedicineIdByDisplayOrName(medText);
+        if (medId == null) {
+            showWarn("Receive", "Please select/add a medicine."); return;
+        }
+
+        // 3) نفّذ الإدخال داخل معاملة واحدة (تجميع الكمية على نفس الدفعة)
+        try (Connection c = Database.get()) {
+            c.setAutoCommit(false);
+            long batchId;
+
+            // ملاحظة: عند التعارض نجمع الكمية: quantity = existing + EXCLUDED.quantity
+            // ونحافظ على أقدم تاريخ انتهاء (LEAST) إذا اختلف.
+            try (PreparedStatement ps = c.prepareStatement("""
+            INSERT INTO medicine_batches (medicine_id, batch_no, expiry_date, quantity)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT (medicine_id, batch_no) DO UPDATE
+               SET expiry_date = LEAST(medicine_batches.expiry_date, EXCLUDED.expiry_date),
+                   quantity    = medicine_batches.quantity + EXCLUDED.quantity
+            RETURNING id
+        """)) {
+                ps.setLong(1, medId);
+                ps.setString(2, batch);
+                ps.setDate(3, java.sql.Date.valueOf(exp));
+                ps.setInt(4, qty);
+                try (ResultSet rs = ps.executeQuery()) {
+                    rs.next(); batchId = rs.getLong(1);
+                }
+            }
+
+            // سجل حركة الوارد (الـ triggers هتحدث available_quantity تلقائيًا)
+            try (PreparedStatement ps = c.prepareStatement("""
+            INSERT INTO inventory_transactions (medicine_id, batch_id, qty_change, reason, ref_type)
+            VALUES (?, ?, ?, 'RECEIVE', 'manual_receive')
+        """)) {
+                ps.setLong(1, medId);
+                ps.setLong(2, batchId);
+                ps.setInt(3, qty);
+                ps.executeUpdate();
+            }
+
+            c.commit();
+            showInfo("Batch received successfully.");
+
+            // 4) نظّف الحقول وحوّل إلى Inventory
+            selectedMedicineId = null;
+            if (MedicineNameRecive != null) MedicineNameRecive.clear();
+            if (batchNum != null)          batchNum.clear();
+            if (quantity != null)          quantity.clear();
+            if (ExpiryDate != null)        ExpiryDate.setValue(null);
+            hideSuggest();
+
+            // بدّل التبويب واعرض المخزون وحدّث الجدول
+            if (btnInventory != null) btnInventory.setSelected(true);
+            showInventoryMainMode();
+            reloadInventoryTable();
+        } catch (Exception ex) {
+            try { /* لو في مشكلة حاول ترجع */ } catch (Exception ignored) {}
+            ex.printStackTrace();
+            showError("Failed to receive batch: " + ex.getMessage());
+        }
+    }
+    // --- Draft holder used when user adds a medicine but wants to save it together with the batch later
+    private static final class NewMedicineDraft {
+        String name;
+        String strength;
+        String form;
+        String baseUnit; // matches med_unit enum text
+        Integer tabletsPerBlister;
+        Integer blistersPerBox;
+        Integer mlPerBottle;
+        Integer gramsPerTube;
+        Boolean splitAllowed;
+    }
+    private NewMedicineDraft pendingNewMedicine; // not-null means: create medicine at Save
+    private Long resolveMedicineIdByDisplayOrName(String text) {
+        if (text == null || text.isBlank()) return null;
+        try (Connection c = Database.get();
+             PreparedStatement ps = c.prepareStatement("""
+            SELECT id FROM medicines
+            WHERE lower(COALESCE(display_name, name)) = lower(?)
+               OR COALESCE(display_name, name) ILIKE ?
+            ORDER BY CASE WHEN lower(COALESCE(display_name,name)) = lower(?) THEN 0 ELSE 1 END,
+                     similarity(COALESCE(display_name,name), ?) DESC
+            LIMIT 1
+         """)) {
+            ps.setString(1, text);
+            ps.setString(2, "%" + text + "%");
+            ps.setString(3, text);
+            ps.setString(4, text);
+            try (ResultSet rs = ps.executeQuery()) { if (rs.next()) return rs.getLong(1); }
+        } catch (Exception ignore) {}
+        return null;
+    }
+
+    // --- Utility alert methods ---
+    private void showWarn(String title, String msg) {
+        javafx.application.Platform.runLater(() -> {
+            var alert = new javafx.scene.control.Alert(javafx.scene.control.Alert.AlertType.WARNING);
+            alert.setTitle(title);
+            alert.setHeaderText(null);
+            alert.setContentText(msg);
+            alert.showAndWait();
+        });
+    }
+
+    private void showInfo(String msg) {
+        javafx.application.Platform.runLater(() -> {
+            var alert = new javafx.scene.control.Alert(javafx.scene.control.Alert.AlertType.INFORMATION);
+            alert.setTitle("Info");
+            alert.setHeaderText(null);
+            alert.setContentText(msg);
+            alert.showAndWait();
+        });
+    }
+
+    private void showError(String msg) {
+        javafx.application.Platform.runLater(() -> {
+            var alert = new javafx.scene.control.Alert(javafx.scene.control.Alert.AlertType.ERROR);
+            alert.setTitle("Error");
+            alert.setHeaderText(null);
+            alert.setContentText(msg);
+            alert.showAndWait();
+        });
+    }
+
+    public static final class MedicineSuggestion {
+        public final long id;           // -1 = Add new
+        public final String name;
+        public final String strength;
+        public final boolean addNew;
+        public MedicineSuggestion(long id, String name, String strength, boolean addNew) {
+            this.id=id; this.name=name; this.strength=strength; this.addNew=addNew;
+        }
+        public String display() {
+            return name + (strength==null||strength.isBlank()? "" : " " + strength);
+        }
+    }
+
 }
