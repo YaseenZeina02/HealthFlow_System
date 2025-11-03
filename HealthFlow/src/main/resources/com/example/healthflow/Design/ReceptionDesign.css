@@ -597,3 +597,63 @@
     -fx-background-insets: 0, 1 0 0 0; /* subtle pressed effect */
 }
 
+
+/* لما المؤشر يكون على الخلية */
+.table-cell:hover {
+    -fx-font-size: 14px;
+    -fx-wrap-text: true;
+    -fx-background-color: #e0f7fa;
+}
+
+/* لما الخلية تكون محددة */
+.table-cell:selected {
+    -fx-wrap-text: true;
+    -fx-font-weight: bold;
+    -fx-background-color: #b2ebf2;
+    -fx-text-fill: black;
+}
+
+/* نمط الخلية لما تتوسع مؤقتًا */
+.table-cell.expanded-cell {
+    -fx-font-size: 15px;
+    -fx-wrap-text: true;
+    -fx-background-color: #d1f0ff;
+    -fx-text-fill: black;
+}
+
+/* ===== Copyable table cells (hover/focus visuals) ===== */
+.table-cell.copyable-cell:hover {
+    -fx-background-color: rgba(59,130,246,0.08); /* أزرق خفيف */
+}
+
+/* Pseudo-class custom من الجافا: يظهر عند الضغط/الفوكس */
+.table-cell.copyable-cell.copyable-active {
+    -fx-background-color: rgba(59,130,246,0.16);
+    -fx-border-color: #3b82f6;
+    -fx-border-width: 0 0 0 3; /* شريط يسار */
+}
+
+/* يلمّع خانة النص نفسها حتى لو الصف Selected */
+.table-cell.copyable-cell .text-field.copyable-inner.copyable-active {
+    -fx-background-color: rgba(59,130,246,0.12);
+    -fx-background-insets: 0;
+    -fx-background-radius: 4;
+    -fx-border-color: #3b82f6;
+    -fx-border-width: 0 0 2 0;
+    -fx-border-radius: 4;
+    -fx-padding: 0 6 0 6;
+}
+
+/* إظهار حالة الفوكس داخل الحقل حتى لو الصف كله Selected */
+.table-cell.copyable-cell .text-field.copyable-inner:focused {
+    -fx-background-color: rgba(59,130,246,0.12);
+    -fx-background-insets: 0;
+    -fx-background-radius: 4;
+    -fx-border-color: #3b82f6;
+    -fx-border-width: 0 0 2 0;
+    -fx-border-radius: 4;
+}
+
+.table-row-cell:selected {
+    -fx-background-color: rgba(0, 0, 0, 0.04);
+}

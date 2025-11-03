@@ -23,12 +23,14 @@ import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
 import javafx.application.Platform;
 import javafx.beans.property.*;
+import javafx.beans.value.ChangeListener;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.collections.transformation.FilteredList;
 import javafx.collections.transformation.SortedList;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
+import javafx.geometry.Insets;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.chart.BarChart;
@@ -38,9 +40,12 @@ import javafx.scene.chart.XYChart;
 import javafx.scene.control.*;
 import javafx.scene.control.cell.ComboBoxTableCell;
 import javafx.scene.control.cell.TextFieldTableCell;
+import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.AnchorPane;
+import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.shape.Circle;
+import javafx.scene.text.Text;
 import javafx.stage.Stage;
 import javafx.util.Duration;
 
@@ -58,6 +63,16 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.TimeUnit;
 import com.example.healthflow.ui.ComboAnimations;
+
+import javafx.scene.control.TextField;
+import javafx.scene.control.ContextMenu;
+import javafx.scene.control.MenuItem;
+import javafx.scene.control.SeparatorMenuItem;
+import javafx.scene.control.TablePosition;
+import javafx.scene.input.Clipboard;
+import javafx.scene.input.ClipboardContent;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyEvent;
 
 
 
@@ -1345,14 +1360,24 @@ public class ReceptionController {
     private void wireAppointmentsTables() {
         if (TableINAppointment == null) return;
        //TableINAppointment.setColumnResizePolicy(TableView.UNCONSTRAINED_RESIZE_POLICY);
+        TableINAppointment.setColumnResizePolicy(TableView.UNCONSTRAINED_RESIZE_POLICY);
+
+        TableINAppointment.setFixedCellSize(-1);
+
+//        enableCellExpansion(colPatientNameAppointment);
+//        enableCellExpansion(colSpecialty);
+//        enableCellExpansion(colDoctorNameAppointment);
+//        enableCellExpansion(colRoomNumber);
+        enableExpandAutoWidth(TableINAppointment, colPatientNameAppointment, 600);
+        enableExpandAutoWidth(TableINAppointment, colSpecialty, 500);
+        enableExpandAutoWidth(TableINAppointment, colDoctorNameAppointment, 500);
+
         TableINAppointment.setItems(sortedAppt);
         sortedAppt.comparatorProperty().bind(TableINAppointment.comparatorProperty());
         // === تفعيل التحرير داخل جدول المواعيد ===
         TableINAppointment.setEditable(true);
         ensureAppointmentBindings();
         colDateAppointment.setEditable(true);
-
-
 
         setupInlineEditing();
         if (colDateAppointment != null) colDateAppointment.setCellValueFactory(cd -> cd.getValue().dateProperty());
@@ -1639,6 +1664,8 @@ public class ReceptionController {
                 }
             });
         }
+
+
         if (TableINAppointment != null) TableINAppointment.refresh();
     }
 
@@ -1718,14 +1745,14 @@ public class ReceptionController {
         final String q = (searchAppointmentDach == null || searchAppointmentDach.getText() == null)
                 ? "" : searchAppointmentDach.getText().trim().toLowerCase();
         final String statusSel = (statusFilter == null || statusFilter.getValue() == null)
-                ? "ALL" : statusFilter.getValue();
+                ? "SCHEDULED" : statusFilter.getValue();
 
         filteredAppt.setPredicate(r -> {
             // 1) فلتر التاريخ
             if (selDate != null && !selDate.equals(r.getDate())) return false;
 
             // 2) فلتر الحالة
-            if (!"ALL".equals(statusSel)) {
+            if (!"SCHEDULED".equals(statusSel)) {
                 String st = (r.getStatus() == null) ? "" : r.getStatus().toUpperCase();
                 if (!st.equals(statusSel)) return false;
             }
@@ -2747,13 +2774,6 @@ public class ReceptionController {
         }, "appt-status-chart").start();
     }
 
-    // =======================
-    // Controller initialization (add wireDashboardDatePicker to the wiring section)
-    // =======================
-    // (Assuming a method like initialize() exists, insert wiring call)
-    // (You may need to find the actual initialize() method in the file and add the following line
-    //   wireDashboardDatePicker();
-    //   right after other wire... calls)
 
 
     // Ensure tables are bound to their proper Sorted/Filtered lists (idempotent)
@@ -3203,6 +3223,23 @@ public class ReceptionController {
             }
         });
 
+        try {
+            TableUtils.makeAllStringColumnsCopyable(TableINAppointment);
+            TableUtils.makeAllStringColumnsCopyable(TableAppInDashboard);
+            TableUtils.makeAllStringColumnsCopyable(patientTable);
+            TableUtils.makeAllStringColumnsCopyable(DocTable_Recption);
+
+            if (TableINAppointment != null) TableINAppointment.getSelectionModel().setCellSelectionEnabled(true);
+            if (TableAppInDashboard != null) TableAppInDashboard.getSelectionModel().setCellSelectionEnabled(true);
+            if (patientTable != null) patientTable.getSelectionModel().setCellSelectionEnabled(true);
+            if (DocTable_Recption != null) DocTable_Recption.getSelectionModel().setCellSelectionEnabled(true);
+
+            TableUtils.forceIBeamOnCopyableCells(TableINAppointment);
+            TableUtils.forceIBeamOnCopyableCells(TableAppInDashboard);
+            TableUtils.forceIBeamOnCopyableCells(patientTable);
+            TableUtils.forceIBeamOnCopyableCells(DocTable_Recption);
+        } catch (Throwable ignore) { }
+
     }
 
     private void wireStatusFilter() {
@@ -3362,4 +3399,59 @@ public class ReceptionController {
             } catch (Throwable ignore) { }
         });
     }
+
+    // ---------- Expand-on-select helper for text columns ----------
+    // يحفظ العرض الأصلي لكل عمود
+    private final Map<TableColumn<?, ?>, Double> _origColWidth = new HashMap<>();
+
+    // يوسّع العمود مؤقتًا عند hover/selection ليعرض النص كامل ثم يرجّعه
+    private <R> void enableExpandAutoWidth(TableView<R> table, TableColumn<R, String> column, double maxWidth) {
+        column.setCellFactory(col -> new TableCell<R, String>() {
+            private final Label label = new Label();
+
+            {
+                setContentDisplay(ContentDisplay.GRAPHIC_ONLY);
+                label.setTextOverrun(OverrunStyle.ELLIPSIS);
+                label.setWrapText(false);
+                label.setPadding(new Insets(4, 8, 4, 8));
+                setGraphic(label);
+
+                setOnMouseEntered(e -> expandNow());
+                setOnMouseExited(e -> restoreWidth());
+                selectedProperty().addListener((o, ov, nv) -> { if (nv) expandNow(); else restoreWidth(); });
+                focusedProperty().addListener((o, ov, nv) -> { if (nv) expandNow(); else restoreWidth(); });
+            }
+
+            private void expandNow() {
+                if (getItem() == null) return;
+                // احسب العرض المطلوب للنص
+                Text t = new Text(getItem());
+                t.setFont(label.getFont());
+                double needed = t.getLayoutBounds().getWidth() + 28; // padding
+                needed = Math.min(Math.max(needed, column.getWidth()), maxWidth);
+
+                _origColWidth.putIfAbsent(column, column.getWidth());
+                table.setColumnResizePolicy(TableView.UNCONSTRAINED_RESIZE_POLICY);
+                column.setPrefWidth(needed);
+
+                // اعرض النص كامل بدون "..."
+                label.setWrapText(false);
+                label.setTextOverrun(OverrunStyle.CLIP);
+            }
+
+            private void restoreWidth() {
+                Double orig = _origColWidth.get(column);
+                if (orig != null) column.setPrefWidth(orig);
+                label.setWrapText(false);
+                label.setTextOverrun(OverrunStyle.ELLIPSIS);
+            }
+
+            @Override
+            protected void updateItem(String item, boolean empty) {
+                super.updateItem(item, empty);
+                label.setText(empty ? null : item);
+            }
+        });
+    }
+
 }

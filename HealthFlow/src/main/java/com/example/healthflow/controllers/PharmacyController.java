@@ -146,6 +146,8 @@ public class PharmacyController {
 
     @FXML
     private AnchorPane ReceivePane;
+//    @FXML
+//    private AnchorPane InventoryPane;
 
     @FXML
     private Label RejectedNumber;
@@ -1516,71 +1518,99 @@ public class PharmacyController {
     /* ====== Inventory Receive vs Deduct (like segmented behavior) ====== */
     private ToggleGroup invToggleGroup;
     private ToggleButton lastSelectedInvBtn;
+    @FXML private ToggleButton btnInventory;
+    @FXML private AnchorPane InventoryPane;
+//    @FXML private AnchorPane AdjustPane;
+
+
+
+
 
 
     private void showInventoryReceiveMode() {
-        ReceivePane.setVisible(true);
-        deductPane.setVisible(false);
+        if (ReceivePane != null) ReceivePane.setVisible(true);
+        if (deductPane  != null) deductPane.setVisible(false);
+        if (InventoryPane != null) InventoryPane.setVisible(false);
     }
 
     private void showInventoryDeductMode() {
-        ReceivePane.setVisible(false);
-        deductPane.setVisible(true);
+        if (ReceivePane != null) ReceivePane.setVisible(false);
+        if (deductPane  != null) deductPane.setVisible(true);
+        if (InventoryPane != null) InventoryPane.setVisible(false);
     }
 
-private void wireInventoryToggles() {
-    invToggleGroup = new ToggleGroup();
-    if (btnReceive != null) btnReceive.setToggleGroup(invToggleGroup);
-    if (btnDeduct != null)  btnDeduct.setToggleGroup(invToggleGroup);
-
-    // امنع إلغاء التحديد بالضغط على الزر المحدد
-    if (btnReceive != null) {
-        btnReceive.addEventFilter(MouseEvent.MOUSE_PRESSED, e -> {
-            if (btnReceive.isSelected()) e.consume();
-        });
-    }
-    if (btnDeduct != null) {
-        btnDeduct.addEventFilter(MouseEvent.MOUSE_PRESSED, e -> {
-            if (btnDeduct.isSelected()) e.consume();
-        });
+    private void showInventoryMainMode() { // الزر الافتراضي: btnInventory
+        if (ReceivePane != null) ReceivePane.setVisible(false);
+        if (deductPane  != null) deductPane.setVisible(false);
+        if (InventoryPane != null) InventoryPane.setVisible(true);
     }
 
-    // تأكد أن الـ SegmentedButton يحتوي أزرارنا
-    if (segInv != null) {
-        if (btnReceive != null && !segInv.getButtons().contains(btnReceive)) segInv.getButtons().add(btnReceive);
-        if (btnDeduct  != null && !segInv.getButtons().contains(btnDeduct))  segInv.getButtons().add(btnDeduct);
-    }
+    private void wireInventoryToggles() {
+        invToggleGroup = new ToggleGroup();
+        if (btnReceive != null) btnReceive.setToggleGroup(invToggleGroup);
+        if (btnDeduct != null)  btnDeduct.setToggleGroup(invToggleGroup);
+        if (btnInventory != null)  btnInventory.setToggleGroup(invToggleGroup);
 
-    // الوضع الافتراضي = Receive
-    if (btnReceive != null) btnReceive.setSelected(true);
-    if (btnDeduct  != null) btnDeduct.setSelected(false);
-    lastSelectedInvBtn = (btnReceive != null) ? btnReceive : btnDeduct;
+        // امنع إلغاء التحديد بالضغط على الزر المحدد
+        if (btnReceive != null) {
+            btnReceive.addEventFilter(MouseEvent.MOUSE_PRESSED, e -> {
+                if (btnReceive.isSelected()) e.consume();
+            });
+        }
+        if (btnDeduct != null) {
+            btnDeduct.addEventFilter(MouseEvent.MOUSE_PRESSED, e -> {
+                if (btnDeduct.isSelected()) e.consume();
+            });
+        }
+        if (btnInventory != null) {
+            btnInventory.addEventFilter(MouseEvent.MOUSE_PRESSED, e -> {
+                if (btnInventory.isSelected()) e.consume();
+            });
+        }
 
-    // أظهر البانل المناسب بدايةً
-    if (btnReceive != null && btnReceive.isSelected()) {
-        showInventoryReceiveMode();
-    } else {
-        showInventoryDeductMode();
-    }
+        // تأكد أن الـ SegmentedButton يحتوي أزرارنا
+        if (btnInventory == null) btnInventory = new ToggleButton("Inventory");
+        if (segInv != null) {
+            if (btnInventory    != null && !segInv.getButtons().contains(btnInventory))    segInv.getButtons().add(btnInventory);
+            if (btnReceive   != null && !segInv.getButtons().contains(btnReceive))   segInv.getButtons().add(btnReceive);
+            if (btnDeduct    != null && !segInv.getButtons().contains(btnDeduct))    segInv.getButtons().add(btnDeduct);
+        }
 
-    // بدّل البانلز عند تغيير الاختيار + لا تسمح بـ null
-    if (invToggleGroup != null) {
-        invToggleGroup.selectedToggleProperty().addListener((obs, oldT, newT) -> {
-            if (newT == null) {
-                if (lastSelectedInvBtn != null) invToggleGroup.selectToggle(lastSelectedInvBtn);
-                return;
-            }
-            if (newT == btnReceive) {
-                showInventoryReceiveMode();
-            } else if (newT == btnDeduct) {
-                showInventoryDeductMode();
-            }
-            if (newT instanceof ToggleButton tb) {
-                lastSelectedInvBtn = tb;
-            }
-        });
+        // الوضع الافتراضي = btnInventory
+        if (btnReceive != null) btnReceive.setSelected(false);
+        if (btnDeduct  != null) btnDeduct.setSelected(false);
+        if (btnInventory  != null) btnInventory.setSelected(true);
+        lastSelectedInvBtn = (btnInventory != null) ? btnInventory : (btnReceive != null ? btnReceive : btnDeduct);
+
+        // أظهر البانل المناسب بدايةً
+        if (btnReceive != null && btnReceive.isSelected()) {
+            showInventoryReceiveMode();
+        } else if (btnDeduct != null && btnDeduct.isSelected()) {
+            showInventoryDeductMode();
+        } else if (btnInventory != null && btnInventory.isSelected()) {
+            showInventoryMainMode();
+        }
+
+        // بدّل البانلز عند تغيير الاختيار + لا تسمح بـ null
+        if (invToggleGroup != null) {
+            invToggleGroup.selectedToggleProperty().addListener((obs, oldT, newT) -> {
+                if (newT == null) {
+                    if (lastSelectedInvBtn != null) invToggleGroup.selectToggle(lastSelectedInvBtn);
+                    return;
+                }
+                if (newT == btnReceive) {
+                    showInventoryReceiveMode();
+                } else if (newT == btnDeduct) {
+                    showInventoryDeductMode();
+                } else if (newT == btnInventory) {
+                    showInventoryMainMode();
+                }
+                if (newT instanceof ToggleButton tb) {
+                    lastSelectedInvBtn = tb;
+                }
+            });
+        }
     }
-}
 
     public PharmacyController(ConnectivityMonitor monitor) {
         this.monitor = monitor;
@@ -1621,6 +1651,7 @@ private void wireInventoryToggles() {
         // Defensive: hide all sections first; we'll explicitly show one below
         btnReceive.setOnAction(e -> showInventoryReceiveMode());
         btnDeduct.setOnAction(e -> showInventoryDeductMode());
+        if (btnInventory != null) btnInventory.setOnAction(e -> showInventoryMainMode());
 
         // Quick sanity check: if IDs are not wired, navigation won't work
         boolean missing = warnIfMissing();

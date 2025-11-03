@@ -928,3 +928,46 @@ ALTER TABLE prescriptions
 -- (اختياري) تأكيد الـ default على DRAFT
 ALTER TABLE prescriptions
     ALTER COLUMN status SET DEFAULT 'DRAFT';
+
+ALTER TABLE medicines
+    ADD COLUMN IF NOT EXISTS strength VARCHAR(50),
+    ADD COLUMN IF NOT EXISTS form     VARCHAR(30);
+
+ALTER TABLE medicines
+DROP CONSTRAINT IF EXISTS medicines_name_key;
+
+DROP INDEX IF EXISTS uniq_medicines_sku;
+CREATE UNIQUE INDEX IF NOT EXISTS uniq_medicines_sku ON medicines (
+    lower(name),
+    COALESCE(strength,''),
+    COALESCE(form,''),
+    COALESCE(tablets_per_blister, 0),
+    COALESCE(blisters_per_box,     0),
+    COALESCE(ml_per_bottle,        0),
+    COALESCE(grams_per_tube,       0)
+    );
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'medicines' AND column_name = 'display_name'
+  ) THEN
+ALTER TABLE medicines
+    ADD COLUMN display_name TEXT
+        GENERATED ALWAYS AS (
+            btrim(
+                    COALESCE(name,'') ||
+                    CASE WHEN strength IS NOT NULL AND btrim(strength) <> '' THEN ' ' || strength ELSE '' END ||
+                    CASE WHEN form     IS NOT NULL AND btrim(form)     <> '' THEN ' ' || form     ELSE '' END ||
+                    CASE
+                        WHEN grams_per_tube IS NOT NULL THEN ' (' || grams_per_tube::text || ' g)'
+                        WHEN ml_per_bottle  IS NOT NULL THEN ' (' || ml_per_bottle::text  || ' mL)'
+                        WHEN tablets_per_blister IS NOT NULL AND blisters_per_box IS NOT NULL
+                            THEN ' (' || tablets_per_blister::text || '×' || blisters_per_box::text || ')'
+                        ELSE ''
+                        END
+            )
+            ) STORED;
+END IF;
+END $$;
