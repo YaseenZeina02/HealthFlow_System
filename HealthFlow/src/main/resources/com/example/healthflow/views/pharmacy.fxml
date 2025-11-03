@@ -404,35 +404,39 @@
                   </AnchorPane>
                   <AnchorPane fx:id="InventoryAnchorPane" layoutY="-2.0" prefHeight="560.0" prefWidth="890.0" style="-fx-background-color: #ededed;" stylesheets="@../Design/ReceptionDesign.css" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="-2.0">
                      <children>
-                        <AnchorPane layoutX="9.0" layoutY="11.0" prefHeight="538.0" prefWidth="870.0" stylesheets="@../Design/ReceptionDesign.css" AnchorPane.bottomAnchor="11.0" AnchorPane.leftAnchor="9.0" AnchorPane.rightAnchor="11.0" AnchorPane.topAnchor="11.0">
+                        <AnchorPane layoutX="10.0" layoutY="11.0" prefHeight="538.0" prefWidth="870.0" stylesheets="@../Design/ReceptionDesign.css" AnchorPane.bottomAnchor="11.0" AnchorPane.leftAnchor="10.0" AnchorPane.rightAnchor="10.0" AnchorPane.topAnchor="11.0">
                            <styleClass>
                               <String fx:value="white-bg" />
                               <String fx:value="radius" />
                               <String fx:value="shadow" />
                            </styleClass>
                            <children>
-                              <AnchorPane fx:id="InventoryPane" layoutY="47.0" prefHeight="491.0" prefWidth="870.0" stylesheets="@../Design/ReceptionDesign.css" visible="false" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="47.0">
+                              <AnchorPane fx:id="InventoryPane" layoutY="47.0" prefHeight="491.0" prefWidth="870.0" stylesheets="@../Design/ReceptionDesign.css" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="47.0">
                                  <children>
                                     <Label layoutX="18.0" layoutY="13.0" prefHeight="23.0" prefWidth="205.0" styleClass="header-top" stylesheets="@../Design/ReceptionDesign.css" text="Inentory Contents" AnchorPane.leftAnchor="18.0" AnchorPane.topAnchor="13.0">
                                        <font>
                                           <Font size="18.0" />
                                        </font>
                                     </Label>
-                                    <TextField fx:id="searchOnInentory" layoutX="420.0" layoutY="19.0" prefHeight="26.0" prefWidth="215.0" promptText="search" styleClass="box" stylesheets="@../Design/ReceptionDesign.css" AnchorPane.rightAnchor="225.0" AnchorPane.topAnchor="19.0" />
-                                    <TableView fx:id="TableMedicinesInentory" layoutX="15.0" layoutY="46.0" prefHeight="427.0" prefWidth="627.0" stylesheets="@../Design/ReceptionDesign.css" AnchorPane.bottomAnchor="12.0" AnchorPane.leftAnchor="16.0" AnchorPane.rightAnchor="222.0" AnchorPane.topAnchor="67.0">
+                                    <TextField fx:id="searchOnInventory" layoutX="640.0" layoutY="21.0" prefHeight="26.0" prefWidth="215.0" promptText="search" styleClass="box" stylesheets="@../Design/ReceptionDesign.css" AnchorPane.rightAnchor="15.0" AnchorPane.topAnchor="21.0" />
+                                    <TableView fx:id="TableMedicinesInventory" layoutX="15.0" layoutY="46.0" prefHeight="247.0" prefWidth="839.0" stylesheets="@../Design/ReceptionDesign.css" AnchorPane.bottomAnchor="177.0" AnchorPane.leftAnchor="16.0" AnchorPane.rightAnchor="15.0" AnchorPane.topAnchor="67.0">
                                        <columns>
-                                          <TableColumn fx:id="colIdx11" maxWidth="2000.0" prefWidth="50.0" text="#" />
-                                          <TableColumn fx:id="colMedicineNameInentory" prefWidth="100.0" text="Medicine Name" />
-                                          <TableColumn fx:id="colDosageInentory" prefWidth="75.0" text="Batch Number" />
-                                          <TableColumn fx:id="colQuantityInentory" prefWidth="75.0" text="Quantity" />
-                                          <TableColumn fx:id="colDiagnosisInentory" prefWidth="100.0" text="Expiry Date" />
-                                          <TableColumn fx:id="colPresesActionInentory" prefWidth="58.0" text="Received at " />
+                                          <TableColumn fx:id="colSerialInventory" maxWidth="1000.0" prefWidth="50.0" text="#" />
+                                          <TableColumn fx:id="colMedicineNameInventory" prefWidth="116.0" text="Medicine Name" />
+                                          <TableColumn fx:id="colMedicineForm" prefWidth="70.99996948242188" text="Form" />
+                                          <TableColumn fx:id="colMedicineBase" prefWidth="131.99996948242188" text="Base Unit" />
+                                          <TableColumn fx:id="colQuantityInventory" prefWidth="109.00003051757812" text="Avilable Qty" />
+                                          <TableColumn fx:id="colMedicineBatchNextNumber" prefWidth="100.0" text="Next Batch " />
+                                          <TableColumn fx:id="colQtyNext" prefWidth="131.99996948242188" text="Qty (Next)" />
+                                          <TableColumn fx:id="colExpiryNext" prefWidth="131.99996948242188" text="Expiry (Next)" />
+                                          <TableColumn fx:id="colReceivedBy" prefWidth="131.99996948242188" text="Received By" />
+                                          <TableColumn fx:id="colReceivedAt" prefWidth="131.99996948242188" text="Received At" />
                                        </columns>
                                        <columnResizePolicy>
                                           <TableView fx:constant="CONSTRAINED_RESIZE_POLICY" />
                                        </columnResizePolicy>
                                     </TableView>
-                                    <AnchorPane layoutX="645.0" layoutY="66.0" prefHeight="169.0" prefWidth="201.0" style="-fx-border-color: #3232; -fx-border-radius: 10px;" styleClass="white-bg" AnchorPane.rightAnchor="14.0" AnchorPane.topAnchor="66.0">
+                                    <AnchorPane layoutX="18.0" layoutY="320.0" prefHeight="169.0" prefWidth="201.0" style="-fx-border-color: #3232; -fx-border-radius: 10px;" styleClass="white-bg" AnchorPane.rightAnchor="651.0" AnchorPane.topAnchor="320.0">
                                        <children>
                                           <Label layoutX="19.0" layoutY="11.0" prefHeight="25.0" prefWidth="140.0" styleClass="text-gradient" stylesheets="@../Design/ReceptionDesign.css" text="Some Information">
                                              <font>
@@ -477,7 +481,7 @@
                                     <String fx:value="radius" />
                                  </styleClass>
                               </AnchorPane>
-                              <AnchorPane fx:id="ReceivePane" prefHeight="491.0" prefWidth="870.0" stylesheets="@../Design/ReceptionDesign.css" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="47.0">
+                              <AnchorPane fx:id="ReceivePane" prefHeight="491.0" prefWidth="870.0" stylesheets="@../Design/ReceptionDesign.css" visible="false" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="47.0">
                                  <children>
                                     <Label layoutX="22.0" layoutY="83.0" prefHeight="25.0" prefWidth="112.0" styleClass="text-gradient" stylesheets="@../Design/ReceptionDesign.css" text="Batch Number">
                                        <font>

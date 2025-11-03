@@ -2,6 +2,7 @@ package com.example.healthflow.controllers;
 
 import com.example.healthflow.dao.PrescriptionDAO;
 import com.example.healthflow.dao.PrescriptionDAO.DashboardRow;
+import com.example.healthflow.model.dto.InventoryRow;
 import com.example.healthflow.service.AuthService.Session;
 import com.example.healthflow.dao.PrescriptionItemDAO;
 import com.example.healthflow.db.Database;
@@ -152,8 +153,7 @@ public class PharmacyController {
     @FXML
     private Button ReportsButton;
 
-    @FXML
-    private TableView<?> TableMedicinesInentory;
+
 
     @FXML
     private TableView<PrescItemRow> TablePrescriptionItems;
@@ -219,8 +219,6 @@ public class PharmacyController {
     @FXML
     private TableColumn<PrescItemRow, String> colItemStatus;
 
-    @FXML
-    private TableColumn<?, ?> colDiagnosisInentory;
 
     @FXML
     private TableColumn<DashboardRow, String> colDoctorName;
@@ -228,8 +226,7 @@ public class PharmacyController {
     @FXML
     private TableColumn<PrescItemRow, String> colDosage;
 
-    @FXML
-    private TableColumn<?, ?> colDosageInentory;
+
 
     @FXML
     private TableColumn<PrescItemRow, Number> colDose;
@@ -240,17 +237,30 @@ public class PharmacyController {
     @FXML
     private TableColumn<PrescItemRow, Number> colIdx;
 
-    @FXML
-    private TableColumn<?, ?> colIdx11;
+
 
     @FXML
     private TableColumn<PrescItemRow, String> colMedicineName;
 
-    @FXML
-    private TableColumn<?, ?> colMedicineNameInentory;
 
-    @FXML
-    private TableColumn<?, ?> colMedicineNameInentoryByBatchNumber;
+    //    Table in Inventory
+    @FXML private TableView<InventoryRow> TableMedicinesInventory;
+    @FXML private TableColumn<InventoryRow, Number>   colSerialInventory;
+    @FXML private TableColumn<InventoryRow, String>   colMedicineNameInventory;
+    @FXML private TableColumn<InventoryRow, String>   colMedicineForm;
+    @FXML private TableColumn<InventoryRow, String>   colMedicineBase;
+    @FXML private TableColumn<InventoryRow, Number>   colQuantityInventory;
+    @FXML private TableColumn<InventoryRow, String>   colMedicineBatchNextNumber;
+    @FXML private TableColumn<InventoryRow, Number>   colQtyNext;
+    @FXML private TableColumn<InventoryRow, java.time.LocalDate> colExpiryNext;
+    @FXML private TableColumn<InventoryRow, String>   colReceivedAt;
+    @FXML private TableColumn<InventoryRow, String>   colReceivedBy;
+
+
+
+
+
+
 
     @FXML
     private TableColumn<DashboardRow, String> colPatientName;
@@ -258,8 +268,6 @@ public class PharmacyController {
     @FXML
     private TableColumn<PrescItemRow, Void> colPresesItemAction;
 
-    @FXML
-    private TableColumn<?, ?> colPresesActionInentory;
 
     @FXML
     private TableColumn<PrescItemRow, Number> colQuantity;
@@ -268,8 +276,7 @@ public class PharmacyController {
     // (display helper; we render text inside colSuggestionQty via cellFactory)
     private static final String SUGG_PLACEHOLDER = "—";
 
-    @FXML
-    private TableColumn<?, ?> colQuantityInentory;
+
 
     @FXML
     private TableColumn<DashboardRow, Number> colSerialPhDashboard;
@@ -312,7 +319,8 @@ public class PharmacyController {
     private TextField searchItems;
 
     @FXML
-    private TextField searchOnInentory;
+    private TextField searchOnInventory;
+
     @FXML
     private TextArea descriptionTf;
 

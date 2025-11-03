@@ -127,6 +127,7 @@ public class ReceptionController {
     @FXML private Label RemainingNum;
 
 
+
     @FXML private Circle ActiveStatus;
     @FXML private TableColumn<?, ?> AppointmentIdColumn;
     @FXML private AnchorPane Appointments;
