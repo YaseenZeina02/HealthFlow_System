@@ -150,35 +150,53 @@ public final class ExcelInventoryIO {
 
             // بدءاً من الصف 1 (بعد العناوين)
             for (int i = 1; i <= last; i++) {
-                Row r = sh.getRow(i);
-                if (r == null) continue;
+                Row row = sh.getRow(i);
+                if (row == null) continue;
 
-                String medicine = getString(r, Col.MEDICINE_NAME.idx);
-                String strength = getString(r, Col.STRENGTH.idx);
-                String form     = getString(r, Col.FORM.idx);
-                String base     = getString(r, Col.BASE_UNIT.idx);
-                Integer qty     = getInteger(r, Col.QUANTITY.idx);
-                String batch    = getString(r, Col.BATCH_NO.idx);
-                LocalDate exp   = getDate(r, Col.EXPIRY.idx);
-                String desc     = getString(r, Col.DESCRIPTION.idx);
+                String medicine = getString(row, Col.MEDICINE_NAME.idx);
+                String strength = getString(row, Col.STRENGTH.idx);
+                String form     = getString(row, Col.FORM.idx);
+                String base     = getString(row, Col.BASE_UNIT.idx);
+                Integer qty     = getInteger(row, Col.QUANTITY.idx);
+                String batch    = getString(row, Col.BATCH_NO.idx);
+
+                // ✅ معالجة التاريخ بمرونة عالية
+                LocalDate expiry = null;
+                try {
+                    Cell expiryCell = row.getCell(Col.EXPIRY.idx);
+                    if (expiryCell != null) {
+                        expiry = parseExcelDate(expiryCell); // يحاول كل أنواع الخلايا
+                        if (expiry == null) {
+                            // fallback للنصوص المكتوبة يدويًا مثل "31/12/2026" أو "2026-12-31"
+                            String expTxt = getString(row, Col.EXPIRY.idx);
+                            expiry = parseDateString(expTxt);
+                        }
+                    }
+                } catch (Exception ignore) {
+                    // fallback إضافي لو فشل الكل
+                    String expTxt = getString(row, Col.EXPIRY.idx);
+                    expiry = parseDateString(expTxt);
+                }
+
+                String desc = getString(row, Col.DESCRIPTION.idx);
 
                 // تخطي الصفوف الفارغة كليّاً
-                boolean allBlank = (isBlank(medicine) && qty == null && isBlank(batch) && exp == null
+                boolean allBlank = (isBlank(medicine) && qty == null && isBlank(batch) && expiry == null
                         && isBlank(strength) && isBlank(form) && isBlank(base) && isBlank(desc));
                 if (allBlank) continue;
 
-                // تحقق و تجميع رسائل الخطأ
+                // تحقق من الحقول المطلوبة
                 List<String> rowErr = new ArrayList<>();
                 if (isBlank(medicine)) rowErr.add("Medicine Name is required");
                 if (qty == null || qty <= 0) rowErr.add("Quantity must be positive");
-                if (exp == null) rowErr.add("Expiry Date is required (YYYY-MM-DD)");
+                if (expiry == null) rowErr.add("Expiry Date is required or invalid format (e.g. 2026-12-31)");
 
                 if (!rowErr.isEmpty()) {
                     errors.add("Row " + (i + 1) + ": " + String.join(", ", rowErr));
                     continue;
                 }
 
-                rows.add(new ReceiveRow(medicine, strength, form, base, qty, batch, exp, desc));
+                rows.add(new ReceiveRow(medicine, strength, form, base, qty, batch, expiry, desc));
             }
         }
 
@@ -234,12 +252,59 @@ public final class ExcelInventoryIO {
         return null;
     }
 
-    private static final java.time.format.DateTimeFormatter[] DATE_PATTERNS = new java.time.format.DateTimeFormatter[] {
-            java.time.format.DateTimeFormatter.ISO_LOCAL_DATE,            // 2026-12-31
-            java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy"),   // 31/12/2026
-            java.time.format.DateTimeFormatter.ofPattern("d/M/yyyy"),     // 1/2/2026
-            java.time.format.DateTimeFormatter.ofPattern("MM/dd/yyyy")    // 12/31/2026
+    // في ExcelInventoryIO.java (داخل الكلاس)
+    private static final java.time.format.DateTimeFormatter[] FLEX_DATE_FORMATS = new java.time.format.DateTimeFormatter[] {
+            java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd"),
+            java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy"),
+            java.time.format.DateTimeFormatter.ofPattern("dd-MM-yyyy"),
+            java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy"),
+            java.time.format.DateTimeFormatter.ofPattern("MM/dd/yyyy"),
+            java.time.format.DateTimeFormatter.ofPattern("MM-dd-yyyy"),
+            java.time.format.DateTimeFormatter.ofPattern("MM.dd.yyyy")
     };
+
+    private static java.time.LocalDate parseDateString(String s) {
+        if (s == null || s.trim().isEmpty()) return null;
+        try { return java.time.LocalDate.parse(s.trim()); } catch (Exception ignore) {}
+        for (var f : FLEX_DATE_FORMATS) {
+            try { return java.time.LocalDate.parse(s.trim(), f); } catch (Exception ignore) {}
+        }
+        return null;
+    }
+
+    private static java.time.LocalDate parseExcelDate(org.apache.poi.ss.usermodel.Cell cell) {
+        if (cell == null) return null;
+        var t = cell.getCellType();
+        if (t == org.apache.poi.ss.usermodel.CellType.NUMERIC) {
+            if (org.apache.poi.ss.usermodel.DateUtil.isCellDateFormatted(cell)) {
+                var d = cell.getDateCellValue().toInstant().atZone(java.time.ZoneId.systemDefault()).toLocalDate();
+                return d;
+            } else {
+                // serial بدون فورمات
+                try {
+                    var d = org.apache.poi.ss.usermodel.DateUtil.getJavaDate(cell.getNumericCellValue(), false)
+                            .toInstant().atZone(java.time.ZoneId.systemDefault()).toLocalDate();
+                    return d;
+                } catch (Exception ignore) {}
+            }
+        } else if (t == org.apache.poi.ss.usermodel.CellType.STRING) {
+            return parseDateString(cell.getStringCellValue());
+        } else if (t == org.apache.poi.ss.usermodel.CellType.FORMULA) {
+            try {
+                if (org.apache.poi.ss.usermodel.DateUtil.isCellDateFormatted(cell)) {
+                    var d = cell.getDateCellValue().toInstant().atZone(java.time.ZoneId.systemDefault()).toLocalDate();
+                    return d;
+                } else {
+                    var d = org.apache.poi.ss.usermodel.DateUtil.getJavaDate(cell.getNumericCellValue(), false)
+                            .toInstant().atZone(java.time.ZoneId.systemDefault()).toLocalDate();
+                    return d;
+                }
+            } catch (Exception ignore) {
+                try { return parseDateString(cell.getStringCellValue()); } catch (Exception ignore2) {}
+            }
+        }
+        return null;
+    }
 
 //    private static java.time.LocalDate readExpiry(org.apache.poi.ss.usermodel.Cell c) {
 //        if (c == null) return null;

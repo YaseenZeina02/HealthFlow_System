@@ -13,6 +13,8 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+
 import javafx.application.Platform;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.concurrent.Task;
@@ -2944,6 +2946,9 @@ public class PharmacyController {
     // ===== Excel: Import (.xlsx) =====
     @FXML
     private void onImportExcelFile() {
+
+
+
         try {
             javafx.stage.FileChooser fc = new javafx.stage.FileChooser();
             fc.setTitle("Select Receive Excel (.xlsx)");
@@ -2955,6 +2960,11 @@ public class PharmacyController {
             var window = (rootPane == null || rootPane.getScene() == null) ? null : rootPane.getScene().getWindow();
             java.io.File file = fc.showOpenDialog(window);
             if (file == null) return;
+
+            if (!file.getName().toLowerCase().endsWith(".xlsx")) {
+                showError("Invalid file format. Please select a valid Excel (.xlsx) file.");
+                return;
+            }
 
             lastExcelDir = file.getParentFile().toPath();
 
@@ -3228,18 +3238,77 @@ public class PharmacyController {
         });
     }
 
+    // reverce Date in Excel to add medicene
+    private LocalDate parseFlexibleDate(String text) {
+        if (text == null || text.isBlank()) return null;
+
+        // جرّب أولاً الصيغة الصحيحة ISO (yyyy-MM-dd)
+        try {
+            return LocalDate.parse(text.trim());
+        } catch (Exception ignore) {}
+
+        // لو فشلت، جرّب الصيغ المعكوسة المحتملة
+        DateTimeFormatter[] formats = new DateTimeFormatter[] {
+                DateTimeFormatter.ofPattern("dd/MM/yyyy"),
+                DateTimeFormatter.ofPattern("dd-MM-yyyy"),
+                DateTimeFormatter.ofPattern("MM/dd/yyyy"),
+                DateTimeFormatter.ofPattern("MM-dd-yyyy")
+        };
+
+        for (DateTimeFormatter fmt : formats) {
+            try {
+                return LocalDate.parse(text.trim(), fmt);
+            } catch (Exception ignore) {}
+        }
+
+        // لو ولا صيغة اشتغلت، رجّع null
+        return null;
+    }
+
+
     @FXML
     private void onSaveReceiveBtn() {
+        // 1) أولاً: لو في استيراد من إكسل جاهز → نُجري الكومِت ونخرج
         if (lastImportResult != null
                 && lastImportResult.rows != null
                 && !lastImportResult.rows.isEmpty()) {
-            // Excel commit
             commitImportedRowsToDb();
-        } else {
-            // Manual single-row save (تستخدم دالتك الحالية كما هي)
-            onSaveReceive();
+            return;
         }
+
+        // 2) خلاف ذلك: مسار الحفظ اليدوي
+        // نطبّع (normalize) تاريخ الانتهاء من محرر الـ DatePicker لو كان مكتوبًا نصيًا
+        if (ExpiryDate != null && ExpiryDate.getValue() == null && ExpiryDate.getEditor() != null) {
+            String txt = ExpiryDate.getEditor().getText();
+            LocalDate exp = parseFlexibleDate(txt);
+            if (exp != null) {
+                // نثبّت التاريخ في الـ DatePicker حتى تستخدمه onSaveReceive()
+                ExpiryDate.setValue(exp);
+            }
+        }
+
+        // 3) نفوّض لباقي التحقق/الحفظ اليدوي الموجود عندك
+        onSaveReceive();
     }
+
+    // شغالة تمام
+//    @FXML
+//    private void onSaveReceiveBtn() {
+//        LocalDate exp = null;
+//        if (ExpiryDate != null && ExpiryDate.getValue() != null) {
+//            exp = ExpiryDate.getValue();
+//        } else if (ExpiryDate != null && ExpiryDate.getEditor() != null) {
+//            // خُذ النص المكتوب يدويًا
+//            String txt = ExpiryDate.getEditor().getText();
+//            exp = parseFlexibleDate(txt);
+//        }
+//
+//        if (exp == null) {
+//            showWarn("Receive", "Expiry date is required or invalid format (try yyyy-MM-dd).");
+//            return;
+//        }
+//
+//    }
 
 
 
