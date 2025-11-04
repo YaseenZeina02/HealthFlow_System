@@ -1234,7 +1234,8 @@ public class PharmacyController {
             colSuggestionQty.setPrefWidth(180);
         }
         if (PresciptionsTable == null) return;
-        PresciptionsTable.setColumnResizePolicy(javafx.scene.control.TableView.UNCONSTRAINED_RESIZE_POLICY);
+//        PresciptionsTable.setColumnResizePolicy(javafx.scene.control.TableView.UNCONSTRAINED_RESIZE_POLICY);
+
         // Serial #
         // -------- Serial # --------
         if (colSerialPhDashboard != null) {
