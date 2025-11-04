@@ -17,21 +17,19 @@ import javafx.application.Platform;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.concurrent.Task;
 import javafx.animation.PauseTransition;
+import javafx.geometry.Pos;
 import javafx.scene.Cursor;
 import com.example.healthflow.core.packaging.PackagingSupport;
 import com.example.healthflow.core.packaging.PackagingSupport.PackagingInfo;
 import com.example.healthflow.core.packaging.PackagingSupport.PackSuggestion;
-
-import javafx.scene.layout.GridPane;
+import javafx.concurrent.Task; // (لو مش موجود بس)
+import javafx.scene.layout.*;
 import javafx.util.Duration;
 import com.example.healthflow.net.ConnectivityMonitor;
 import com.example.healthflow.ui.ConnectivityBanner;
 import com.example.healthflow.ui.OnlineBindings;
 import javafx.fxml.FXML;
 import javafx.scene.control.*;
-import javafx.scene.layout.HBox;
-import javafx.scene.layout.VBox;
-import javafx.scene.layout.AnchorPane;
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
 import org.controlsfx.control.SegmentedButton;
@@ -68,6 +66,9 @@ public class PharmacyController {
 
     private static final int LOW_STOCK_THRESHOLD_UNITS = 20;   // المخزون المنخفض: ≤ 20 وحدة
     private static final int EXPIRY_SOON_DAYS = 30;            // قريب الانتهاء: خلال 30 يومًا
+
+    // Remember last folder used for Excel import/export
+    private java.nio.file.Path lastExcelDir = null;
 
     @FXML
     private VBox rootPane;
@@ -314,12 +315,9 @@ public class PharmacyController {
     @FXML
     private Button saveBtnDeduct;
 
-    @FXML
-    private Button saveBtnReceive;
-    @FXML
-    private Button downloadTemp;
-    @FXML
-    private Button importExcelFile;
+    @FXML private Button saveBtnReceive;
+    @FXML private Button downloadTemp;
+    @FXML private Button importExcelFile;
     @FXML private Label labelFileDetails;
 
     @FXML
@@ -2048,6 +2046,7 @@ public class PharmacyController {
             saveBtnReceive.setOnAction(e -> onSaveReceive());
         }
 
+        applyInventoryNullPlaceholders();
     }
     private void startPharmacyDbNotifications() {
         if (dbn != null) return; // already started
@@ -2438,69 +2437,6 @@ public class PharmacyController {
     }
 
     /**
-     * Opens the Add Medicine dialog with all relevant fields, including Description.
-     */
-//    private void openAddMedicineDialog(String trim) {
-//        Dialog<Void> dialog = new Dialog<>();
-//        dialog.setTitle("Add Medicine");
-//        dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
-//
-//        // Fields for medicine properties
-//        TextField nameTf = new TextField();
-//        TextField strengthTf = new TextField();
-//        TextField formTf = new TextField();
-//        ChoiceBox<String> baseUnit = new ChoiceBox<>(FXCollections.observableArrayList(
-//                "TABLET", "CAPSULE", "SYRUP", "SUSPENSION", "INJECTION", "CREAM", "OINTMENT", "DROPS", "SPRAY"
-//        ));
-//        TextField tabletsPerBlisterTf = new TextField();
-//        TextField blistersPerBoxTf = new TextField();
-//        TextField mlPerBottleTf = new TextField();
-//        TextField gramsPerTubeTf = new TextField();
-//        // Description field (TextArea)
-//        TextArea descriptionTf = new TextArea();
-//        descriptionTf.setPromptText("Description...");
-//        descriptionTf.setPrefRowCount(3);
-//        descriptionTf.setPrefColumnCount(25);
-//
-//        GridPane grid = new GridPane();
-//        grid.setHgap(10);
-//        grid.setVgap(8);
-//
-//        int row = 0;
-//        grid.add(new Label("Name:"), 0, row); grid.add(nameTf, 1, row++);
-//        grid.add(new Label("Strength:"), 0, row); grid.add(strengthTf, 1, row++);
-//        grid.add(new Label("Form:"), 0, row); grid.add(formTf, 1, row++);
-//        grid.add(new Label("Base Unit:"), 0, row); grid.add(baseUnit, 1, row++);
-//        grid.add(new Label("Tablets/Blister:"), 0, row); grid.add(tabletsPerBlisterTf, 1, row++);
-//        grid.add(new Label("Blisters/Box:"), 0, row); grid.add(blistersPerBoxTf, 1, row++);
-//        grid.add(new Label("mL/Bottle:"), 0, row); grid.add(mlPerBottleTf, 1, row++);
-//        grid.add(new Label("g/Tube:"), 0, row); grid.add(gramsPerTubeTf, 1, row++);
-//        grid.add(new Label("Description:"), 0, row); grid.add(descriptionTf, 1, row++);
-//
-//        dialog.getDialogPane().setContent(grid);
-//
-//        dialog.setResultConverter(btn -> {
-//            if (btn == ButtonType.OK) {
-//                String name = nameTf.getText().trim();
-//                String strength = strengthTf.getText().trim();
-//                String form = formTf.getText().trim();
-//                String baseUnitVal = baseUnit.getValue();
-//                Integer tabletsPerBlister = tabletsPerBlisterTf.getText().isEmpty() ? null : Integer.valueOf(tabletsPerBlisterTf.getText());
-//                Integer blistersPerBox = blistersPerBoxTf.getText().isEmpty() ? null : Integer.valueOf(blistersPerBoxTf.getText());
-//                Integer mlPerBottle = mlPerBottleTf.getText().isEmpty() ? null : Integer.valueOf(mlPerBottleTf.getText());
-//                Integer gramsPerTube = gramsPerTubeTf.getText().isEmpty() ? null : Integer.valueOf(gramsPerTubeTf.getText());
-//                String description = descriptionTf.getText();
-//
-//                // Save to DB
-//                saveMedicineToDb(name, strength, form, baseUnitVal, tabletsPerBlister, blistersPerBox, mlPerBottle, gramsPerTube, description);
-//            }
-//            return null;
-//        });
-//
-//        dialog.showAndWait();
-//    }
-
-    /**
      * Save the new medicine to the medicines table, including the description.
      */
     private void saveMedicineToDb(String name, String strength, String form, String baseUnit,
@@ -2573,6 +2509,12 @@ public class PharmacyController {
 
     @FXML
     private void onSaveReceive() {
+    // If an Excel import is pending, commit it and skip manual validations
+        if (lastImportResult != null && lastImportResult.rows != null && !lastImportResult.rows.isEmpty()) {
+            commitImportedRowsToDb();
+            return;
+        }
+
         final String medText = (MedicineNameRecive != null) ? MedicineNameRecive.getText().trim() : "";
         if ((selectedMedicineId == null) && medText.isBlank()) {
             showWarn("Receive", "Select a medicine or type its name.");
@@ -2971,10 +2913,345 @@ public class PharmacyController {
         }
     }
 
+    // ===== Excel: Download Template =====
+    @FXML
+    private void onDownloadTemplate() {
+        try {
+            javafx.stage.DirectoryChooser dc = new javafx.stage.DirectoryChooser();
+            dc.setTitle("Choose folder to save template");
+            if (lastExcelDir != null && java.nio.file.Files.isDirectory(lastExcelDir)) {
+                dc.setInitialDirectory(lastExcelDir.toFile());
+            }
+            var window = (rootPane == null || rootPane.getScene() == null) ? null : rootPane.getScene().getWindow();
+            java.io.File dir = dc.showDialog(window);
+            if (dir == null) return;
+
+            // generate template
+            java.nio.file.Path out = com.example.healthflow.io.ExcelInventoryIO.writeReceiveTemplate(dir.toPath());
+
+            lastExcelDir = dir.toPath(); // remember
+
+            if (labelFileDetails != null) {
+                labelFileDetails.setText("Template saved: " + out.toAbsolutePath());
+            }
+            showInfo("Template created:\n" + out.toAbsolutePath());
+        } catch (Throwable ex) {
+            ex.printStackTrace();
+            showError("Failed to create template: " + (ex.getMessage() == null ? ex.toString() : ex.getMessage()));
+        }
+    }
+
+    // ===== Excel: Import (.xlsx) =====
+    @FXML
+    private void onImportExcelFile() {
+        try {
+            javafx.stage.FileChooser fc = new javafx.stage.FileChooser();
+            fc.setTitle("Select Receive Excel (.xlsx)");
+            fc.getExtensionFilters().setAll(
+                    new javafx.stage.FileChooser.ExtensionFilter("Excel (*.xlsx)", "*.xlsx"));
+            if (lastExcelDir != null && java.nio.file.Files.isDirectory(lastExcelDir)) {
+                fc.setInitialDirectory(lastExcelDir.toFile());
+            }
+            var window = (rootPane == null || rootPane.getScene() == null) ? null : rootPane.getScene().getWindow();
+            java.io.File file = fc.showOpenDialog(window);
+            if (file == null) return;
+
+            lastExcelDir = file.getParentFile().toPath();
+
+            var task = new javafx.concurrent.Task<com.example.healthflow.io.ExcelInventoryIO.Result>() {
+                @Override
+                protected com.example.healthflow.io.ExcelInventoryIO.Result call() throws Exception {
+                    return com.example.healthflow.io.ExcelInventoryIO.readReceiveFile(file);
+                }
+            };
+
+            task.setOnRunning(e -> {
+                setBusy(true, "Reading Excel…");
+            });
+            task.setOnSucceeded(e -> {
+                setBusy(false, null);
+                var result = task.getValue();
+                lastImportResult = result;
+
+                int ok = (result == null) ? 0 : result.okCount();
+                int err = (result != null && result.hasErrors()) ? result.errors.size() : 0;
+
+                StringBuilder sb = new StringBuilder();
+                sb.append("File: ").append(file.getName())
+                        .append("\nRows OK: ").append(ok);
+                if (err > 0) {
+                    sb.append("\nErrors: ").append(err);
+                    int limit = Math.min(5, err);
+                    for (int i = 0; i < limit; i++) sb.append("\n - ").append(result.errors.get(i));
+                    if (err > 5) sb.append("\n ... and ").append(err - 5).append(" more");
+                }
+
+                if (labelFileDetails != null) {
+                    labelFileDetails.setWrapText(true);
+                    labelFileDetails.setText(sb.toString());
+                }
+
+                if (saveBtnReceive != null) {
+                    // The button might be bound in FXML; unbind before setting state.
+                    if (saveBtnReceive.disableProperty().isBound()) {
+                        saveBtnReceive.disableProperty().unbind();
+                    }
+                    boolean noOk = (ok == 0);
+                    saveBtnReceive.setDisable(noOk);
+                    saveBtnReceive.setText(noOk ? "Save" : ("Save (" + ok + " imported)"));
+                }
+
+                showInfo(sb.toString());
+            });
+            task.setOnFailed(e -> {
+                setBusy(false, "Failed to import file");
+                Throwable ex = task.getException();
+                ex.printStackTrace();
+                showError("Failed to import file: " + (ex.getMessage() == null ? ex.toString() : ex.getMessage()));
+            });
+
+            new Thread(task, "excel-read").start();
+
+        } catch (Throwable ex) {
+            setBusy(false, null);
+            ex.printStackTrace();
+            showError("Failed to import file: " + (ex.getMessage() == null ? ex.toString() : ex.getMessage()));
+        }
+    }
+
+    // احفظ نتيجة آخر استيراد لحد ما نضغط Save
+    private com.example.healthflow.io.ExcelInventoryIO.Result lastImportResult;
+
+    private void commitImportedRowsToDb() {
+        if (lastImportResult == null || lastImportResult.rows == null || lastImportResult.rows.isEmpty()) {
+            showWarn("Import", "No imported data available.");
+            return;
+        }
+        final var rows = lastImportResult.rows;
+
+        var task = new javafx.concurrent.Task<Integer>() {
+            @Override
+            protected Integer call() throws Exception {
+                return commitImportedRowsToDbInternal(rows);
+            }
+        };
+
+        task.setOnRunning(e -> setBusy(true, "Saving imported rows..."));
+        task.setOnSucceeded(e -> {
+            setBusy(false, null);
+            int saved = task.getValue();
+            showInfo("Imported rows committed successfully. Saved: " + saved);
+            lastImportResult = null;
+            if (saveBtnReceive != null) {
+                if (saveBtnReceive.disableProperty().isBound()) {
+                    saveBtnReceive.disableProperty().unbind();
+                }
+                saveBtnReceive.setText("Save");
+                saveBtnReceive.setDisable(false);
+            }
+            reloadInventoryTable();
+        });
+        task.setOnFailed(e -> {
+            setBusy(false, null);
+            Throwable ex = task.getException();
+            ex.printStackTrace();
+            showError("Commit failed: " + (ex.getMessage() == null ? ex.toString() : ex.getMessage()));
+        });
+
+        new Thread(task, "excel-commit").start();
+    }
+    private int commitImportedRowsToDbInternal(
+            java.util.List<com.example.healthflow.io.ExcelInventoryIO.ReceiveRow> rows) throws Exception {
+
+        if (rows == null || rows.isEmpty()) return 0;
+
+        try (Connection c = Database.get()) {
+            c.setAutoCommit(false);
+            final Long pharmacistId = requireCurrentPharmacistId(); // ممكن يكون null
+
+            final String upsertBatchSql = """
+            INSERT INTO medicine_batches (medicine_id, batch_no, expiry_date, quantity)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT (medicine_id, batch_no) DO UPDATE
+               SET expiry_date = LEAST(medicine_batches.expiry_date, EXCLUDED.expiry_date),
+                   quantity    = medicine_batches.quantity + EXCLUDED.quantity
+            RETURNING id
+        """;
+
+            final String insertTxSql = """
+            INSERT INTO inventory_transactions (medicine_id, batch_id, qty_change, reason, ref_type, pharmacist_id)
+            VALUES (?, ?, ?, 'RECEIVE', 'excel_import', ?)
+        """;
+
+            final String createMedSql = """
+            INSERT INTO medicines
+              (name, strength, form, base_unit, description)
+            VALUES
+              (?, NULLIF(?,''), NULLIF(?,''), NULLIF(?, '')::med_unit, NULLIF(?, ''))
+            ON CONFLICT DO NOTHING
+            RETURNING id
+        """;
+
+            int ok = 0;
+
+            try (PreparedStatement psBatch = c.prepareStatement(upsertBatchSql);
+                 PreparedStatement psTx    = c.prepareStatement(insertTxSql);
+                 PreparedStatement psMed   = c.prepareStatement(createMedSql)) {
+
+                for (var row : rows) {
+                    if (row == null) continue;
+
+                    Long   medId     = row.getMedicineId();
+                    String name      = safeTrim(row.getMedicineName());
+                    String strength  = safeTrim(row.getStrength());
+                    String form      = safeTrim(row.getForm());
+                    String baseUnit  = safeTrim(row.getBaseUnit());
+                    Integer qty      = row.getQuantity();
+                    String batchNo   = safeTrim(row.getBatchNo());
+                    // خُذ التاريخ من أي حقل موجود
+                    java.time.LocalDate expiry = (row.getExpiryDate() != null ? row.getExpiryDate()
+                            : row.getExpiry());
+                    String desc = safeTrim(row.getDescription());
+
+                    // تحقق صلاحية الصف
+                    if (qty == null || qty <= 0 || batchNo == null || batchNo.isBlank() || expiry == null) {
+                        continue;
+                    }
+
+                    // حلّ هوية الدواء إن كانت مفقودة
+                    if (medId == null) {
+                        // حاول باسم العرض (name + strength + form)
+                        String displayTry = ((name == null) ? "" : name)
+                                + ((strength == null || strength.isBlank()) ? "" : " " + strength)
+                                + ((form == null || form.isBlank()) ? "" : " " + form);
+
+                        medId = resolveMedicineIdByDisplayOrName(displayTry);
+
+                        // أنشئ الدواء إذا ما لقيناه وكان عندنا اسم
+                        if (medId == null && name != null && !name.isBlank()) {
+                            psMed.clearParameters();
+                            psMed.setString(1, name);
+                            psMed.setString(2, strength);
+                            psMed.setString(3, form);
+                            psMed.setString(4, baseUnit);
+                            psMed.setString(5, desc);
+                            try (ResultSet rs = psMed.executeQuery()) {
+                                if (rs.next()) medId = rs.getLong(1);
+                            }
+                            // لو ما رجع id (بسبب CONFLICT)، حاول نحلّه مجددًا بالاسم الصافي
+                            if (medId == null) {
+                                medId = resolveMedicineIdByDisplayOrName(name);
+                            }
+                        }
+                    }
+                    if (medId == null) continue; // ما نقدر نكمل بدون دواء
+
+                    // UPSERT لدفعة المخزون
+                    psBatch.clearParameters();
+                    psBatch.setLong(1, medId);
+                    psBatch.setString(2, batchNo);
+                    psBatch.setDate(3, java.sql.Date.valueOf(expiry));
+                    psBatch.setInt(4, qty);
+
+                    long batchId;
+                    try (ResultSet rs = psBatch.executeQuery()) {
+                        rs.next();
+                        batchId = rs.getLong(1);
+                    }
+
+                    // سجل الحركة
+                    psTx.clearParameters();
+                    psTx.setLong(1, medId);
+                    psTx.setLong(2, batchId);
+                    psTx.setInt(3,  qty);
+                    if (pharmacistId == null) psTx.setNull(4, java.sql.Types.BIGINT);
+                    else                      psTx.setLong(4, pharmacistId);
+                    psTx.executeUpdate();
+
+                    ok++;
+                }
+            } catch (Exception ex) {
+                c.rollback();
+                throw ex;
+            }
+
+            c.commit();
+            return ok;
+        }
+    }
+
+    private static String safeTrim(String s) {
+        return (s == null ? null : s.trim());
+    }
+
+
+    // (overlay no longer used; keeping fields for now)
+    private StackPane busyOverlay;
+    private Label busyText;
+
+    private void ensureBusyOverlay() {
+        if (rootPane == null) return;
+        if (busyOverlay != null) return;
+
+        busyOverlay = new StackPane();
+        busyOverlay.setStyle("-fx-background-color: rgba(0,0,0,0.35);");
+        ProgressIndicator pi = new ProgressIndicator();
+        busyText = new Label("Loading...");
+        VBox box = new VBox(12, pi, busyText);
+        box.setAlignment(Pos.CENTER);
+        busyOverlay.getChildren().add(box);
+        busyOverlay.setVisible(false);
+
+        // rootPane عندك StackPane، فنقدر نركّب الطبقة فوقه
+        rootPane.getChildren().add(busyOverlay);
+        StackPane.setAlignment(busyOverlay, Pos.CENTER);
+    }
+
+    private void setBusy(boolean on, String msg) {
+        javafx.application.Platform.runLater(() -> {
+            // Show status in the footer label instead of dimming the whole UI.
+            if (labelFileDetails != null) {
+                String prefix = on ? "⏳ " : "✔ ";
+                if (msg != null && !msg.isBlank()) {
+                    labelFileDetails.setText(prefix + msg);
+                } else if (!on) {
+                    // keep the previous details text if we're just clearing busy state
+                }
+            }
+            // Disable the Save button while busy (after unbinding if needed).
+            if (saveBtnReceive != null) {
+                if (saveBtnReceive.disableProperty().isBound()) {
+                    saveBtnReceive.disableProperty().unbind();
+                }
+                saveBtnReceive.setDisable(on);
+            }
+        });
+    }
+
+    @FXML
+    private void onSaveReceiveBtn() {
+        if (lastImportResult != null
+                && lastImportResult.rows != null
+                && !lastImportResult.rows.isEmpty()) {
+            // Excel commit
+            commitImportedRowsToDb();
+        } else {
+            // Manual single-row save (تستخدم دالتك الحالية كما هي)
+            onSaveReceive();
+        }
+    }
+
+
+
 
     // --- Make inventory table rows open the details dialog with editable threshold ---
     {
         javafx.application.Platform.runLater(() -> {
+            if (saveBtnReceive != null) {
+                // always route Save to the unified handler
+                saveBtnReceive.setOnAction(ev -> onSaveReceiveBtn());
+            }
+
             if (TableMedicinesInventory != null) {
                 TableMedicinesInventory.setRowFactory(tv -> {
                     TableRow<InventoryRow> row = new TableRow<>();
