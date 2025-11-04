@@ -177,6 +177,7 @@ public class ReceptionController {
     @FXML private TableColumn<ApptRow, String> colRoomNumber;
 
     @FXML private Label LabelToAlert;
+
     @FXML private Label getPatientName;
     @FXML private Label getPatientID;
 
@@ -1361,7 +1362,7 @@ public class ReceptionController {
     private void wireAppointmentsTables() {
         if (TableINAppointment == null) return;
        //TableINAppointment.setColumnResizePolicy(TableView.UNCONSTRAINED_RESIZE_POLICY);
-        TableINAppointment.setColumnResizePolicy(TableView.UNCONSTRAINED_RESIZE_POLICY);
+        //TableINAppointment.setColumnResizePolicy(TableView.UNCONSTRAINED_RESIZE_POLICY);
 
         TableINAppointment.setFixedCellSize(-1);
 
