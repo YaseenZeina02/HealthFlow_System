@@ -973,3 +973,12 @@ END IF;
 END $$;
 
 ALTER TYPE med_unit ADD VALUE IF NOT EXISTS 'SPRAY';
+
+ALTER TABLE medicines
+    ADD COLUMN IF NOT EXISTS reorder_threshold INT NOT NULL DEFAULT 20 CHECK (reorder_threshold >= 0);
+
+
+ALTER TABLE inventory_transactions
+    ADD COLUMN IF NOT EXISTS pharmacist_id BIGINT REFERENCES pharmacists(id);
+
+

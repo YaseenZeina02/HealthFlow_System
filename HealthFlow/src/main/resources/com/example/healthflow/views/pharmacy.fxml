@@ -411,7 +411,7 @@
                               <String fx:value="shadow" />
                            </styleClass>
                            <children>
-                              <AnchorPane fx:id="InventoryPane" layoutY="47.0" prefHeight="491.0" prefWidth="870.0" stylesheets="@../Design/ReceptionDesign.css" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="47.0">
+                              <AnchorPane fx:id="InventoryPane" layoutY="47.0" prefHeight="491.0" prefWidth="870.0" stylesheets="@../Design/ReceptionDesign.css" visible="false" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="47.0">
                                  <children>
                                     <Label layoutX="18.0" layoutY="13.0" prefHeight="23.0" prefWidth="205.0" styleClass="header-top" stylesheets="@../Design/ReceptionDesign.css" text="Inentory Contents" AnchorPane.leftAnchor="18.0" AnchorPane.topAnchor="13.0">
                                        <font>
@@ -419,7 +419,7 @@
                                        </font>
                                     </Label>
                                     <TextField fx:id="searchOnInventory" layoutX="640.0" layoutY="21.0" prefHeight="26.0" prefWidth="215.0" promptText="search" styleClass="box" stylesheets="@../Design/ReceptionDesign.css" AnchorPane.rightAnchor="15.0" AnchorPane.topAnchor="21.0" />
-                                    <TableView fx:id="TableMedicinesInventory" layoutX="15.0" layoutY="46.0" prefHeight="247.0" prefWidth="839.0" stylesheets="@../Design/ReceptionDesign.css" AnchorPane.bottomAnchor="177.0" AnchorPane.leftAnchor="16.0" AnchorPane.rightAnchor="15.0" AnchorPane.topAnchor="67.0">
+                                    <TableView fx:id="TableMedicinesInventory" layoutX="15.0" layoutY="46.0" nodeOrientation="LEFT_TO_RIGHT" prefHeight="312.0" prefWidth="839.0" style="-fx-background-radius: 8;" stylesheets="@../Design/ReceptionDesign.css" AnchorPane.bottomAnchor="112.0" AnchorPane.leftAnchor="16.0" AnchorPane.rightAnchor="15.0" AnchorPane.topAnchor="67.0">
                                        <columns>
                                           <TableColumn fx:id="colSerialInventory" maxWidth="1000.0" prefWidth="50.0" text="#" />
                                           <TableColumn fx:id="colMedicineNameInventory" prefWidth="116.0" text="Medicine Name" />
@@ -436,39 +436,39 @@
                                           <TableView fx:constant="CONSTRAINED_RESIZE_POLICY" />
                                        </columnResizePolicy>
                                     </TableView>
-                                    <AnchorPane layoutX="18.0" layoutY="320.0" prefHeight="169.0" prefWidth="201.0" style="-fx-border-color: #3232; -fx-border-radius: 10px;" styleClass="white-bg" AnchorPane.rightAnchor="651.0" AnchorPane.topAnchor="320.0">
+                                    <AnchorPane layoutX="87.0" layoutY="390.0" prefHeight="87.0" prefWidth="696.0" style="-fx-border-color: #3232; -fx-border-radius: 10px;" styleClass="white-bg" AnchorPane.bottomAnchor="14.0" AnchorPane.leftAnchor="87.0" AnchorPane.rightAnchor="87.0">
                                        <children>
-                                          <Label layoutX="19.0" layoutY="11.0" prefHeight="25.0" prefWidth="140.0" styleClass="text-gradient" stylesheets="@../Design/ReceptionDesign.css" text="Some Information">
+                                          <Label layoutX="266.0" layoutY="14.0" prefHeight="25.0" prefWidth="140.0" styleClass="text-gradient" stylesheets="@../Design/ReceptionDesign.css" text="Some Information" AnchorPane.bottomAnchor="48.0" AnchorPane.leftAnchor="265.0" AnchorPane.rightAnchor="290.0">
                                              <font>
                                                 <Font name="System Bold Italic" size="21.0" />
                                              </font>
                                           </Label>
-                                          <Label layoutX="7.0" layoutY="54.0" prefHeight="25.0" prefWidth="122.0" styleClass="text-gradient" stylesheets="@../Design/ReceptionDesign.css" text="Total medicines:">
+                                          <Label layoutX="20.0" layoutY="54.0" prefHeight="25.0" prefWidth="122.0" styleClass="text-gradient" stylesheets="@../Design/ReceptionDesign.css" text="Total medicines:" AnchorPane.bottomAnchor="8.0" AnchorPane.leftAnchor="20.0" AnchorPane.rightAnchor="553.0">
                                              <font>
                                                 <Font name="System Bold Italic" size="22.0" />
                                              </font>
                                           </Label>
-                                          <Label layoutX="27.0" layoutY="94.0" prefHeight="25.0" prefWidth="82.0" styleClass="text-gradient" stylesheets="@../Design/ReceptionDesign.css" text="Low stock:" AnchorPane.leftAnchor="27.0" AnchorPane.rightAnchor="89.0">
+                                          <Label layoutX="266.0" layoutY="56.0" prefHeight="5.0" prefWidth="100.0" styleClass="text-gradient" stylesheets="@../Design/ReceptionDesign.css" text="Low stock:" AnchorPane.bottomAnchor="11.0" AnchorPane.rightAnchor="330.0">
                                              <font>
                                                 <Font name="System Bold Italic" size="22.0" />
                                              </font>
                                           </Label>
-                                          <Label layoutX="20.0" layoutY="130.0" prefHeight="25.0" prefWidth="108.0" styleClass="text-gradient" stylesheets="@../Design/ReceptionDesign.css" text="Expiring soon:" AnchorPane.leftAnchor="20.0" AnchorPane.rightAnchor="77.0">
+                                          <Label layoutX="513.0" layoutY="54.0" prefHeight="25.0" prefWidth="111.0" styleClass="text-gradient" stylesheets="@../Design/ReceptionDesign.css" text="Expiring soon:" AnchorPane.bottomAnchor="8.0" AnchorPane.leftAnchor="513.0" AnchorPane.rightAnchor="71.0">
                                              <font>
                                                 <Font name="System Bold Italic" size="22.0" />
                                              </font>
                                           </Label>
-                                          <Label fx:id="TotalmedicinesNumber" layoutX="136.0" layoutY="54.0" prefHeight="25.0" prefWidth="45.0" styleClass="text-gradient" stylesheets="@../Design/ReceptionDesign.css" text="0">
+                                          <Label fx:id="TotalmedicinesNumber" layoutX="147.0" layoutY="53.0" prefHeight="25.0" prefWidth="47.0" styleClass="text-gradient" stylesheets="@../Design/ReceptionDesign.css" text="0" AnchorPane.bottomAnchor="10.0" AnchorPane.leftAnchor="146.0" AnchorPane.rightAnchor="503.0">
                                              <font>
                                                 <Font name="System Bold Italic" size="22.0" />
                                              </font>
                                           </Label>
-                                          <Label fx:id="LowStockMedicine" layoutX="135.0" layoutY="94.0" prefHeight="25.0" prefWidth="39.0" styleClass="text-gradient" stylesheets="@../Design/ReceptionDesign.css" text="0">
+                                          <Label fx:id="LowStockMedicine" layoutX="355.0" layoutY="54.0" prefHeight="25.0" prefWidth="39.0" styleClass="text-gradient" stylesheets="@../Design/ReceptionDesign.css" text="0" AnchorPane.bottomAnchor="9.0" AnchorPane.rightAnchor="302.0">
                                              <font>
                                                 <Font name="System Bold Italic" size="22.0" />
                                              </font>
                                           </Label>
-                                          <Label fx:id="ExpiringSoonMedicine" layoutX="135.0" layoutY="130.0" prefHeight="25.0" prefWidth="47.0" styleClass="text-gradient" stylesheets="@../Design/ReceptionDesign.css" text="0">
+                                          <Label fx:id="ExpiringSoonMedicine" layoutX="629.0" layoutY="54.0" prefHeight="25.0" prefWidth="47.0" styleClass="text-gradient" stylesheets="@../Design/ReceptionDesign.css" text="0" AnchorPane.bottomAnchor="8.0" AnchorPane.leftAnchor="621.0" AnchorPane.rightAnchor="27.0">
                                              <font>
                                                 <Font name="System Bold Italic" size="22.0" />
                                              </font>
@@ -481,7 +481,7 @@
                                     <String fx:value="radius" />
                                  </styleClass>
                               </AnchorPane>
-                              <AnchorPane fx:id="ReceivePane" prefHeight="491.0" prefWidth="870.0" stylesheets="@../Design/ReceptionDesign.css" visible="false" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="47.0">
+                              <AnchorPane fx:id="ReceivePane" prefHeight="491.0" prefWidth="870.0" stylesheets="@../Design/ReceptionDesign.css" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="47.0">
                                  <children>
                                     <Label layoutX="22.0" layoutY="83.0" prefHeight="25.0" prefWidth="112.0" styleClass="text-gradient" stylesheets="@../Design/ReceptionDesign.css" text="Batch Number">
                                        <font>
@@ -512,7 +512,7 @@
                                        </font>
                                     </Label>
                                     <DatePicker fx:id="ExpiryDate" layoutX="157.0" layoutY="232.0" prefHeight="48.0" prefWidth="160.0" styleClass="box" stylesheets="@../Design/ReceptionDesign.css" />
-                                    <Button fx:id="saveBtnReceive" layoutX="778.0" layoutY="430.0" minWidth="45.0" mnemonicParsing="false" prefHeight="33.0" prefWidth="64.0" styleClass="btn-2" stylesheets="@../Design/ReceptionDesign.css" text="save" />
+                                    <Button fx:id="saveBtnReceive" layoutX="768.0" layoutY="436.0" minWidth="45.0" mnemonicParsing="false" prefHeight="33.0" prefWidth="75.0" styleClass="btn-2" stylesheets="@../Design/ReceptionDesign.css" text="save" />
                                     <VBox fx:id="medBox" fillWidth="true" layoutX="528.0" layoutY="71.0" prefHeight="168.0" prefWidth="328.0">
 
                                              <!-- جدول الاقتراحات يظهر/يختفي -->
@@ -530,7 +530,10 @@
                                        </font>
                                     </Label>
                                     <TextArea fx:id="descriptionTf" layoutX="158.0" layoutY="291.0" prefHeight="127.0" prefWidth="244.0" styleClass="box" />
-                                    <Label fx:id="MedicineLabelDt" layoutX="527.0" layoutY="247.0" prefHeight="54.0" prefWidth="332.0" />
+                                    <Label fx:id="MedicineLabelDt" layoutX="527.0" layoutY="247.0" prefHeight="54.0" prefWidth="332.0" text="label to get medicen detailes" />
+                                    <Button fx:id="downloadTemp" layoutX="389.0" layoutY="436.0" minWidth="45.0" mnemonicParsing="false" prefHeight="33.0" prefWidth="174.0" styleClass="btn-2" stylesheets="@../Design/ReceptionDesign.css" text="Download Template .xlsx" />
+                                    <Button fx:id="importExcelFile" layoutX="576.0" layoutY="436.0" minWidth="45.0" mnemonicParsing="false" prefHeight="33.0" prefWidth="174.0" styleClass="btn-2" stylesheets="@../Design/ReceptionDesign.css" text=" Import (.xlsx) " />
+                                    <Label fx:id="labelFileDetails" layoutX="576.0" layoutY="397.0" prefHeight="29.0" prefWidth="236.0" text="label to write file name" />
 <!--                                    <TextField fx:id="MedicineNameRecive" layoutX="154.0" layoutY="179.0" promptText="Type medicine name..." />-->
                                  </children>
                                  <styleClass>

@@ -1,8 +1,8 @@
+
 package com.example.healthflow.controllers;
 
 import com.example.healthflow.dao.PrescriptionDAO;
 import com.example.healthflow.dao.PrescriptionDAO.DashboardRow;
-import com.example.healthflow.model.dto.InventoryRow;
 import com.example.healthflow.service.AuthService.Session;
 import com.example.healthflow.dao.PrescriptionItemDAO;
 import com.example.healthflow.db.Database;
@@ -40,6 +40,11 @@ import javafx.scene.input.MouseEvent;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.scene.control.cell.PropertyValueFactory;
+import com.example.healthflow.model.dto.InventoryRow;
+import com.example.healthflow.dao.PharmacyQueries;
+
+import javafx.collections.transformation.FilteredList;
+import javafx.collections.transformation.SortedList;
 
 public class PharmacyController {
 
@@ -58,9 +63,15 @@ public class PharmacyController {
     private LocalDate lastLoadedDate = null;
     private PauseTransition dpDebounce;
 
+    private final PharmacyQueries queries = new PharmacyQueries();
+    // ===== Inventory summary thresholds =====
+
+    private static final int LOW_STOCK_THRESHOLD_UNITS = 20;   // المخزون المنخفض: ≤ 20 وحدة
+    private static final int EXPIRY_SOON_DAYS = 30;            // قريب الانتهاء: خلال 30 يومًا
 
     @FXML
     private VBox rootPane;
+
 
     @FXML
     private Label AppointmentDate;
@@ -144,8 +155,7 @@ public class PharmacyController {
 
     @FXML
     private AnchorPane ReceivePane;
-//    @FXML
-//    private AnchorPane InventoryPane;
+
 
     @FXML
     private Label RejectedNumber;
@@ -242,38 +252,33 @@ public class PharmacyController {
     @FXML
     private TableColumn<PrescItemRow, String> colMedicineName;
 
-
-    //    Table in Inventory
     @FXML private TableView<InventoryRow> TableMedicinesInventory;
     @FXML private TableColumn<InventoryRow, Number>   colSerialInventory;
-    @FXML private TableColumn<InventoryRow, String>   colMedicineNameInventory;
+    @FXML private TableColumn<InventoryRow, String>   colMedicineNameInventory; // اسم الدواء
     @FXML private TableColumn<InventoryRow, String>   colMedicineForm;
     @FXML private TableColumn<InventoryRow, String>   colMedicineBase;
     @FXML private TableColumn<InventoryRow, Number>   colQuantityInventory;
-    @FXML private TableColumn<InventoryRow, String>   colMedicineBatchNextNumber;
-    @FXML private TableColumn<InventoryRow, Number>   colQtyNext;
-    @FXML private TableColumn<InventoryRow, java.time.LocalDate> colExpiryNext;
-    @FXML private TableColumn<InventoryRow, String>   colReceivedAt;
+    @FXML private TableColumn<InventoryRow, String>   colMedicineBatchNextNumber;  // رقم الدفعة الأقدم
+    @FXML private TableColumn<InventoryRow, Number>   colQtyNext;                  // كمية تلك الدفعة
+    @FXML private TableColumn<InventoryRow, java.time.LocalDate> colExpiryNext;    // تاريخ انتهاء الدفعة
     @FXML private TableColumn<InventoryRow, String>   colReceivedBy;
+    @FXML private TableColumn<InventoryRow, String>   colReceivedAt;
 
-
-
-
-
-
+    // Backing data + filters/sorters for Inventory table
+    private final ObservableList<InventoryRow> inventoryRows = FXCollections.observableArrayList();
+    private FilteredList<InventoryRow> invFiltered;
+    private SortedList<InventoryRow>   invSorted;
 
     @FXML
     private TableColumn<DashboardRow, String> colPatientName;
 
     @FXML
     private TableColumn<PrescItemRow, Void> colPresesItemAction;
-
-
     @FXML
     private TableColumn<PrescItemRow, Number> colQuantity;
     @FXML
     private TableColumn<PrescItemRow, Number> colSuggestionQty;
-    // (display helper; we render text inside colSuggestionQty via cellFactory)
+
     private static final String SUGG_PLACEHOLDER = "—";
 
 
@@ -311,6 +316,11 @@ public class PharmacyController {
 
     @FXML
     private Button saveBtnReceive;
+    @FXML
+    private Button downloadTemp;
+    @FXML
+    private Button importExcelFile;
+    @FXML private Label labelFileDetails;
 
     @FXML
     private TextField searchDashbord;
@@ -379,6 +389,142 @@ public class PharmacyController {
             active.getStyleClass().add(ACTIVE_CLASS);
         }
     }
+    /** One-time setup for Inventory table columns and row factory. */
+    private void initInventoryTableIfNeeded() {
+        if (TableMedicinesInventory == null) return;
+
+        if (TableMedicinesInventory.getItems() == null) {
+            TableMedicinesInventory.setItems(inventoryRows);
+        }
+
+        // Serial #
+        if (colSerialInventory != null) {
+            colSerialInventory.setCellValueFactory(cf ->
+                    new javafx.beans.property.SimpleIntegerProperty(
+                            cf.getTableView().getItems().indexOf(cf.getValue()) + 1));
+            colSerialInventory.setStyle("-fx-alignment: CENTER;");
+        }
+
+        // Value factories
+        if (colMedicineNameInventory != null)
+            colMedicineNameInventory.setCellValueFactory(new PropertyValueFactory<>("displayName"));
+        if (colMedicineForm != null)
+            colMedicineForm.setCellValueFactory(new PropertyValueFactory<>("form"));
+        if (colMedicineBase != null)
+            colMedicineBase.setCellValueFactory(new PropertyValueFactory<>("baseUnit"));
+        if (colQuantityInventory != null)
+            colQuantityInventory.setCellValueFactory(new PropertyValueFactory<>("availableQuantity"));
+        if (colMedicineBatchNextNumber != null)
+            colMedicineBatchNextNumber.setCellValueFactory(new PropertyValueFactory<>("nextBatchNo"));
+        if (colQtyNext != null)
+            colQtyNext.setCellValueFactory(new PropertyValueFactory<>("nextBatchQty"));
+        if (colExpiryNext != null)
+            colExpiryNext.setCellValueFactory(new PropertyValueFactory<>("nextExpiry"));
+        if (colReceivedBy != null)
+            colReceivedBy.setCellValueFactory(new PropertyValueFactory<>("receivedBy"));
+        if (colReceivedAt != null)
+            colReceivedAt.setCellValueFactory(new PropertyValueFactory<>("receivedAt"));
+
+        // لف نص اسم الدواء
+        if (colMedicineNameInventory != null) {
+            colMedicineNameInventory.setCellFactory(tc -> new TableCell<>() {
+                private final Label lbl = new Label();
+                { lbl.setWrapText(true); }
+                @Override protected void updateItem(String item, boolean empty) {
+                    super.updateItem(item, empty);
+                    if (empty || item == null) { setGraphic(null); return; }
+                    lbl.setText(item);
+                    setGraphic(lbl);
+                }
+            });
+        }
+
+        // تلوين تاريخ الانتهاء
+        if (colExpiryNext != null) {
+            colExpiryNext.setCellFactory(tc -> new TableCell<>() {
+                @Override protected void updateItem(java.time.LocalDate d, boolean empty) {
+                    super.updateItem(d, empty);
+                    if (empty || d == null) { setText(null); setStyle(""); return; }
+                    setText(d.toString());
+                    long days = java.time.temporal.ChronoUnit.DAYS
+                            .between(java.time.LocalDate.now(APP_TZ), d);
+                    if (days <= 0) setStyle("-fx-text-fill:#b91c1c; -fx-font-weight:bold;"); // منتهي
+                    else if (days <= 30) setStyle("-fx-text-fill:#b45309;");                 // قريب الانتهاء
+                    else setStyle("");
+                }
+            });
+        }
+
+        // دبل-كليك: تفاصيل سريعة
+//        TableMedicinesInventory.setRowFactory(tv -> {
+//            TableRow<InventoryRow> row = new TableRow<>();
+//            row.setOnMouseClicked(e -> {
+//                if (e.getClickCount() == 2 && !row.isEmpty()) {
+//                    InventoryRow r = row.getItem();
+//                    showInventoryQuickDetails(r);
+//                }
+//            });
+//            return row;
+//        });
+
+        if (TableMedicinesInventory != null) {
+            TableMedicinesInventory.setRowFactory(tv -> {
+                TableRow<InventoryRow> row = new TableRow<>();
+                row.setOnMouseClicked(ev -> {
+                    if (ev.getClickCount() == 2 && !row.isEmpty()) {
+                        showInventoryDetailsDialog(row.getItem());
+                    }
+                });
+                return row;
+            });
+        }
+
+        if (TableMedicinesInventory.getPlaceholder() == null) {
+            TableMedicinesInventory.setPlaceholder(new Label("No content in table"));
+        }
+
+        // البحث الحيّ (مرة واحدة)
+        if (searchOnInventory != null && invFiltered == null) {
+            invFiltered = new FilteredList<>(inventoryRows, r -> true);
+            invSorted   = new SortedList<>(invFiltered);
+            invSorted.comparatorProperty().bind(TableMedicinesInventory.comparatorProperty());
+            TableMedicinesInventory.setItems(invSorted);
+
+            searchOnInventory.textProperty().addListener((obs, a, b) -> {
+                String q = (b == null ? "" : b.trim().toLowerCase());
+                invFiltered.setPredicate(r -> {
+                    if (q.isEmpty()) return true;
+                    return (r.getDisplayName() != null && r.getDisplayName().toLowerCase().contains(q))
+                            || (r.getForm() != null && r.getForm().toLowerCase().contains(q))
+                            || (r.getBaseUnit() != null && r.getBaseUnit().toLowerCase().contains(q))
+                            || (r.getNextBatchNo() != null && r.getNextBatchNo().toLowerCase().contains(q))
+                            || (r.getReceivedBy() != null && r.getReceivedBy().toLowerCase().contains(q))
+                            || (r.getReceivedAt() != null && r.getReceivedAt().toLowerCase().contains(q));
+                });
+            });
+        }
+        applyInventoryNullPlaceholders();
+    }
+
+    private void showInventoryQuickDetails(InventoryRow r) {
+        Dialog<Void> dlg = new Dialog<>();
+        dlg.setTitle("Medicine Details");
+        dlg.getDialogPane().getButtonTypes().add(ButtonType.CLOSE);
+        GridPane gp = new GridPane(); gp.setHgap(12); gp.setVgap(8);
+        int i = 0;
+        gp.addRow(i++, new Label("Name:"),  new Label(r.getDisplayName()));
+        gp.addRow(i++, new Label("Form:"),  new Label(r.getForm()==null? "" : r.getForm()));
+        gp.addRow(i++, new Label("Base:"),  new Label(r.getBaseUnit()==null? "" : r.getBaseUnit()));
+        gp.addRow(i++, new Label("Available:"), new Label(String.valueOf(r.getAvailableQuantity())));
+        gp.addRow(i++, new Label("Next Batch:"), new Label(r.getNextBatchNo()==null? "—" : r.getNextBatchNo()));
+        gp.addRow(i++, new Label("Qty (Next):"), new Label(r.getNextBatchQty()==null? "—" : String.valueOf(r.getNextBatchQty())));
+        gp.addRow(i++, new Label("Expiry (Next):"), new Label(r.getNextExpiry()==null? "—" : r.getNextExpiry().toString()));
+        gp.addRow(i++, new Label("Received By:"), new Label(r.getReceivedBy()==null? "—" : r.getReceivedBy()));
+        gp.addRow(i++, new Label("Received At:"), new Label(r.getReceivedAt()==null? "—" : r.getReceivedAt()));
+        dlg.getDialogPane().setContent(gp);
+        dlg.showAndWait();
+    }
+
 
     private void startClock() {
         if (time != null) {
@@ -694,9 +840,32 @@ public class PharmacyController {
     private volatile boolean autoRefreshStarted = false;
 
 
-    // لازم تتعدل عندما ننتهي من المخزن
+    // ===== Inventory: loader =====
     private void reloadInventoryTable() {
-        // استعمل اللودر الموجود في المخزون
+        if (TableMedicinesInventory == null) return;
+        initInventoryTableIfNeeded();
+
+        Task<ObservableList<InventoryRow>> task = new Task<>() {
+            @Override protected ObservableList<InventoryRow> call() throws Exception {
+                ObservableList<InventoryRow> rows = FXCollections.observableArrayList();
+                try (Connection c = Database.get()) {
+                    rows.addAll(queries.getInventoryOverview(c, APP_TZ));
+                }
+                return rows;
+            }
+        };
+        task.setOnSucceeded(ev -> inventoryRows.setAll(task.getValue()));
+        updateInventorySummary();
+
+        task.setOnFailed(ev -> {
+            Throwable ex = task.getException();
+            System.err.println("[PharmacyController] reloadInventoryTable FAILED: " + ex);
+            if (TableMedicinesInventory != null)
+                TableMedicinesInventory.setPlaceholder(new Label("Failed to load"));
+        });
+        Thread th = new Thread(task, "inv-overview-loader");
+        th.setDaemon(true);
+        th.start();
     }
 
     private boolean isDashboardVisible() {
@@ -1773,6 +1942,14 @@ public class PharmacyController {
         loadDashboardTable();
 
     // This in Inventory
+        try {
+            initInventoryTableIfNeeded();
+            reloadInventoryTable();
+            updateInventorySummary();
+        } catch (Throwable ignored) {}
+
+        if (MedicineLabelDt != null) MedicineLabelDt.setWrapText(true);
+        if (descriptionTf != null) descriptionTf.setWrapText(true);
     // Recive
         if (tblMedSuggest != null) {
             colSuggName.setCellValueFactory(c -> new javafx.beans.property.SimpleStringProperty(c.getValue().name));
@@ -2396,20 +2573,24 @@ public class PharmacyController {
 
     @FXML
     private void onSaveReceive() {
-        // 1) اجمع المدخلات
         final String medText = (MedicineNameRecive != null) ? MedicineNameRecive.getText().trim() : "";
         if ((selectedMedicineId == null) && medText.isBlank()) {
-            showWarn("Receive", "Select a medicine or type its name."); return;
+            showWarn("Receive", "Select a medicine or type its name.");
+            return;
         }
 
         Integer qty = null;
         try { qty = Integer.valueOf(quantity.getText().trim()); } catch (Exception ignore) {}
         if (qty == null || qty <= 0) {
-            showWarn("Receive", "Quantity must be a positive integer."); return;
+            showWarn("Receive", "Quantity must be a positive integer.");
+            return;
         }
 
         final LocalDate exp = (ExpiryDate != null) ? ExpiryDate.getValue() : null;
-        if (exp == null) { showWarn("Receive", "Expiry date is required."); return; }
+        if (exp == null) {
+            showWarn("Receive", "Expiry date is required.");
+            return;
+        }
 
         String batch = (batchNum != null && batchNum.getText() != null) ? batchNum.getText().trim() : "";
         if (batch.isBlank()) {
@@ -2417,26 +2598,22 @@ public class PharmacyController {
                     .format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"));
         }
 
-        // Resolve current pharmacist_id (optional)
-        Long currentUserId = tryResolveCurrentUserId();
-        Long currentPharmacistId = findPharmacistIdByUser(currentUserId);
+        final Long currentPharmacistId = requireCurrentPharmacistId();
+        if (currentPharmacistId == null) return;
 
-        // 2) Resolve/Create medicine ID
         Long medId = selectedMedicineId;
-
-        // If the user filled the Add Medicine dialog, insert the medicine now (single flow)
         if (medId == null && pendingNewMedicine != null) {
             try (Connection c = Database.get();
                  PreparedStatement ps = c.prepareStatement("""
-                    INSERT INTO medicines
-                      (name, strength, form, base_unit,
-                       tablets_per_blister, blisters_per_box, ml_per_bottle, grams_per_tube, split_allowed, description)
-                    VALUES
-                      (?, NULLIF(?,''), NULLIF(?,''), ?::med_unit,
-                       ?, ?, ?, ?, ?, NULLIF(?, ''))
-                    ON CONFLICT DO NOTHING
-                    RETURNING id
-                """)){
+                INSERT INTO medicines
+                  (name, strength, form, base_unit,
+                   tablets_per_blister, blisters_per_box, ml_per_bottle, grams_per_tube, split_allowed, description)
+                VALUES
+                  (?, NULLIF(?,''), NULLIF(?,''), ?::med_unit,
+                   ?, ?, ?, ?, ?, NULLIF(?, ''))
+                ON CONFLICT DO NOTHING
+                RETURNING id
+            """)) {
                 ps.setString(1, pendingNewMedicine.name);
                 ps.setString(2, pendingNewMedicine.strength);
                 ps.setString(3, pendingNewMedicine.form);
@@ -2455,113 +2632,79 @@ public class PharmacyController {
                 return;
             }
 
-            // If conflict (already exists), resolve by display text as fallback
             if (medId == null) {
-                medId = resolveMedicineIdByDisplayOrName(MedicineNameRecive != null ? MedicineNameRecive.getText().trim() : pendingNewMedicine.name);
+                medId = resolveMedicineIdByDisplayOrName(
+                        MedicineNameRecive != null ? MedicineNameRecive.getText().trim() : pendingNewMedicine.name);
             }
             selectedMedicineId = medId;
-            pendingNewMedicine = null; // consumed
+            pendingNewMedicine = null;
         }
 
         if (medId == null) medId = resolveMedicineIdByDisplayOrName(medText);
         if (medId == null) {
-            showWarn("Receive", "Please select/add a medicine."); return;
+            showWarn("Receive", "Please select/add a medicine.");
+            return;
         }
 
-        // 3) نفّذ الإدخال داخل معاملة واحدة (تجميع الكمية على نفس الدفعة)
         try (Connection c = Database.get()) {
             c.setAutoCommit(false);
+
             long batchId;
 
-            // Note: we need two SQL variants to support DBs with/without the new receiver column.
-            Long pharmacistIdLocal = currentPharmacistId; // capture effectively-final
-            Long[] outBatchId = new Long[1];
-            // First try with received_by column if it exists
-            String sqlWithReceiver = """
-                INSERT INTO medicine_batches (medicine_id, batch_no, expiry_date, quantity, received_by)
-                VALUES (?, ?, ?, ?, ?)
-                ON CONFLICT (medicine_id, batch_no) DO UPDATE
-                   SET expiry_date = LEAST(medicine_batches.expiry_date, EXCLUDED.expiry_date),
-                       quantity    = medicine_batches.quantity + EXCLUDED.quantity
-                RETURNING id
-            """;
-            String sqlWithoutReceiver = """
-                INSERT INTO medicine_batches (medicine_id, batch_no, expiry_date, quantity)
-                VALUES (?, ?, ?, ?)
-                ON CONFLICT (medicine_id, batch_no) DO UPDATE
-                   SET expiry_date = LEAST(medicine_batches.expiry_date, EXCLUDED.expiry_date),
-                       quantity    = medicine_batches.quantity + EXCLUDED.quantity
-                RETURNING id
-            """;
-            try (PreparedStatement ps = c.prepareStatement(sqlWithReceiver)) {
+            // ✅ الآن نضيف quantity لأن العمود NOT NULL
+            final String upsertBatch = """
+            INSERT INTO medicine_batches (medicine_id, batch_no, expiry_date, quantity)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT (medicine_id, batch_no) DO UPDATE
+               SET expiry_date = LEAST(medicine_batches.expiry_date, EXCLUDED.expiry_date),
+                   quantity = medicine_batches.quantity + EXCLUDED.quantity
+            RETURNING id
+        """;
+            try (PreparedStatement ps = c.prepareStatement(upsertBatch)) {
                 ps.setLong(1, medId);
                 ps.setString(2, batch);
                 ps.setDate(3, java.sql.Date.valueOf(exp));
                 ps.setInt(4, qty);
-                if (pharmacistIdLocal == null) ps.setNull(5, java.sql.Types.BIGINT); else ps.setLong(5, pharmacistIdLocal);
-                try (ResultSet rs = ps.executeQuery()) { rs.next(); outBatchId[0] = rs.getLong(1); }
-            } catch (org.postgresql.util.PSQLException ex) {
-                // Undefined column -> fallback
-                if (!"42703".equals(ex.getSQLState())) throw ex;
-                try (PreparedStatement ps2 = c.prepareStatement(sqlWithoutReceiver)) {
-                    ps2.setLong(1, medId);
-                    ps2.setString(2, batch);
-                    ps2.setDate(3, java.sql.Date.valueOf(exp));
-                    ps2.setInt(4, qty);
-                    try (ResultSet rs2 = ps2.executeQuery()) { rs2.next(); outBatchId[0] = rs2.getLong(1); }
-                }
+                try (ResultSet rs = ps.executeQuery()) { rs.next(); batchId = rs.getLong(1); }
             }
-            batchId = outBatchId[0];
 
-            // سجل حركة الوارد (الـ triggers هتحدث available_quantity تلقائيًا)
-            // Again, two variants to support DBs with/without the pharmacist_id column.
-            String txWithPharmacist = """
-                INSERT INTO inventory_transactions (medicine_id, batch_id, qty_change, reason, ref_type, pharmacist_id)
-                VALUES (?, ?, ?, 'RECEIVE', 'manual_receive', ?)
-            """;
-            String txWithoutPharmacist = """
-                INSERT INTO inventory_transactions (medicine_id, batch_id, qty_change, reason, ref_type)
-                VALUES (?, ?, ?, 'RECEIVE', 'manual_receive')
-            """;
-            try (PreparedStatement ps = c.prepareStatement(txWithPharmacist)) {
+            final String txSql = """
+            INSERT INTO inventory_transactions (medicine_id, batch_id, qty_change, reason, ref_type, pharmacist_id)
+            VALUES (?, ?, ?, 'RECEIVE', 'manual_receive', ?)
+        """;
+            try (PreparedStatement ps = c.prepareStatement(txSql)) {
                 ps.setLong(1, medId);
                 ps.setLong(2, batchId);
                 ps.setInt(3, qty);
-                if (currentPharmacistId == null) ps.setNull(4, java.sql.Types.BIGINT); else ps.setLong(4, currentPharmacistId);
+                if (currentPharmacistId == null)
+                    ps.setNull(4, java.sql.Types.BIGINT);
+                else
+                    ps.setLong(4, currentPharmacistId);
                 ps.executeUpdate();
-            } catch (org.postgresql.util.PSQLException ex) {
-                if (!"42703".equals(ex.getSQLState())) throw ex;
-                try (PreparedStatement ps2 = c.prepareStatement(txWithoutPharmacist)) {
-                    ps2.setLong(1, medId);
-                    ps2.setLong(2, batchId);
-                    ps2.setInt(3, qty);
-                    ps2.executeUpdate();
-                }
             }
 
             c.commit();
             showInfo("Batch received successfully.");
 
-            // 4) نظّف الحقول وحوّل إلى Inventory
             selectedMedicineId = null;
             if (MedicineNameRecive != null) MedicineNameRecive.clear();
-            if (batchNum != null)          batchNum.clear();
-            if (quantity != null)          quantity.clear();
-            if (ExpiryDate != null)        ExpiryDate.setValue(null);
-            if (MedicineLabelDt != null) {
-                MedicineLabelDt.setText("");
-            }
+            if (batchNum != null) batchNum.clear();
+            if (quantity != null) quantity.clear();
+            if (ExpiryDate != null) ExpiryDate.setValue(null);
+            if (MedicineLabelDt != null) MedicineLabelDt.setText("");
             hideSuggest();
 
-            // بدّل التبويب واعرض المخزون وحدّث الجدول
-            if (btnInventory != null) btnInventory.setSelected(true);
             showInventoryMainMode();
+            btnInventory.setSelected(true);
+            btnReceive.setSelected(false);
             reloadInventoryTable();
+
         } catch (Exception ex) {
-            try { /* لو في مشكلة حاول ترجع */ } catch (Exception ignored) {}
             ex.printStackTrace();
             showError("Failed to receive batch: " + ex.getMessage());
         }
+
+
     }
     // --- Draft holder used when user adds a medicine but wants to save it together with the batch later
     private static final class NewMedicineDraft {
@@ -2628,6 +2771,86 @@ public class PharmacyController {
         });
     }
 
+    /**
+     * Apply '—' placeholder for empty/null inventory cells to keep the grid tidy.
+     */
+    private void applyInventoryNullPlaceholders() {
+        if (colMedicineNameInventory != null) {
+            colMedicineNameInventory.setCellFactory(col -> new javafx.scene.control.TableCell<>() {
+                @Override protected void updateItem(String item, boolean empty) {
+                    super.updateItem(item, empty);
+                    setText(empty ? null : (item == null || item.isBlank() ? "—" : item));
+                }
+            });
+        }
+        if (colMedicineForm != null) {
+            colMedicineForm.setCellFactory(col -> new javafx.scene.control.TableCell<>() {
+                @Override protected void updateItem(String item, boolean empty) {
+                    super.updateItem(item, empty);
+                    setText(empty ? null : (item == null || item.isBlank() ? "—" : item));
+                }
+            });
+        }
+        if (colMedicineBase != null) {
+            colMedicineBase.setCellFactory(col -> new javafx.scene.control.TableCell<>() {
+                @Override protected void updateItem(String item, boolean empty) {
+                    super.updateItem(item, empty);
+                    setText(empty ? null : (item == null || item.isBlank() ? "—" : item));
+                }
+            });
+        }
+        if (colQuantityInventory != null) {
+            colQuantityInventory.setCellFactory(col -> new javafx.scene.control.TableCell<InventoryRow, Number>() {
+                @Override protected void updateItem(Number item, boolean empty) {
+                    super.updateItem(item, empty);
+                    setText(empty ? null : (item == null ? "—" : item.toString()));
+                }
+            });
+        }
+        if (colMedicineBatchNextNumber != null) {
+            colMedicineBatchNextNumber.setCellFactory(col -> new javafx.scene.control.TableCell<InventoryRow, String>() {
+                @Override protected void updateItem(String item, boolean empty) {
+                    super.updateItem(item, empty);
+                    setText(empty ? null : (item == null || item.isBlank() ? "—" : item));
+                }
+            });
+        }
+        if (colQtyNext != null) {
+            colQtyNext.setCellFactory(col -> new javafx.scene.control.TableCell<InventoryRow, Number>() {
+                @Override protected void updateItem(Number item, boolean empty) {
+                    super.updateItem(item, empty);
+                    setText(empty ? null : (item == null ? "—" : item.toString()));
+                }
+            });
+        }
+        if (colExpiryNext != null) {
+            colExpiryNext.setCellFactory(col -> new javafx.scene.control.TableCell<InventoryRow, java.time.LocalDate>() {
+                @Override protected void updateItem(java.time.LocalDate item, boolean empty) {
+                    super.updateItem(item, empty);
+                    if (empty) { setText(null); return; }
+                    setText(item == null ? "—" : item.toString());
+                }
+            });
+        }
+        if (colReceivedBy != null) {
+            colReceivedBy.setCellFactory(col -> new javafx.scene.control.TableCell<InventoryRow, String>() {
+                @Override protected void updateItem(String item, boolean empty) {
+                    super.updateItem(item, empty);
+                    setText(empty ? null : (item == null || item.isBlank() ? "—" : item));
+                }
+            });
+        }
+        if (colReceivedAt != null) {
+            colReceivedAt.setCellFactory(col -> new javafx.scene.control.TableCell<InventoryRow, String>() {
+                @Override protected void updateItem(String item, boolean empty) {
+                    super.updateItem(item, empty);
+                    setText(empty ? null : (item == null || item.isBlank() ? "—" : item));
+                }
+            });
+        }
+    }
+
+
     public static final class MedicineSuggestion {
         public final long id;           // -1 = Add new
         public final String name;
@@ -2641,4 +2864,128 @@ public class PharmacyController {
         }
     }
 
+    /** يحسب ملخّص الجرد (إجمالي/منخفض/قريب الانتهاء) ويعرضه في الكروت. */
+    private void updateInventorySummary() {
+        int total = (inventoryRows == null) ? 0 : inventoryRows.size();
+
+        int low = 0;
+        int soon = 0;
+        java.time.LocalDate today = java.time.ZonedDateTime.now(APP_TZ).toLocalDate();
+        java.time.LocalDate soonLimit = today.plusDays(EXPIRY_SOON_DAYS);
+
+        if (inventoryRows != null) {
+            for (InventoryRow r : inventoryRows) {
+                if (r == null) continue;
+
+                // استخدم عتبة الدواء الخاصة (reorder_threshold) إن وجدت، وإلا استخدم القيمة العامة
+                int threshold = (r.getReorderThreshold() == null)
+                        ? LOW_STOCK_THRESHOLD_UNITS
+                        : r.getReorderThreshold();
+
+                // Low stock check
+                if (r.getAvailableQuantity() <= threshold) {
+                    low++;
+                }
+
+                // Expiring soon (يقترب تاريخ الانتهاء)
+                java.time.LocalDate exp = r.getNextExpiry();
+                if (exp != null && !exp.isBefore(today) && !exp.isAfter(soonLimit)) {
+                    soon++;
+                }
+            }
+        }
+
+        if (TotalmedicinesNumber != null)
+            TotalmedicinesNumber.setText(String.valueOf(total));
+        if (LowStockMedicine != null)
+            LowStockMedicine.setText(String.valueOf(low));
+        if (ExpiringSoonMedicine != null)
+            ExpiringSoonMedicine.setText(String.valueOf(soon));
+    }
+
+
+    /** Show details of a selected inventory row and allow editing its reorder threshold. */
+    private void showInventoryDetailsDialog(InventoryRow row) {
+        if (row == null) return;
+
+        GridPane gp = new GridPane();
+        gp.setHgap(12);
+        gp.setVgap(8);
+
+        int r = 0;
+        gp.addRow(r++, new Label("Name:"),        new Label(row.getDisplayName()));
+        gp.addRow(r++, new Label("Form:"),        new Label(row.getForm() == null ? "—" : row.getForm()));
+        gp.addRow(r++, new Label("Base:"),        new Label(row.getBaseUnit() == null ? "—" : row.getBaseUnit()));
+        gp.addRow(r++, new Label("Available:"),   new Label(String.valueOf(row.getAvailableQuantity())));
+        gp.addRow(r++, new Label("Next Batch:"),  new Label(row.getNextBatchNo() == null ? "—" : row.getNextBatchNo()));
+        gp.addRow(r++, new Label("Qty (Next):"),  new Label(row.getNextBatchQty() == null ? "—" : row.getNextBatchQty().toString()));
+        gp.addRow(r++, new Label("Expiry (Next):"),
+                new Label(row.getNextExpiry() == null ? "—" : row.getNextExpiry().toString()));
+        gp.addRow(r++, new Label("Received By:"), new Label(row.getReceivedBy() == null ? "—" : row.getReceivedBy()));
+        gp.addRow(r++, new Label("Received At:"), new Label(row.getReceivedAt() == null ? "—" : row.getReceivedAt()));
+
+        // threshold الحالي (لو null يستخدم الديفولت العام)
+        final int currentThr = (row.getReorderThreshold() == null)
+                ? LOW_STOCK_THRESHOLD_UNITS
+                : row.getReorderThreshold();
+
+        // خانة إدخال قابلة للتعديل
+        Spinner<Integer> thrSpinner = new Spinner<>(0, Integer.MAX_VALUE, currentThr);
+        thrSpinner.setEditable(true);
+        gp.addRow(r++, new Label("Reorder threshold:"), thrSpinner);
+
+        Dialog<ButtonType> dlg = new Dialog<>();
+        dlg.setTitle("Medicine Details");
+        dlg.getDialogPane().setContent(gp);
+
+        ButtonType BTN_SAVE = new ButtonType("Save", ButtonBar.ButtonData.OK_DONE);
+        dlg.getDialogPane().getButtonTypes().setAll(BTN_SAVE, ButtonType.CLOSE);
+
+        // تصحيح الإدخال عند الكتابة في محرر السبنر
+        final TextField editor = thrSpinner.getEditor();
+        editor.textProperty().addListener((obs, oldV, newV) -> {
+            try {
+                int v = Integer.parseInt(newV.trim());
+                if (v < 0) throw new NumberFormatException();
+                thrSpinner.getValueFactory().setValue(v);
+            } catch (Exception ignore) { /* نترك القيمة السابقة لحين الضغط Save */ }
+        });
+
+        dlg.setResultConverter(bt -> bt);
+        var res = dlg.showAndWait();
+        if (res.isEmpty() || res.get() != BTN_SAVE) return;
+
+        int newThr = thrSpinner.getValue();
+        if (newThr < 0) {
+            showWarn("Invalid value", "Please enter a non-negative integer.");
+            return;
+        }
+
+        try {
+            queries.updateReorderThreshold(row.getMedicineId(), newThr);
+            reloadInventoryTable();
+            showInfo("Reorder threshold updated.");
+        } catch (Exception ex) {
+            ex.printStackTrace();
+            showError("Failed to update threshold: " + ex.getMessage());
+        }
+    }
+
+
+    // --- Make inventory table rows open the details dialog with editable threshold ---
+    {
+        javafx.application.Platform.runLater(() -> {
+            if (TableMedicinesInventory != null) {
+                TableMedicinesInventory.setRowFactory(tv -> {
+                    TableRow<InventoryRow> row = new TableRow<>();
+                    row.setOnMouseClicked(ev -> {
+                        if (ev.getClickCount() == 2 && !row.isEmpty()) {
+                            showInventoryDetailsDialog(row.getItem());
+                        }
+                    });
+                    return row;
+                });
+            }
+        });
+    }
 }

@@ -11,11 +11,13 @@ public class InventoryRow {
     private final java.time.LocalDate nextExpiry;
     private final String receivedBy;
     private final String receivedAtText;
+    private final Integer reorderThreshold;
 
     public InventoryRow(long medicineId, String displayName, String form, String baseUnit,
                         int availableQuantity,
                         String nextBatchNo, Integer nextBatchQty, java.time.LocalDate nextExpiry,
-                        String receivedBy, String receivedAtText) {
+                        String receivedBy, String receivedAtText,
+                        Integer reorderThreshold) {
         this.medicineId = medicineId;
         this.displayName = displayName;
         this.form = form;
@@ -26,6 +28,7 @@ public class InventoryRow {
         this.nextExpiry = nextExpiry;
         this.receivedBy = receivedBy;
         this.receivedAtText = receivedAtText;
+        this.reorderThreshold = reorderThreshold;
     }
     public long getMedicineId() { return medicineId; }
     public String getDisplayName() { return displayName; }
@@ -37,4 +40,5 @@ public class InventoryRow {
     public java.time.LocalDate getNextExpiry() { return nextExpiry; }
     public String getReceivedBy() { return receivedBy; }
     public String getReceivedAt() { return receivedAtText; }
+    public Integer getReorderThreshold() { return reorderThreshold; }
 }
