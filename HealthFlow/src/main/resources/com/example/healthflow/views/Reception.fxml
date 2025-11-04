@@ -97,7 +97,7 @@
                                 <Line endX="86.99998474121094" endY="-1.52587890625E-5" layoutX="107.0" layoutY="189.0" startX="-90.19999694824219" startY="-1.52587890625E-5" />
                                 <Label layoutX="15.0" layoutY="206.0" text="Feature" textFill="WHITE" />
 
-                                <Button fx:id="DachboardButton" layoutX="7.0" layoutY="237.0" mnemonicParsing="false" prefHeight="40.0" prefWidth="200.0" styleClass="btn-1" stylesheets="@../Design/ReceptionDesign.css" text="Dashboard">
+                                <Button fx:id="DachboardButton" layoutX="6.0" layoutY="226.0" mnemonicParsing="false" prefHeight="40.0" prefWidth="200.0" styleClass="btn-1" stylesheets="@../Design/ReceptionDesign.css" text="Dashboard">
 
                                     <graphic>
                                         <FontIcon iconColor="#66ccff" iconLiteral="fas-tachometer-alt" iconSize="18" />
@@ -105,27 +105,34 @@
                                 </Button>
 
 
-                                <Button fx:id="DoctorsButton" layoutX="5.0" layoutY="301.0" mnemonicParsing="false" prefHeight="40.0" prefWidth="200.0" styleClass="btn-1" stylesheets="@../Design/ReceptionDesign.css" text="Doctors">
+                                <Button fx:id="DoctorsButton" layoutX="4.0" layoutY="279.0" mnemonicParsing="false" prefHeight="40.0" prefWidth="200.0" styleClass="btn-1" stylesheets="@../Design/ReceptionDesign.css" text="Doctors">
                                     <graphic>
                                         <FontIcon iconColor="#66ccff" iconLiteral="fas-user-md" iconSize="18" />
                                     </graphic>
                                 </Button>
 
-                                <Button fx:id="PatientsButton" layoutX="5.0" layoutY="371.0" mnemonicParsing="false" prefHeight="40.0" prefWidth="200.0" styleClass="btn-1" stylesheets="@../Design/ReceptionDesign.css" text="Patients">
+                                <Button fx:id="PatientsButton" layoutX="4.0" layoutY="330.0" mnemonicParsing="false" prefHeight="40.0" prefWidth="200.0" styleClass="btn-1" stylesheets="@../Design/ReceptionDesign.css" text="Patients">
                                     <graphic>
                                         <FontIcon iconColor="#66ccff" iconLiteral="fas-user" iconSize="18" />
                                     </graphic>
                                 </Button>
 
-                                <Button fx:id="AppointmentsButton" layoutX="7.0" layoutY="439.0" mnemonicParsing="false" prefHeight="40.0" prefWidth="200.0" styleClass="btn-1" stylesheets="@../Design/ReceptionDesign.css" text="Appointments">
+                                <Button fx:id="AppointmentsButton" layoutX="4.0" layoutY="381.0" mnemonicParsing="false" prefHeight="40.0" prefWidth="200.0" styleClass="btn-1" stylesheets="@../Design/ReceptionDesign.css" text="Appointments">
                                     <graphic>
                                         <FontIcon iconColor="#66ccff" iconLiteral="fas-calendar" iconSize="18" />
                                     </graphic>
                                 </Button>
 
-                                <FontIcon iconColor="#9dbfc7" iconLiteral="fas-hospital" iconSize="64" layoutX="81.0" layoutY="534.0" AnchorPane.bottomAnchor="15.257143402099587" />
-
                                 <Label layoutX="14.0" layoutY="104.0" prefHeight="18.0" prefWidth="74.0" text="Username:" textFill="WHITE" />
+                        <FontIcon iconColor="#9dbfc7" iconLiteral="fas-hospital" iconSize="64" layoutX="76.0" layoutY="499.0" text="" AnchorPane.bottomAnchor="50.0" />
+                        <Button fx:id="PrescriptionButton1" layoutX="66.0" layoutY="516.0" mnemonicParsing="false" prefHeight="27.0" prefWidth="76.0" styleClass="btn-1" stylesheets="@../Design/ReceptionDesign.css" text="Log out" AnchorPane.bottomAnchor="15.0">
+                           <graphic>
+                              <FontIcon iconColor="#66ccff" iconLiteral="fas-user" iconSize="9" text="" />
+                           </graphic>
+                           <font>
+                              <Font size="8.0" />
+                           </font>
+                        </Button>
                             </children>
                         </AnchorPane>
                     </left>
@@ -148,14 +155,14 @@
                                                 </Label>
                                                 <TableView fx:id="TableAppInDashboard" layoutX="15.0" layoutY="49.0" prefHeight="300.0" prefWidth="580.0" stylesheets="@../Design/ReceptionDesign.css" AnchorPane.bottomAnchor="10.0" AnchorPane.leftAnchor="15.0" AnchorPane.rightAnchor="10.0" AnchorPane.topAnchor="49.0">
                                                     <columns>
-                                                        <TableColumn fx:id="colAppointmentID" maxWidth="30.0" prefWidth="30.0" resizable="false" text="#" />
-                                                        <TableColumn fx:id="colPatientNameDash" minWidth="90.0" prefWidth="90.0" text="Patient Name" />
+                                                        <TableColumn fx:id="colAppointmentID" maxWidth="50.0" prefWidth="30.0" resizable="false" text="#" />
+                                                        <TableColumn fx:id="colPatientNameDash" minWidth="100.0" prefWidth="90.0" text="Patient Name" />
                                                         <TableColumn fx:id="colSpecialtyDash" minWidth="70.0" prefWidth="70.0" text="Specialty" />
                                                         <TableColumn fx:id="colDoctorNameDash" minWidth="90.0" prefWidth="90.0" text="Doctor name" />
-                                                        <TableColumn fx:id="colAppintementDateDash" minWidth="70.0" prefWidth="70.0" text="Date" />
-                                                        <TableColumn fx:id="colAppintementTimeDash" minWidth="70.0" prefWidth="70.0" text="Time" />
+                                                        <TableColumn fx:id="colAppintementDateDash" minWidth="60.0" prefWidth="60.0" text="Date" />
+                                                        <TableColumn fx:id="colAppintementTimeDash" minWidth="90.0" prefWidth="75.0" text="Time" />
                                                         <TableColumn fx:id="colRoomDash" minWidth="60.0" prefWidth="60.0" text="Room" />
-                                                        <TableColumn fx:id="colActionDash" minWidth="75.0" prefWidth="75.0" text="Action" />
+                                                        <TableColumn fx:id="colActionDash" minWidth="70.0" prefWidth="70.0" text="Action" />
                                                     </columns>
                                                     <columnResizePolicy>
                                                         <TableView fx:constant="CONSTRAINED_RESIZE_POLICY" />
@@ -476,7 +483,7 @@
                                                 </Label>
                                                 <TableView fx:id="TableINAppointment" layoutX="15.0" layoutY="55.0" style="-fx-background-color: #ededed;" stylesheets="@../Design/ReceptionDesign.css" AnchorPane.bottomAnchor="55.0" AnchorPane.leftAnchor="15.0" AnchorPane.rightAnchor="15.400000000000091" AnchorPane.topAnchor="55.0">
                                                     <columns>
-                                                        <TableColumn fx:id="colAppointmentSerialNUm" maxWidth="40.0" minWidth="20.0" prefWidth="40.0" resizable="false" text="#" />
+                                                        <TableColumn fx:id="colAppointmentSerialNUm" maxWidth="50.0" prefWidth="30.0" resizable="false" text="#" />
                                                         <TableColumn fx:id="colPatientNameAppointment" minWidth="-1.0" prefWidth="100.0" text="Patient Name" />
                                                         <TableColumn fx:id="colSpecialty" minWidth="-1.0" prefWidth="90.0" text="Specialty" />
                                                         <TableColumn fx:id="colDoctorNameAppointment" minWidth="-1.0" prefWidth="100.0" text="Doctor Name" />

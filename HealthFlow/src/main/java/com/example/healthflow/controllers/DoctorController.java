@@ -2324,6 +2324,7 @@ private void wirePrescriptionItemsTable() {
     if (colRoute != null)        colRoute.setPrefWidth(100);
     if (colQuantity != null)     colQuantity.setPrefWidth(80);
 
+
     ChangeListener<Number> _refit = (obs, ov, nv) -> fitLastColumn.run();
     TablePrescriptionItems.widthProperty().addListener(_refit);
     if (colIdx != null)           colIdx.widthProperty().addListener(_refit);

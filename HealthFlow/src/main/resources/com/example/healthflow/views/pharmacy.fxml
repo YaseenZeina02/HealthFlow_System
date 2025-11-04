@@ -19,7 +19,7 @@
 <?import org.controlsfx.control.SegmentedButton?>
 <?import org.kordamp.ikonli.javafx.FontIcon?>
 
-<VBox fx:id="rootPane" fillWidth="true" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" spacing="0" xmlns="http://javafx.com/javafx/19" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.example.healthflow.controllers.PharmacyController">
+<VBox fx:id="rootPane" fillWidth="true" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" spacing="0" xmlns="http://javafx.com/javafx/23.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.example.healthflow.controllers.PharmacyController">
    <children>
       <BorderPane prefHeight="600.0" prefWidth="1100.0" stylesheets="@../Design/ReceptionDesign.css" VBox.vgrow="ALWAYS">
          <top>
@@ -83,27 +83,35 @@
                   </Label>
                   <Line endX="87.0" layoutX="107.0" layoutY="189.0" startX="-90.2" />
                   <Label layoutX="15.0" layoutY="206.0" text="Feature" textFill="WHITE" />
-                  <Button fx:id="PrescriptionsButton" layoutX="5.0" layoutY="294.0" mnemonicParsing="false" prefHeight="40.0" prefWidth="200.0" styleClass="btn-1" stylesheets="@../Design/ReceptionDesign.css" text="Prescriptions" AnchorPane.leftAnchor="5.0" AnchorPane.rightAnchor="5.0">
+                  <Button fx:id="PrescriptionsButton" layoutX="5.0" layoutY="279.0" mnemonicParsing="false" prefHeight="40.0" prefWidth="200.0" styleClass="btn-1" stylesheets="@../Design/ReceptionDesign.css" text="Prescriptions" AnchorPane.leftAnchor="5.0" AnchorPane.rightAnchor="4.600000000000023">
                      <graphic>
                         <FontIcon iconColor="#66ccff" iconLiteral="fas-calendar" iconSize="18" />
                      </graphic>
                   </Button>
-                  <Button fx:id="InventoryButton" layoutX="5.0" layoutY="350.0" mnemonicParsing="false" prefHeight="40.0" prefWidth="200.0" styleClass="btn-1" stylesheets="@../Design/ReceptionDesign.css" text="Inventory">
+                  <Button fx:id="InventoryButton" layoutX="5.0" layoutY="335.0" mnemonicParsing="false" prefHeight="40.0" prefWidth="200.0" styleClass="btn-1" stylesheets="@../Design/ReceptionDesign.css" text="Inventory">
                      <graphic>
                         <FontIcon iconColor="#66ccff" iconLiteral="fas-user" iconSize="18" />
                      </graphic>
                   </Button>
-                  <FontIcon iconColor="#9dbfc7" iconLiteral="fas-hospital" iconSize="64" layoutX="81.0" layoutY="534.0" AnchorPane.bottomAnchor="15.257143402099587" />
+                  <FontIcon iconColor="#9dbfc7" iconLiteral="fas-hospital" iconSize="64" layoutX="81.0" layoutY="534.0" AnchorPane.bottomAnchor="50.0" />
                   <Label layoutX="25.0" layoutY="108.0" prefHeight="18.0" prefWidth="73.0" text="User Name:" textFill="WHITE" />
-                  <Button fx:id="ReportsButton" layoutX="5.0" layoutY="407.0" mnemonicParsing="false" prefHeight="40.0" prefWidth="200.0" styleClass="btn-1" stylesheets="@../Design/ReceptionDesign.css" text="Reports">
+                  <Button fx:id="ReportsButton" layoutX="5.0" layoutY="392.0" mnemonicParsing="false" prefHeight="40.0" prefWidth="200.0" styleClass="btn-1" stylesheets="@../Design/ReceptionDesign.css" text="Reports">
                      <graphic>
                         <FontIcon iconColor="#66ccff" iconLiteral="fas-user" iconSize="18" />
                      </graphic>
                   </Button>
-                  <Button fx:id="DashboardButton" layoutX="-2.0" layoutY="239.0" mnemonicParsing="false" prefHeight="40.0" prefWidth="200.0" styleClass="btn-1" stylesheets="@../Design/ReceptionDesign.css" text="Dashbord" AnchorPane.leftAnchor="5.0">
+                  <Button fx:id="DashboardButton" layoutX="5.0" layoutY="224.0" mnemonicParsing="false" prefHeight="40.0" prefWidth="200.0" styleClass="btn-1" stylesheets="@../Design/ReceptionDesign.css" text="Dashbord" AnchorPane.leftAnchor="5.0">
                      <graphic>
                         <FontIcon iconColor="#66ccff" iconLiteral="fas-tachometer-alt" iconSize="18" />
                      </graphic>
+                  </Button>
+                  <Button fx:id="PrescriptionButton1" layoutX="70.0" layoutY="516.0" mnemonicParsing="false" prefHeight="27.0" prefWidth="76.0" styleClass="btn-1" stylesheets="@../Design/ReceptionDesign.css" text="Log out" AnchorPane.bottomAnchor="15.0">
+                     <graphic>
+                        <FontIcon iconColor="#66ccff" iconLiteral="fas-user" iconSize="9" text="" />
+                     </graphic>
+                     <font>
+                        <Font size="8.0" />
+                     </font>
                   </Button>
                </children>
             </AnchorPane>
