@@ -10,6 +10,7 @@ import javafx.event.EventHandler;
 import javafx.scene.Node;
 import javafx.scene.control.TableView;
 
+import javafx.scene.paint.Color;
 import javafx.stage.FileChooser;
 import javafx.stage.Window;
 import java.io.BufferedWriter;
@@ -40,6 +41,54 @@ import org.kordamp.ikonli.javafx.FontIcon;
  */
 public final class TableUtils {
     private TableUtils(){}
+
+
+    @SafeVarargs
+    public static void applyUnifiedTableStyle(Node root, TableView<?>... tables) {
+        // 1) ثيم على الرووت
+        try {
+            if (root != null) {
+                var classes = root.getStyleClass();
+                if (!classes.contains("hf-theme")) classes.add("hf-theme");
+            }
+        } catch (Throwable ignored) {}
+
+        if (tables == null) return;
+
+        for (TableView<?> tv : tables) {
+            if (tv == null) continue;
+
+            // 2) ستايل موحّد
+            try {
+                var cls = tv.getStyleClass();
+                if (!cls.contains("hf-force"))  cls.add("hf-force");
+                if (!cls.contains("hf-select")) cls.add("hf-select");
+                tv.setFocusTraversable(true);
+            } catch (Throwable ignored) {}
+
+            // 3) ميزات النسخ و I-beam
+            try { makeAllStringColumnsCopyable(tv); } catch (Throwable ignored) {}
+            try { forceIBeamOnCopyableCells(tv); }  catch (Throwable ignored) {}
+        }
+    }
+
+    // أوفرلود بدون root إذا ما احتجته
+    public static void applyUnifiedTableStyle(TableView<?>... tables) {
+        applyUnifiedTableStyle(null, tables);
+    }
+
+    // =========================
+    // Copy helpers (universal)
+    // =========================
+    public static <R> void makeAllStringColumnsCopyable(TableView<R> table) {
+        if (table == null) return;
+        for (TableColumn<R, ?> c : table.getColumns()) {
+            applyCopyableToColumnRec(c);
+        }
+        enableTableCopyShortcut(table);
+        installTableCopyContextMenu(table);
+        enhanceSelectionBehavior((TableView<Object>) table);
+    }
 
     private static final PseudoClass PC_COPY_ACTIVE = PseudoClass.getPseudoClass("copy-active");
     private static boolean isClassPresent(String fqcn) {
@@ -78,18 +127,6 @@ public final class TableUtils {
         if (sel != null) table.getSelectionModel().select(sel);
     }
 
-    // =========================
-// Copy helpers (universal)
-// =========================
-    public static <R> void makeAllStringColumnsCopyable(TableView<R> table) {
-        if (table == null) return;
-        for (TableColumn<R, ?> c : table.getColumns()) {
-            applyCopyableToColumnRec(c);
-        }
-        enableTableCopyShortcut(table);
-        installTableCopyContextMenu(table);
-        enhanceSelectionBehavior((TableView<Object>) table);
-    }
 
     @SuppressWarnings({"unchecked","rawtypes"})
     private static <R> void applyCopyableToColumnRec(TableColumn<R, ?> col) {
@@ -120,6 +157,8 @@ public final class TableUtils {
         table.getSelectionModel().setSelectionMode(SelectionMode.SINGLE); // صف واحد فقط
         table.getSelectionModel().setSelectionMode(SelectionMode.SINGLE);
         table.getSelectionModel().setCellSelectionEnabled(false);     // صفوف فقط
+        // Ensure table can take focus for keyboard navigation
+        table.setFocusTraversable(true);
         if (!table.getStyleClass().contains("hf-select")) {
             table.getStyleClass().add("hf-select");                  // فعّل ستايل التحديد
         }
@@ -143,38 +182,42 @@ public final class TableUtils {
                 row.getStyleClass().add("hf-row");
 
                 row.addEventFilter(MouseEvent.MOUSE_PRESSED, e -> {
-                    if (row.getItem() == _EmptyRowMarker.INSTANCE) {
+                    // صف تعبئة/فارغ → نظّف التحديد وامنَع الفقاعة
+                    if (row.getItem() == _EmptyRowMarker.INSTANCE || row.isEmpty()) {
                         table.getSelectionModel().clearSelection();
                         e.consume();
                         return;
                     }
-                    if (!row.isEmpty()) {
-                        int idx = row.getIndex();
-                        if (!table.getSelectionModel().isSelected(idx)) {
-                            table.getSelectionModel().clearSelection();
-                            table.getSelectionModel().select(idx);
-                        }
-                    } else {
-                        table.getSelectionModel().clearSelection();
-                        e.consume();
+
+                    // حالات التحديد المدى/متعدد أو الزرّ اليمين: خلِّ السلوك الافتراضي يشتغل
+                    if (e.isShiftDown() || e.isShortcutDown() || e.isSecondaryButtonDown()) {
+                        return;
                     }
+
+                    final int idx = row.getIndex();
+                    final TableView.TableViewSelectionModel<?> sm = table.getSelectionModel();
+                    if (sm == null) return;
+
+                    // صفوف فقط (لا تحدد خلايا/مدى أعمدة حتى نتجنب IndexOutOfBounds)
+                    sm.setCellSelectionEnabled(false);
+
+                    // حماية حدود
+                    if (idx < 0 || idx >= table.getItems().size()) return;
+
+                    // حدِّد الصف مباشرة
+                    if (!sm.isSelected(idx)) {
+                        sm.clearAndSelect(idx);
+                    } else {
+                        // إعادة النقر على نفس الصف: ثبّت التحديد فقط
+                        sm.select(idx);
+                    }
+                    // Ensure keyboard navigation works immediately
+                    if (table != null) table.requestFocus();
+                    e.consume();
                 });
 
                 table.sceneProperty().addListener((o,os,ns)-> {
                     System.out.println("[DEBUG] table style classes: " + table.getStyleClass());
-                });
-
-                row.addEventFilter(MouseEvent.MOUSE_PRESSED, e -> {
-                    if (!row.isEmpty()) {
-                        int idx = row.getIndex();
-                        if (!table.getSelectionModel().isSelected(idx)) {
-                            table.getSelectionModel().clearSelection();
-                            table.getSelectionModel().select(idx);
-                        }
-                    } else {
-                        table.getSelectionModel().clearSelection();
-                        e.consume();
-                    }
                 });
 
                 return row;
@@ -271,18 +314,85 @@ public final class TableUtils {
                 // hook for CSS
                 getStyleClass().add("copyable-cell");
                 tf.getStyleClass().add("copyable-inner");
-        // Cursor + focus handling on the inner TextField
+                // Cursor + focus handling on the inner TextField
                 tf.setCursor(Cursor.TEXT); // خلي المؤشر I-beam دائمًا داخل الحقل
                 tf.setOnMouseEntered(e -> tf.setCursor(Cursor.TEXT));
                 tf.setOnMouseExited(e -> tf.setCursor(Cursor.TEXT)); // خليه I-beam حتى لما يطلع من الحقل داخل الخلية
 
-        // امنع TableRow من سرقة الحدث وخلي الفوكس داخل الحقل
+                // امنع TableRow من سرقة الحدث وخلي الفوكس داخل الحقل
                 tf.addEventFilter(MouseEvent.MOUSE_PRESSED, e -> {
                     if (!isEmpty()) {
                         getTableView().getSelectionModel().select(getIndex());
                         tf.requestFocus(); // إدخال المؤشر داخل الحقل
                     }
                     e.consume(); // مهم: ما تخليش الحدث يطلع للـ Row
+                });
+
+                // Keyboard navigation while focus is inside the inner TextField
+                tf.addEventFilter(KeyEvent.KEY_PRESSED, e -> {
+                    TableView<?> tv = getTableView();
+                    if (tv == null) return;
+                    var sm = tv.getSelectionModel();
+                    if (sm == null) return;
+
+                    int current = getIndex();
+                    int last = tv.getItems() == null ? -1 : tv.getItems().size() - 1;
+
+                    switch (e.getCode()) {
+                        case UP -> {
+                            if (current > 0) {
+                                sm.setCellSelectionEnabled(false);
+                                sm.clearAndSelect(current - 1);
+                                tv.scrollTo(Math.max(0, current - 1));
+                            }
+                            e.consume();
+                        }
+                        case DOWN -> {
+                            if (current >= 0 && current < last) {
+                                sm.setCellSelectionEnabled(false);
+                                sm.clearAndSelect(current + 1);
+                                tv.scrollTo(Math.min(last, current + 1));
+                            }
+                            e.consume();
+                        }
+                        case PAGE_UP -> {
+                            int target = Math.max(0, current - 10);
+                            if (target != current) {
+                                sm.setCellSelectionEnabled(false);
+                                sm.clearAndSelect(target);
+                                tv.scrollTo(target);
+                            }
+                            e.consume();
+                        }
+                        case PAGE_DOWN -> {
+                            int target = Math.min(last, current + 10);
+                            if (target != current) {
+                                sm.setCellSelectionEnabled(false);
+                                sm.clearAndSelect(target);
+                                tv.scrollTo(target);
+                            }
+                            e.consume();
+                        }
+                        case HOME -> {
+                            if (last >= 0 && current != 0) {
+                                sm.setCellSelectionEnabled(false);
+                                sm.clearAndSelect(0);
+                                tv.scrollTo(0);
+                            }
+                            e.consume();
+                        }
+                        case END -> {
+                            if (last >= 0 && current != last) {
+                                sm.setCellSelectionEnabled(false);
+                                sm.clearAndSelect(last);
+                                tv.scrollTo(last);
+                            }
+                            e.consume();
+                        }
+                        default -> {
+                            // allow left/right/home/end with modifiers to behave normally
+                        }
+                    }
                 });
 
                 // أثناء السحب لتحديد النص
@@ -329,6 +439,8 @@ public final class TableUtils {
                 addEventFilter(MouseEvent.MOUSE_PRESSED, e -> {
                     if (!isEmpty()) {
                         getTableView().getSelectionModel().select(getIndex());
+                        // Ensure TableView also receives focus so that arrow keys work immediately
+                        if (getTableView() != null) getTableView().requestFocus();
                         tf.requestFocus();
                     }
                 });
@@ -488,7 +600,7 @@ public final class TableUtils {
                 true
         ));
 
-        MenuItem miExportCsv  = prettyItem("fas-file-code",
+        MenuItem miExportCsv  = prettyItem("fas-file-export",
                 poiAvailable ? "Export to CSV (.csv)" : "Export (Excel-compatible .csv)", "");
         miExportCsv.setOnAction(e -> exportTableToExcel(
                 table,
@@ -521,41 +633,46 @@ public final class TableUtils {
         table.setContextMenu(cm);
     }
 
-    // Header بلا hover: CustomMenuItem معطّل وشفّاف (يظهر كعنوان فقط)
-    private static MenuItem sectionHeader(String title) {
-        Label lbl = new Label(title);
-        lbl.setStyle("-fx-text-fill: white; -fx-font-size:12px; -fx-font-weight:bold;");
 
-        HBox box = new HBox(lbl);
-        box.setPadding(new Insets(8, 14, 8, 14));
-        box.setStyle("-fx-background-color:#0e5159; -fx-background-radius:8;");
-        box.setMouseTransparent(true); // ما ياخذ فوكس ولا أحداث
-
-        CustomMenuItem cmi = new CustomMenuItem(box, false);
-        cmi.getStyleClass().add("hf-ctx-header");
-        cmi.setHideOnClick(false);
-        cmi.setDisable(true); // مهم: لمنع حالة :armed (ما في hover)
-        cmi.setStyle("-fx-background-color: transparent; -fx-opacity: 1;"); // يظل واضح
-        cmi.getStyleClass().add("hf-ctx-item");
-        return cmi;
-    }
-    // Helper to build a pretty menu row with icon + text + (optional) right hint
     private static MenuItem prettyItem(String iconLiteral, String text, String hint) {
         HBox row = new HBox(10);
-        row.setPadding(new Insets(6, 10, 6, 6));
-        FontIcon ic = new FontIcon(iconLiteral); // e.g., "fas-copy"
+        row.setPadding(new Insets(8, 14, 8, 12));
+
+        FontIcon ic = new FontIcon(iconLiteral);
         ic.setIconSize(14);
+        ic.getStyleClass().add("hf-icon");
+        ic.setIconColor(Color.web("#1e293b")); // لون ثابت
+
         Label lbl = new Label(text);
-        lbl.setStyle("-fx-font-size: 13px;");
+        lbl.setStyle("-fx-font-size: 13px; -fx-text-fill: #1e293b;");
+
         HBox spacer = new HBox();
         spacer.setMinWidth(10);
-        HBox.setHgrow(spacer, javafx.scene.layout.Priority.ALWAYS);
+        HBox.setHgrow(spacer, Priority.ALWAYS);
+
         Label rhint = new Label(hint == null ? "" : hint);
-        rhint.setStyle("-fx-text-fill: #7a869a; -fx-font-size: 11px;");
+        rhint.setStyle("-fx-text-fill: #94a3b8; -fx-font-size: 11px;");
+
         row.getChildren().addAll(ic, lbl, spacer, rhint);
         CustomMenuItem cmi = new CustomMenuItem(row, true);
         cmi.getStyleClass().add("hf-ctx-item");
         cmi.setMnemonicParsing(false);
+        return cmi;
+    }
+
+    private static MenuItem sectionHeader(String title) {
+        Label lbl = new Label(title);
+        lbl.setStyle("-fx-text-fill: #64748b; -fx-font-size:12px; -fx-font-weight:bold;");
+
+        HBox box = new HBox(lbl);
+        box.setPadding(new Insets(8, 14, 8, 14));
+        box.setStyle("-fx-background-color: transparent;");
+        box.setMouseTransparent(true);
+
+        CustomMenuItem cmi = new CustomMenuItem(box, false);
+        cmi.getStyleClass().add("hf-ctx-header");
+        cmi.setHideOnClick(false);
+        cmi.setDisable(true);
         return cmi;
     }
 

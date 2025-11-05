@@ -5,6 +5,7 @@ import com.example.healthflow.db.Database;
 import com.example.healthflow.model.Role;
 import com.example.healthflow.model.User;
 import com.example.healthflow.model.PatientRow;
+import com.example.healthflow.ui.fx.TableUtils;
 import javafx.beans.property.ReadOnlyStringWrapper;
 import javafx.beans.property.ReadOnlyIntegerWrapper;
 import com.example.healthflow.model.dto.MedicineRow;
@@ -366,6 +367,7 @@ public class DoctorController {
 
         BackButton.setOnAction(e -> goBackToLogin());
 
+
         if (searchDB != null) {
 //            searchDB.setOnAction(e -> hybridPatientSearchNow());
             searchDB.setOnAction(e -> loadAllPatientsForDoctorAsync());
@@ -493,6 +495,15 @@ public class DoctorController {
         if (sendToPharmacy != null) {
             sendToPharmacy.setOnAction(e -> handleSendToPharmacy());
         }
+
+        try {
+            TableUtils.applyUnifiedTableStyle(
+                    rootPane,
+                    AppointmentsTable,
+                    TablePrescriptionItems,
+                    TablePrescriptionItems
+            );
+        } catch (Throwable ignore) {}
 
 
         if (loadUserAndEnsureDoctorProfile()) {

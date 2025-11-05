@@ -144,7 +144,7 @@
 
 
 /* table view styling */
-.table-view {
+.root.reception .table-view {
     -fx-selection-bar: #2d6aa6;
     -fx-selection-bar-non-focused: #8aaed3;
     -fx-padding: 0;
@@ -380,8 +380,8 @@
 /* نص القيمة داخل الكمبوبوكس والدات بيكر يكون أبيض */
 .table-view .table-row-cell:filled:selected .combo-box-base .text,
 .table-view .table-row-cell:filled:selected .date-picker .text {
-    -fx-fill:black;
-    -fx-background-color: green;
+    -fx-fill: #0f172a;
+    -fx-background-color: transparent;
 }
 
 
@@ -661,15 +661,13 @@
 
 
 /* Hover للصفوف ككل */
-.table-view .table-row-cell:filled:hover {
-    -fx-background-color: rgba(14,165,183,0.10);
+.root.reception .table-view .table-row-cell:filled:hover {    -fx-background-color: rgba(14,165,183,0.10);
     -fx-background-insets: 0;
     -fx-background-radius: 8;
 }
 
 /* عندما يكون الصف محدد + Hover: امّا تلغي أو تغيّر اللون */
-.table-view .table-row-cell:filled:selected:hover {
-    /* الغِ تأثير الهوفر أو ضع لون التحديد فقط */
+.root.reception .table-view .table-row-cell:filled:selected:hover {    /* الغِ تأثير الهوفر أو ضع لون التحديد فقط */
     -fx-background-color:
             linear-gradient(to bottom, rgba(14,165,183,0.24), rgba(14,165,183,0.18)),
             #0ea5b7;             /* نفس لون التحديد عندك */

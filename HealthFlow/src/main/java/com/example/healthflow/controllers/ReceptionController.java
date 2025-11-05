@@ -882,7 +882,7 @@ public class ReceptionController {
         colPhoneNumber.setCellValueFactory(cd -> cd.getValue().phoneProperty());
         colMedicalHistory.setCellValueFactory(cd -> cd.getValue().medicalHistoryProperty());
         patientTable.setItems(patientData);
-        patientTable.setEditable(true);
+//        patientTable.setEditable(true);
         setupPatientInlineEditing();
 
         patientTable.getSelectionModel().selectedItemProperty().addListener((obs, old, row) -> {
@@ -1357,6 +1357,9 @@ public class ReceptionController {
         if (GenderComboBox != null) GenderComboBox.setValue(Gender.MALE);
         if (DateOfBirthPicker != null) DateOfBirthPicker.setValue(null);
         if (patientTable != null) patientTable.getSelectionModel().clearSelection();
+        if (search != null) search.clear();
+        if (patientTable != null) patientTable.refresh();
+
     }
 
     private String trimOrNull(String s) {
@@ -3239,23 +3242,16 @@ public class ReceptionController {
             }
         });
 
+
         try {
-            TableUtils.makeAllStringColumnsCopyable(TableINAppointment);
-            TableUtils.makeAllStringColumnsCopyable(TableAppInDashboard);
-            TableUtils.makeAllStringColumnsCopyable(patientTable);
-            TableUtils.makeAllStringColumnsCopyable(DocTable_Recption);
-
-            TableUtils.forceIBeamOnCopyableCells(TableINAppointment);
-            TableUtils.forceIBeamOnCopyableCells(TableAppInDashboard);
-            TableUtils.forceIBeamOnCopyableCells(patientTable);
-            TableUtils.forceIBeamOnCopyableCells(DocTable_Recption);
-//            if (TableINAppointment != null) TableINAppointment.getSelectionModel().setCellSelectionEnabled(true);
-//            if (TableAppInDashboard != null) TableAppInDashboard.getSelectionModel().setCellSelectionEnabled(true);
-//            if (patientTable != null) patientTable.getSelectionModel().setCellSelectionEnabled(true);
-//            if (DocTable_Recption != null) DocTable_Recption.getSelectionModel().setCellSelectionEnabled(true);
-
-
-        } catch (Throwable ignore) { }
+            TableUtils.applyUnifiedTableStyle(
+                    rootPane,
+                    TableINAppointment,
+                    TableAppInDashboard,
+                    patientTable,
+                    DocTable_Recption
+            );
+        } catch (Throwable ignore) {}
 
     }
 
