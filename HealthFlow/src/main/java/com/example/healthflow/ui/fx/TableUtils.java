@@ -26,6 +26,7 @@ import java.util.function.Function;
 import javafx.scene.control.*;
 import javafx.scene.input.*;
 import javafx.scene.layout.*;
+import javafx.scene.control.ComboBoxBase;
 import javafx.scene.control.TextInputControl;
 import javafx.scene.input.MouseButton;
 import javafx.scene.Cursor;
@@ -80,6 +81,29 @@ public final class TableUtils {
     // =========================
     // Copy helpers (universal)
     // =========================
+
+    /** Register nodes that should NOT cause the table to clear selection when clicked. */
+    public static void registerClearSelectionSafeZones(TableView<?> table, Node... zones) {
+        if (table == null || zones == null || zones.length == 0) return;
+        // store as a simple List<Node> on table properties
+        java.util.ArrayList<Node> list = (java.util.ArrayList<Node>) table.getProperties().get("hf.safeZones");
+        if (list == null) {
+            list = new java.util.ArrayList<>();
+            table.getProperties().put("hf.safeZones", list);
+        }
+        for (Node n : zones) {
+            if (n != null && !list.contains(n)) list.add(n);
+        }
+    }
+
+    /** Convenience: install click-outside-to-clear but keep selection when clicking inside any of the provided safe zones. */
+    public static void installClickOutsideToClear(TableView<?> table, Node... safeZones) {
+        if (table == null) return;
+        registerClearSelectionSafeZones(table, safeZones);
+        // enhanceSelectionBehavior is already called from makeAllStringColumnsCopyable(...)
+        // If needed explicitly:
+        try { enhanceSelectionBehavior((TableView<Object>) table); } catch (Throwable ignored) {}
+    }
     public static <R> void makeAllStringColumnsCopyable(TableView<R> table) {
         if (table == null) return;
         for (TableColumn<R, ?> c : table.getColumns()) {
@@ -88,6 +112,23 @@ public final class TableUtils {
         enableTableCopyShortcut(table);
         installTableCopyContextMenu(table);
         enhanceSelectionBehavior((TableView<Object>) table);
+
+        // One-shot: if the table starts empty, re-apply copyable once data arrives
+        if (!Boolean.TRUE.equals(table.getProperties().get("hf.copyInitWatch"))) {
+            table.getProperties().put("hf.copyInitWatch", Boolean.TRUE);
+            table.itemsProperty().addListener((obs, oldList, newList) -> {
+                if (newList != null) {
+                    newList.addListener((javafx.collections.ListChangeListener<R>) ch -> {
+                        if (!newList.isEmpty() && !Boolean.TRUE.equals(table.getProperties().get("hf.copyAppliedOnce"))) {
+                            for (TableColumn<R, ?> c : table.getColumns()) {
+                                applyCopyableToColumnRec(c);
+                            }
+                            table.getProperties().put("hf.copyAppliedOnce", Boolean.TRUE);
+                        }
+                    });
+                }
+            });
+        }
     }
 
     private static final PseudoClass PC_COPY_ACTIVE = PseudoClass.getPseudoClass("copy-active");
@@ -135,6 +176,10 @@ public final class TableUtils {
             for (TableColumn<R, ?> child : col.getColumns()) applyCopyableToColumnRec(child);
             return;
         }
+        // Respect explicit opt-out, editables, and combo-like cells
+        if (Boolean.TRUE.equals(col.getProperties().get("hf.noCopy"))) return;
+        if (col.isEditable()) return;
+        if (isComboLikeCellFactory((TableColumn) col)) return;
         try {
             TableColumn tc = col;
             if (tc.getTableView() != null && !tc.getTableView().getItems().isEmpty()) {
@@ -154,8 +199,8 @@ public final class TableUtils {
     private static void enhanceSelectionBehavior(TableView<Object> table) {
         if (table == null) return;
 
-        table.getSelectionModel().setSelectionMode(SelectionMode.SINGLE); // صف واحد فقط
-        table.getSelectionModel().setSelectionMode(SelectionMode.SINGLE);
+        // Do not force selection mode; preserve controller preferences (SINGLE/MULTIPLE)
+        // table.getSelectionModel().setSelectionMode(SelectionMode.SINGLE); // صف واحد فقط
         table.getSelectionModel().setCellSelectionEnabled(false);     // صفوف فقط
         // Ensure table can take focus for keyboard navigation
         table.setFocusTraversable(true);
@@ -174,17 +219,38 @@ public final class TableUtils {
             });
         }
 
-        // Row factory: نعطي كل صف ستايل كلاس للـ hover, ونمسح التحديد لو الضغط كان على صف فارغ
+        // Row factory: wrap existing rowFactory (if any) to preserve controller behavior
+        Callback<TableView<Object>, TableRow<Object>> prevFactory = (Callback<TableView<Object>, TableRow<Object>>) table.getRowFactory();
         table.setRowFactory(new Callback<>() {
             @Override
             public TableRow<Object> call(TableView<Object> tv) {
-                TableRow<Object> row = new TableRow<>();
-                row.getStyleClass().add("hf-row");
+                TableRow<Object> row = (prevFactory != null) ? prevFactory.call(tv) : new TableRow<>();
+                if (!row.getStyleClass().contains("hf-row")) row.getStyleClass().add("hf-row");
 
                 row.addEventFilter(MouseEvent.MOUSE_PRESSED, e -> {
+                    // السماح لسلوك التحرير/الكومبوبوكس: لا تتدخل إطلاقًا
+                    Node target = (Node) e.getTarget();
+
+                    // إن كان الضغط داخل ComboBox أو أحد مكوناته، لا تتدخل
+                    if (findAncestor(target, ComboBoxBase.class) != null) {
+                        return; // اترك الحدث يمرّ ليفتح القائمة
+                    }
+
+                    // إن كان الضغط داخل TableCell ينتمي لعمود قابل للتحرير أو كومبوبوكس، لا تستهلك الحدث
+                    TableCell<?,?> cell = findAncestor(target, TableCell.class);
+                    if (cell != null) {
+                        TableColumn<?,?> col = cell.getTableColumn();
+                        if (col != null) {
+                            // لا تتدخل في أعمدة التحرير/الكومبوبوكس
+                            if (col.isEditable() || isComboLikeCellFactory((TableColumn) col)) {
+                                return; // اترك التحرير يعمل بشكل طبيعي
+                            }
+                        }
+                    }
+
                     // صف تعبئة/فارغ → نظّف التحديد وامنَع الفقاعة
                     if (row.getItem() == _EmptyRowMarker.INSTANCE || row.isEmpty()) {
-                        table.getSelectionModel().clearSelection();
+                        tv.getSelectionModel().clearSelection();
                         e.consume();
                         return;
                     }
@@ -195,14 +261,14 @@ public final class TableUtils {
                     }
 
                     final int idx = row.getIndex();
-                    final TableView.TableViewSelectionModel<?> sm = table.getSelectionModel();
+                    final TableView.TableViewSelectionModel<?> sm = tv.getSelectionModel();
                     if (sm == null) return;
 
                     // صفوف فقط (لا تحدد خلايا/مدى أعمدة حتى نتجنب IndexOutOfBounds)
                     sm.setCellSelectionEnabled(false);
 
                     // حماية حدود
-                    if (idx < 0 || idx >= table.getItems().size()) return;
+                    if (idx < 0 || idx >= tv.getItems().size()) return;
 
                     // حدِّد الصف مباشرة
                     if (!sm.isSelected(idx)) {
@@ -212,61 +278,14 @@ public final class TableUtils {
                         sm.select(idx);
                     }
                     // Ensure keyboard navigation works immediately
-                    if (table != null) table.requestFocus();
-                    e.consume();
+                    if (tv != null) tv.requestFocus();
                 });
 
-                table.sceneProperty().addListener((o,os,ns)-> {
-                    System.out.println("[DEBUG] table style classes: " + table.getStyleClass());
-                });
+                // removed noisy debug logging
 
                 return row;
             }
         });
-
-        // لما تتغيّر الـ Scene نسجّل فلتر يراقب الضغطات خارج الصفوف/خارج الجدول
-        table.sceneProperty().addListener((obs, oldScene, newScene) -> {
-            // فك الحارس القديم إن وُجد
-            if (oldScene != null) {
-                Object h = table.getProperties().remove("hf.clearSelHandler");
-                if (h instanceof EventHandler) {
-                    oldScene.removeEventFilter(MouseEvent.MOUSE_PRESSED, (EventHandler<MouseEvent>) h);
-                }
-            }
-            if (newScene == null) return;
-
-            EventHandler<MouseEvent> handler = e -> {
-                if (e.getButton() != MouseButton.PRIMARY) return; // ما نتدخل بالضغطة اليمين
-
-                Node target = (Node) e.getTarget();
-                boolean insideTable = isDescendantOf(target, table);
-
-                if (!insideTable) {
-                    // ضغطة خارج الجدول كله
-                    table.getSelectionModel().clearSelection();
-                    return;
-                }
-
-                // ضغطة داخل الجدول: هل هي فوق TableRow فعلي؟
-                TableRow<?> row = findAncestor(target, TableRow.class);
-                if (row == null || row.isEmpty() || row.getIndex() < 0) {
-                    // داخل الجدول لكن خارج أي صف (مساحة فارغة/هيدر/سيرفس)
-                    table.getSelectionModel().clearSelection();
-                }
-                // لو فوق صف غير فارغ, السلوك الافتراضي بينقل التحديد
-            };
-
-            newScene.addEventFilter(MouseEvent.MOUSE_PRESSED, handler);
-            table.getProperties().put("hf.clearSelHandler", handler);
-        });
-        if (table.getScene() != null) {
-            System.out.println("[DEBUG-now] table already in scene, classes: " + table.getStyleClass());
-        } else {
-            table.sceneProperty().addListener((o, os, ns) -> {
-                if (ns != null)
-                    System.out.println("[DEBUG-later] table added to scene, classes: " + table.getStyleClass());
-            });
-        }
     }
     /** Returns true if node n is a descendant of ancestor (inclusive). */
     private static boolean isDescendantOf(Node n, Node ancestor) {
@@ -285,9 +304,84 @@ public final class TableUtils {
         return null;
     }
 
-    /** Render cells as non-editable, selectable TextField with copy menu */
+
+
+    /**
+     * Helper: returns true if the column allows copying its cell values.
+     * نسمح بالنسخ حتى لو العمود يستخدم ComboBox/ChoiceBox — بدون تغيير المصنع الأصلي
+     * هذه الدالة تفيد لو حبيت تعمل مناداة شرطية لاحقًا
+     */
+    public static boolean isCopyAllowed(TableColumn<?, ?> col) {
+        // نسمح بالنسخ حتى لو العمود يستخدم ComboBox/ChoiceBox — بدون تغيير المصنع الأصلي
+        // هذه الدالة تفيد لو حبيت تعمل مناداة شرطية لاحقًا
+        return true;
+    }
+    /**
+     * Decorator: Adds a lightweight "Copy" context menu to each column, without replacing its cellFactory.
+     * Non-intrusive: preserves original editing/cell logic.
+     * @param cols Columns to decorate
+     */
+    @SuppressWarnings({"rawtypes","unchecked"})
+    public static void addCopyMenuNonIntrusive(TableColumn<?, ?>... cols) {
+        if (cols == null) return;
+        for (TableColumn col : cols) {
+            if (col == null) continue;
+            // احفظ المصنع الأصلي كما هو
+            javafx.util.Callback original = col.getCellFactory();
+            // لا تغيّر المصنع لو مش مطلوب؛ لو كان null، أنشئ مصنع افتراضي بسيط ثم زيّنه
+            javafx.util.Callback<TableColumn, TableCell> fallback = tc -> new TableCell<>() {
+                @Override protected void updateItem(Object item, boolean empty) {
+                    super.updateItem(item, empty);
+                    setText(empty ? null : (item == null ? "" : String.valueOf(item)));
+                }
+            };
+            javafx.util.Callback<TableColumn, TableCell> base = (original != null) ? original : fallback;
+
+            col.setCellFactory(tc -> {
+                TableCell cell = base.call((TableColumn) tc);
+
+                // لا نستبدل سلوك التحرير — فقط نضيف قائمة يمين خفيفة للنسخ
+                ContextMenu cm = new ContextMenu();
+
+                MenuItem miCopy = new MenuItem("Copy");
+                miCopy.setOnAction(e -> {
+                    String text;
+                    // لو الفوكس داخل TextInputControl (أثناء التحرير) انسخ التحديد إن وُجد
+                    Node fo = (cell.getScene() == null) ? null : cell.getScene().getFocusOwner();
+                    if (fo instanceof TextInputControl tic) {
+                        text = tic.getSelectedText();
+                        if (text == null || text.isEmpty()) text = tic.getText();
+                    } else {
+                        Object v = cell.getItem();
+                        text = (v == null) ? "" : String.valueOf(v);
+                    }
+                    ClipboardContent cc = new ClipboardContent();
+                    cc.putString(text == null ? "" : text);
+                    Clipboard.getSystemClipboard().setContent(cc);
+                });
+
+                cm.getItems().add(miCopy);
+                cell.setContextMenu(cm);
+
+                return cell;
+            });
+        }
+    }
+
+
     /** Render cells as non-editable, selectable TextField with copy menu */
     public static <R> void makeCopyable(TableColumn<R, String> column) {
+        // ===== لا تستبدل مصنع خلايا الأعمدة القابلة للتحرير/الكومبوبوكس =====
+        if (Boolean.TRUE.equals(column.getProperties().get("hf.noCopy"))) {
+            return; // مستثنى صراحة
+        }
+        if (column.isEditable()) {
+            return; // اترك التحكم للـ controller
+        }
+        if (isComboLikeCellFactory(column)) {
+            return; // لا تلمس أعمدة الـ ComboBox/ChoiceBox
+        }
+
         column.setCellFactory(col -> new TableCell<R, String>() {
             private final TextField tf = new TextField();
             // helper: toggle both pseudo and style class
@@ -501,6 +595,54 @@ public final class TableUtils {
         }
     }
 
+    @SuppressWarnings({"rawtypes","unchecked"})
+    private static boolean isComboLikeCellFactory(TableColumn col) {
+        try {
+            // One-time watch to invalidate cache when cellFactory changes
+            if (!Boolean.TRUE.equals(col.getProperties().get("hf.comboWatch"))) {
+                try {
+                    col.cellFactoryProperty().addListener((obs, oldF, newF) -> col.getProperties().remove("hf.comboLike"));
+                } catch (Throwable ignore) {}
+                col.getProperties().put("hf.comboWatch", Boolean.TRUE);
+            }
+
+            // Cache the probe result on the column to avoid repeated factory calls
+            Object cached = col.getProperties().get("hf.comboLike");
+            if (cached instanceof Boolean b) return b;
+
+            var f = col.getCellFactory();
+            if (f == null) {
+                col.getProperties().put("hf.comboLike", Boolean.FALSE);
+                return false;
+            }
+            TableCell probe = ((javafx.util.Callback<TableColumn, TableCell>) f).call(col);
+            boolean result = false;
+            if (probe != null) {
+                String cn = probe.getClass().getName();
+                result = cn.contains("ComboBoxTableCell") || cn.contains("ChoiceBoxTableCell");
+            }
+            col.getProperties().put("hf.comboLike", Boolean.valueOf(result));
+            return result;
+        } catch (Throwable t) {
+            // On failure, err on the SAFE side by not classifying as combo (so we don't block normal rendering)
+            col.getProperties().put("hf.comboLike", Boolean.FALSE);
+            return false;
+        }
+    }
+
+    // اجعل المؤشر I-beam فقط على الخلايا التي أنشأناها نحن (copyable-cell)
+    // لا تفعل شيئًا الآن؛ يتم ضبط المؤشر داخل makeCopyable على مستوى الخلية نفسها.
+    private static void forceIBeamOnCopyableCells(TableView<?> tv) {
+        // اجعل المؤشر I-beam فقط على الخلايا التي أنشأناها نحن (copyable-cell)
+        // لا تفعل شيئًا الآن؛ يتم ضبط المؤشر داخل makeCopyable على مستوى الخلية نفسها.
+    }
+    public static void optOutCopy(TableColumn<?, ?>... cols) {
+        if (cols == null) return;
+        for (TableColumn<?, ?> c : cols) {
+            if (c == null) continue;
+            c.getProperties().put("hf.noCopy", Boolean.TRUE);
+        }
+    }
 
     /** Cmd/Ctrl+C to copy focused cell text */
     public static void enableTableCopyShortcut(TableView<?> table) {
@@ -825,6 +967,21 @@ public final class TableUtils {
         }
     }
 
+    /** Sanitize text for safe export to spreadsheet apps: strip control chars and neutralize CSV/Excel formulas. */
+    private static String sanitizeForExport(String s) {
+        if (s == null) return "";
+        // Strip control characters except tab/newline
+        s = s.replaceAll("[\\p{Cntrl}&&[^\n\t]]", "");
+        // Neutralize leading characters that trigger formulas in Excel/Google Sheets
+        if (!s.isEmpty()) {
+            char ch = s.charAt(0);
+            if (ch == '=' || ch == '+' || ch == '-' || ch == '@') {
+                s = "'" + s; // prefix apostrophe
+            }
+        }
+        return s;
+    }
+
     /** Write CSV with headers, Excel-compatible UTF-8 BOM. Each row on one line. */
     private static void writeCsv(TableView<?> table, File out) throws IOException {
         StringBuilder sb = new StringBuilder();
@@ -834,7 +991,7 @@ public final class TableUtils {
         for (TableColumn<?, ?> c : table.getVisibleLeafColumns()) {
             if (!first) sb.append(',');
             first = false;
-            sb.append(escapeCsv(c.getText()));
+            sb.append(escapeCsv(sanitizeForExport(c.getText())));
         }
         sb.append('\n');
 
@@ -845,7 +1002,8 @@ public final class TableUtils {
                 if (!firstCell) sb.append(',');
                 firstCell = false;
                 Object v = getCellValue(table, r, c);
-                sb.append(escapeCsv(v));
+                String s = (v == null) ? "" : sanitizeForExport(String.valueOf(v));
+                sb.append(escapeCsv(s));
             }
             if (r < table.getItems().size() - 1) sb.append('\n');
         }
@@ -904,7 +1062,7 @@ public final class TableUtils {
         String title = String.valueOf(table.getProperties().getOrDefault("export.title", baseName));
         Object titleRow = sheetClz.getMethod("createRow", int.class).invoke(sheet, 0);
         Object titleCell = rowClz.getMethod("createCell", int.class).invoke(titleRow, 0);
-        cellClz.getMethod("setCellValue", String.class).invoke(titleCell, title);
+        cellClz.getMethod("setCellValue", String.class).invoke(titleCell, sanitizeForExport(title));
 
         Object titleStyle = wbIfcClz.getMethod("createCellStyle").invoke(wb);
         Object titleFont  = wbIfcClz.getMethod("createFont").invoke(wb);
@@ -971,7 +1129,8 @@ public final class TableUtils {
         int cidx = 0;
         for (TableColumn<?, ?> c : table.getVisibleLeafColumns()) {
             Object cell = rowClz.getMethod("createCell", int.class).invoke(headerRow, cidx++);
-            cellClz.getMethod("setCellValue", String.class).invoke(cell, c.getText() == null ? "" : c.getText());
+            String head = c.getText() == null ? "" : c.getText();
+            cellClz.getMethod("setCellValue", String.class).invoke(cell, sanitizeForExport(head));
             try { cellClz.getMethod("setCellStyle", cellStyleClz).invoke(cell, headerStyle); } catch (Throwable ignore) {}
         }
 
@@ -995,10 +1154,10 @@ public final class TableUtils {
                     try {
                         cellClz.getMethod("setCellValue", double.class).invoke(cell, ((Number) v).doubleValue());
                     } catch (Throwable ignore) {
-                        cellClz.getMethod("setCellValue", String.class).invoke(cell, String.valueOf(v));
+                        cellClz.getMethod("setCellValue", String.class).invoke(cell, sanitizeForExport(String.valueOf(v)));
                     }
                 } else {
-                    cellClz.getMethod("setCellValue", String.class).invoke(cell, String.valueOf(v));
+                    cellClz.getMethod("setCellValue", String.class).invoke(cell, sanitizeForExport(String.valueOf(v)));
                 }
                 // apply alternate row shading
                 if ((r % 2) == 1) {
@@ -1064,21 +1223,21 @@ public final class TableUtils {
         // close workbook
         try { wbIfcClz.getMethod("close").invoke(wb); } catch (Throwable ignore) {}
     }
-    public static void forceIBeamOnCopyableCells(TableView<?> table) {
-        if (table == null) return;
-        table.addEventFilter(MouseEvent.MOUSE_MOVED, e -> {
-            Node n = e.getPickResult() == null ? null : e.getPickResult().getIntersectedNode();
-            boolean inCopy = false;
-            for (Node cur = n; cur != null && cur != table; cur = cur.getParent()) {
-                var clz = cur.getStyleClass();
-                if (clz != null && (clz.contains("copyable-cell") || clz.contains("copyable-inner"))) {
-                    inCopy = true; break;
-                }
-            }
-            table.setCursor(inCopy ? Cursor.TEXT : Cursor.DEFAULT);
-        });
-        table.addEventFilter(MouseEvent.MOUSE_EXITED, e -> table.setCursor(Cursor.DEFAULT));
-    }
+//    public static void forceIBeamOnCopyableCells(TableView<?> table) {
+//        if (table == null) return;
+//        table.addEventFilter(MouseEvent.MOUSE_MOVED, e -> {
+//            Node n = e.getPickResult() == null ? null : e.getPickResult().getIntersectedNode();
+//            boolean inCopy = false;
+//            for (Node cur = n; cur != null && cur != table; cur = cur.getParent()) {
+//                var clz = cur.getStyleClass();
+//                if (clz != null && (clz.contains("copyable-cell") || clz.contains("copyable-inner"))) {
+//                    inCopy = true; break;
+//                }
+//            }
+//            table.setCursor(inCopy ? Cursor.TEXT : Cursor.DEFAULT);
+//        });
+//        table.addEventFilter(MouseEvent.MOUSE_EXITED, e -> table.setCursor(Cursor.DEFAULT));
+//    }
 
     // ——— markers & css ———
     private static final class _EmptyRowMarker {
