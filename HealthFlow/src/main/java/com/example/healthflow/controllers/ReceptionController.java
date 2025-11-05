@@ -245,6 +245,42 @@ public class ReceptionController {
     private static final java.time.format.DateTimeFormatter UI_DATE =
             java.time.format.DateTimeFormatter.ofPattern("EEE, MMM d, yyyy");
 
+
+    private final AtomicBoolean refreshBusy = new AtomicBoolean(false);
+
+    public static final int DEFAULT_SESSION_MIN = 20;
+    // --- Coalesced UI refresh + DB NOTIFY ---
+    private final RefreshScheduler uiRefresh = new RefreshScheduler(600);
+    private DbNotifications apptDbListener;
+
+    // To color current nav button
+    private static final String ACTIVE_CLASS = "current";
+    private static final DateTimeFormatter SLOT_FMT_12H = DateTimeFormatter.ofPattern("hh:mm a");
+
+    /* ============ Types ============ */
+    public enum Gender {MALE, FEMALE}
+
+    /* ============ State ============ */
+    private final ObservableList<PatientRow> patientData = FXCollections.observableArrayList();
+    private FilteredList<PatientRow> filtered;
+
+    private final ObservableList<DoctorRow> doctorData = FXCollections.observableArrayList();
+    private FilteredList<DoctorRow> doctorFiltered;
+
+    private final Navigation navigation = new Navigation();
+    private final PatientService patientService = new PatientService();
+    private final DoctorDAO doctorDAO = new DoctorDAO();
+    private final String cssPath = "/com/example/healthflow/Design/ReceptionDesign.css";
+
+    // When booking from patient, auto-pick nearest future slot once
+    private volatile boolean selectNearestSlotOnNextRefresh = false;
+
+    /* ============ Connectivity ============ */
+    private final ConnectivityMonitor monitor;
+    private static volatile boolean listenerRegistered = false;
+    private static volatile Boolean lastNotifiedOnline = null;
+
+
     // helpers:
     private static java.time.OffsetDateTime toAppOffset(java.time.LocalDate d, java.time.LocalTime t) {
         return java.time.ZonedDateTime.of(d, t, APP_ZONE).toOffsetDateTime();
@@ -329,15 +365,6 @@ public class ReceptionController {
                 t.setDaemon(true);
                 return t;
             });
-    private final AtomicBoolean refreshBusy = new AtomicBoolean(false);
-
-    public static final int DEFAULT_SESSION_MIN = 20;
-    // --- Coalesced UI refresh + DB NOTIFY ---
-    private final RefreshScheduler uiRefresh = new RefreshScheduler(600);
-    private DbNotifications apptDbListener;
-
-    // --- DB NOTIFY handlers (appointments -> refresh dashboard & chart) ---
-
 
     private void startDbNotificationsSafe() {
         try {
@@ -386,9 +413,6 @@ public class ReceptionController {
         }
     }
 
-    // To color current nav button
-    private static final String ACTIVE_CLASS = "current";
-    private static final DateTimeFormatter SLOT_FMT_12H = DateTimeFormatter.ofPattern("hh:mm a");
 
     private void markNavActive(Button active) {
         Button[] all = {DachboardButton, DoctorsButton, PatientsButton, AppointmentsButton};
@@ -462,29 +486,8 @@ public class ReceptionController {
     }
 
 
-    /* ============ Types ============ */
-    public enum Gender {MALE, FEMALE}
-
-    /* ============ State ============ */
-    private final ObservableList<PatientRow> patientData = FXCollections.observableArrayList();
-    private FilteredList<PatientRow> filtered;
-
-    private final ObservableList<DoctorRow> doctorData = FXCollections.observableArrayList();
-    private FilteredList<DoctorRow> doctorFiltered;
-
-    private final Navigation navigation = new Navigation();
-    private final PatientService patientService = new PatientService();
-    private final DoctorDAO doctorDAO = new DoctorDAO();
-    private final String cssPath = "/com/example/healthflow/Design/ReceptionDesign.css";
 
 
-    // When booking from patient, auto-pick nearest future slot once
-    private volatile boolean selectNearestSlotOnNextRefresh = false;
-
-    /* ============ Connectivity ============ */
-    private final ConnectivityMonitor monitor;
-    private static volatile boolean listenerRegistered = false;
-    private static volatile Boolean lastNotifiedOnline = null;
 
     public ReceptionController(ConnectivityMonitor monitor) {
         this.monitor = monitor;
@@ -495,12 +498,12 @@ public class ReceptionController {
     }
 
 
-    private void setupAppointmentSlotsListener() {
-        // listeners already wired in initialize():
-        // AppointmentDate.valueProperty() -> refreshSlots()
-        // avilabelDoctorApp.valueProperty() -> refreshSlots()
-        // cmbSlots.setOnShown(...) -> refreshSlots()
-    }
+//    private void setupAppointmentSlotsListener() {
+//        // listeners already wired in initialize():
+//        // AppointmentDate.valueProperty() -> refreshSlots()
+//        // avilabelDoctorApp.valueProperty() -> refreshSlots()
+//        // cmbSlots.setOnShown(...) -> refreshSlots()
+//    }
 
     private void updateAppointmentDetailsLabel(Appointment.ApptRow row) {
         if (AppointmentDateDetailes == null) return;
@@ -533,6 +536,8 @@ public class ReceptionController {
                 // شكليّات + إصلاحات
                 picker.setEditable(true);
                 picker.setPromptText("yyyy-MM-dd");
+                picker.getStyleClass().addAll("table-cell","box");
+
 
                 // فور اختيار تاريخ جديد
                 picker.setOnAction(e -> {
@@ -602,6 +607,7 @@ public class ReceptionController {
             }
         };
     }
+
     private TableCell<Appointment.ApptRow, String> doctorComboCell() {
         return new TableCell<Appointment.ApptRow, String>() {
             private final ComboBox<DoctorDAO.DoctorOption> combo = new ComboBox<>();
@@ -905,6 +911,7 @@ public class ReceptionController {
         sorted.comparatorProperty().bind(patientTable.comparatorProperty());
         patientTable.setItems(sorted);
     }
+
     private void setupPatientInlineEditing() {
         // Full Name -> users.full_name
         colName.setCellFactory(TextFieldTableCell.forTableColumn());
@@ -1358,21 +1365,20 @@ public class ReceptionController {
         return t.isEmpty() ? null : t;
     }
 
+    // remember original widths per column (weak so columns can GC)
+    private final java.util.Map<TableColumn<?, ?>, Double> _origColWidth = new java.util.WeakHashMap<>();
+
     /* ===== Appointments table wiring & search (minimal) ===== */
     private void wireAppointmentsTables() {
         if (TableINAppointment == null) return;
-       //TableINAppointment.setColumnResizePolicy(TableView.UNCONSTRAINED_RESIZE_POLICY);
+        //TableINAppointment.setColumnResizePolicy(TableView.UNCONSTRAINED_RESIZE_POLICY);
         //TableINAppointment.setColumnResizePolicy(TableView.UNCONSTRAINED_RESIZE_POLICY);
 
         TableINAppointment.setFixedCellSize(-1);
 
-//        enableCellExpansion(colPatientNameAppointment);
-//        enableCellExpansion(colSpecialty);
-//        enableCellExpansion(colDoctorNameAppointment);
-//        enableCellExpansion(colRoomNumber);
-        enableExpandAutoWidth(TableINAppointment, colPatientNameAppointment, 600);
-        enableExpandAutoWidth(TableINAppointment, colSpecialty, 500);
-        enableExpandAutoWidth(TableINAppointment, colDoctorNameAppointment, 500);
+        enableExpandAutoWidth(TableINAppointment, colPatientNameAppointment, 5000);
+        enableExpandAutoWidth(TableINAppointment, colSpecialty, 5000);
+        enableExpandAutoWidth(TableINAppointment, colDoctorNameAppointment, 5000);
 
         TableINAppointment.setItems(sortedAppt);
         sortedAppt.comparatorProperty().bind(TableINAppointment.comparatorProperty());
@@ -1743,18 +1749,25 @@ public class ReceptionController {
 
     private void applyAppointmentFilters() {
         ensureAppointmentBindings();
+
         final LocalDate selDate = (dataPickerAppointment == null) ? null : dataPickerAppointment.getValue();
         final String q = (searchAppointmentDach == null || searchAppointmentDach.getText() == null)
                 ? "" : searchAppointmentDach.getText().trim().toLowerCase();
+
+        // 👈 المفتاح: ALL = لا فلترة حالة
         final String statusSel = (statusFilter == null || statusFilter.getValue() == null)
-                ? "SCHEDULED" : statusFilter.getValue();
+                ? "ALL"
+                : statusFilter.getValue().toUpperCase();
 
         filteredAppt.setPredicate(r -> {
+            // صفوف تعبئة/فراغ (لو موجودة) لا تدخل المنطق
+            if (r == null) return false;
+
             // 1) فلتر التاريخ
             if (selDate != null && !selDate.equals(r.getDate())) return false;
 
-            // 2) فلتر الحالة
-            if (!"SCHEDULED".equals(statusSel)) {
+            // 2) فلتر الحالة (ALL = مرّر)
+            if (!"ALL".equals(statusSel)) {
                 String st = (r.getStatus() == null) ? "" : r.getStatus().toUpperCase();
                 if (!st.equals(statusSel)) return false;
             }
@@ -3093,15 +3106,16 @@ public class ReceptionController {
 
         // appointments wiring + load
         wireAppointmentsTables();
-        setupAppointmentSlotsListener();
+//        setupAppointmentSlotsListener();
         wireDashboardAppointmentsSearch();
         wireDashboardAppointmentsSearchDP();
         wireAppointmentDateFilter();      // لاستخدام datePiker مهم
         wireDashboardTable();
-        wireStatusFilter();
-        wireStatusFilter();
+//        wireStatusFilter();
+//        wireStatusFilter();
         wireAppointmentFilters();
         loadFilteredAppointments();
+        wireAppointmentStatusFilter();
 
         ComboAnimations.applySmoothSelect(statusFilter, s -> s);
 //        ComboAnimations.enableSlidingSelection(statusFilter, Duration.millis(260));
@@ -3231,25 +3245,18 @@ public class ReceptionController {
             TableUtils.makeAllStringColumnsCopyable(patientTable);
             TableUtils.makeAllStringColumnsCopyable(DocTable_Recption);
 
-            if (TableINAppointment != null) TableINAppointment.getSelectionModel().setCellSelectionEnabled(true);
-            if (TableAppInDashboard != null) TableAppInDashboard.getSelectionModel().setCellSelectionEnabled(true);
-            if (patientTable != null) patientTable.getSelectionModel().setCellSelectionEnabled(true);
-            if (DocTable_Recption != null) DocTable_Recption.getSelectionModel().setCellSelectionEnabled(true);
-
             TableUtils.forceIBeamOnCopyableCells(TableINAppointment);
             TableUtils.forceIBeamOnCopyableCells(TableAppInDashboard);
             TableUtils.forceIBeamOnCopyableCells(patientTable);
             TableUtils.forceIBeamOnCopyableCells(DocTable_Recption);
+//            if (TableINAppointment != null) TableINAppointment.getSelectionModel().setCellSelectionEnabled(true);
+//            if (TableAppInDashboard != null) TableAppInDashboard.getSelectionModel().setCellSelectionEnabled(true);
+//            if (patientTable != null) patientTable.getSelectionModel().setCellSelectionEnabled(true);
+//            if (DocTable_Recption != null) DocTable_Recption.getSelectionModel().setCellSelectionEnabled(true);
+
+
         } catch (Throwable ignore) { }
 
-    }
-
-    private void wireStatusFilter() {
-        if (statusFilter != null) {
-            statusFilter.setItems(STATUS_CHOICES);
-            statusFilter.getSelectionModel().select("ALL");
-            statusFilter.valueProperty().addListener((obs, old, v) -> applyAppointmentFilters());
-        }
     }
 
     private void wireAppointmentFilters() {
@@ -3264,6 +3271,12 @@ public class ReceptionController {
                 loadFilteredAppointments();   // فقط
             });
         }
+    }
+    private void wireAppointmentStatusFilter() {
+        if (statusFilter == null) return;
+        statusFilter.setItems(FXCollections.observableArrayList("ALL","SCHEDULED","COMPLETED","CANCELLED"));
+        statusFilter.getSelectionModel().select("SCHEDULED"); // ← الافتراضي المتّسق مع التحميل الحالي
+        statusFilter.valueProperty().addListener((obs, ov, nv) -> applyAppointmentFilters());
     }
 
     private void loadFilteredAppointments() {
@@ -3402,57 +3415,59 @@ public class ReceptionController {
         });
     }
 
-    // ---------- Expand-on-select helper for text columns ----------
-    // يحفظ العرض الأصلي لكل عمود
-    private final Map<TableColumn<?, ?>, Double> _origColWidth = new HashMap<>();
+    /**
+     * Enables hover/selection-based column width expansion for a TableColumn, preserving original cellFactory logic.
+     * If the column already has a cellFactory (e.g., for copyable or editable cells), it wraps it instead of replacing.
+     */
 
-    // يوسّع العمود مؤقتًا عند hover/selection ليعرض النص كامل ثم يرجّعه
+    // لحتى الان مش راضية تشتغل صح فيها مشكلة
     private <R> void enableExpandAutoWidth(TableView<R> table, TableColumn<R, String> column, double maxWidth) {
-        column.setCellFactory(col -> new TableCell<R, String>() {
-            private final Label label = new Label();
+        // keep any existing factory (copyable cells, inline editors, etc.)
+        javafx.util.Callback<TableColumn<R, String>, TableCell<R, String>> original = column.getCellFactory();
+        if (original == null) {
+            original = tc -> new TableCell<>() {
+                @Override protected void updateItem(String item, boolean empty) {
+                    super.updateItem(item, empty);
+                    setText(empty ? null : item);
+                }
+            };
+        }
 
-            {
-                setContentDisplay(ContentDisplay.GRAPHIC_ONLY);
-                label.setTextOverrun(OverrunStyle.ELLIPSIS);
-                label.setWrapText(false);
-                label.setPadding(new Insets(4, 8, 4, 8));
-                setGraphic(label);
+        javafx.util.Callback<TableColumn<R, String>, TableCell<R, String>> finalOriginal = original;
+        column.setCellFactory(tc -> {
+            TableCell<R, String> cell = finalOriginal.call(tc);
 
-                setOnMouseEntered(e -> expandNow());
-                setOnMouseExited(e -> restoreWidth());
-                selectedProperty().addListener((o, ov, nv) -> { if (nv) expandNow(); else restoreWidth(); });
-                focusedProperty().addListener((o, ov, nv) -> { if (nv) expandNow(); else restoreWidth(); });
-            }
-
-            private void expandNow() {
-                if (getItem() == null) return;
-                // احسب العرض المطلوب للنص
-                Text t = new Text(getItem());
-                t.setFont(label.getFont());
+            // handlers to expand/restore
+            Runnable expand = () -> {
+                String txt = cell.getItem();
+                if (txt == null || txt.isEmpty()) return;
+                javafx.scene.text.Text t = new javafx.scene.text.Text(txt);
+                t.setFont(cell.getFont());
                 double needed = t.getLayoutBounds().getWidth() + 28; // padding
-                needed = Math.min(Math.max(needed, column.getWidth()), maxWidth);
+                double cur = column.getWidth();
+                needed = Math.min(Math.max(needed, cur), maxWidth);
 
-                _origColWidth.putIfAbsent(column, column.getWidth());
+                _origColWidth.putIfAbsent(column, cur);
                 table.setColumnResizePolicy(TableView.UNCONSTRAINED_RESIZE_POLICY);
                 column.setPrefWidth(needed);
 
-                // اعرض النص كامل بدون "..."
-                label.setWrapText(false);
-                label.setTextOverrun(OverrunStyle.CLIP);
-            }
+                cell.setWrapText(false);
+                cell.setTextOverrun(javafx.scene.control.OverrunStyle.CLIP);
+            };
 
-            private void restoreWidth() {
+            Runnable restore = () -> {
                 Double orig = _origColWidth.get(column);
                 if (orig != null) column.setPrefWidth(orig);
-                label.setWrapText(false);
-                label.setTextOverrun(OverrunStyle.ELLIPSIS);
-            }
+                cell.setWrapText(false);
+                cell.setTextOverrun(javafx.scene.control.OverrunStyle.ELLIPSIS);
+            };
 
-            @Override
-            protected void updateItem(String item, boolean empty) {
-                super.updateItem(item, empty);
-                label.setText(empty ? null : item);
-            }
+            cell.setOnMouseEntered(e -> expand.run());
+            cell.setOnMouseExited(e -> restore.run());
+            cell.selectedProperty().addListener((o, ov, nv) -> { if (nv) expand.run(); else restore.run(); });
+            cell.focusedProperty().addListener((o, ov, nv) -> { if (nv) expand.run(); else restore.run(); });
+
+            return cell; // keep original graphic/text behavior
         });
     }
 

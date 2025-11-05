@@ -21,7 +21,7 @@
 <?import javafx.scene.text.Font?>
 <?import org.kordamp.ikonli.javafx.FontIcon?>
 
-<StackPane fx:id="rootPane" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="600.0" prefWidth="1100.0" stylesheets="@../Design/ReceptionDesign.css" xmlns="http://javafx.com/javafx/23.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.example.healthflow.controllers.ReceptionController">
+<StackPane fx:id="rootPane" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="600.0" prefWidth="1100.0" stylesheets="@../Design/ReceptionDesign.css" xmlns="http://javafx.com/javafx/19" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.example.healthflow.controllers.ReceptionController">
 
     <children>
         <AnchorPane prefHeight="200.0" prefWidth="200.0">
@@ -457,7 +457,7 @@
                                 </AnchorPane>
 
                                 <!-- ===== Appointments Pane ===== -->
-                                <AnchorPane fx:id="AppointmentsAnchorPane" layoutY="1.0" prefHeight="558.0" prefWidth="890.0" style="-fx-background-color: #ededed;" stylesheets="@../Design/ReceptionDesign.css" visible="false" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="1.0">
+                                <AnchorPane fx:id="AppointmentsAnchorPane" layoutY="1.0" prefHeight="558.0" prefWidth="890.0" style="-fx-background-color: #ededed;" stylesheets="@../Design/ReceptionDesign.css" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="1.0">
                                     <children>
                                         <AnchorPane layoutX="16.0" layoutY="14.0" prefHeight="110.0" prefWidth="850.0" style="-fx-background-color: #ffffff; -fx-background-radius: 5;" styleClass="shadow" AnchorPane.leftAnchor="19.0" AnchorPane.rightAnchor="21.0">
                                             <children>
@@ -503,7 +503,11 @@
                                                 <Button fx:id="clear_Appointments" layoutX="619.0" layoutY="366.0" mnemonicParsing="false" prefHeight="30.0" prefWidth="100.0" styleClass="btn-2" stylesheets="@../Design/ReceptionDesign.css" text="Clear" AnchorPane.bottomAnchor="14.0" AnchorPane.rightAnchor="133.0" />
                                                 <Button fx:id="deleteAppointments" layoutX="762.0" layoutY="327.0" mnemonicParsing="false" prefHeight="30.0" prefWidth="100.0" styleClass="btn-2" stylesheets="@../Design/ReceptionDesign.css" text="Delete" AnchorPane.bottomAnchor="14.0" AnchorPane.rightAnchor="20.0" />
                                                 <Button fx:id="deleteRowApptTable" layoutX="769.0" layoutY="13.0" mnemonicParsing="false" prefHeight="25.0" prefWidth="25.0" styleClass="btn-2" stylesheets="@../Design/ReceptionDesign.css" text="-" AnchorPane.rightAnchor="57.66666666666663" />
-                                                <DatePicker fx:id="dataPickerAppointment" cache="true" layoutX="627.0" layoutY="12.0" minHeight="-Infinity" prefHeight="30.0" prefWidth="130.0" styleClass="boxDataPickar" AnchorPane.rightAnchor="95.0" />
+                                                <DatePicker fx:id="dataPickerAppointment" cache="true" layoutX="627.0" layoutY="12.0" minHeight="-Infinity" prefHeight="30.0" prefWidth="130.0" AnchorPane.rightAnchor="95.0">
+                                       <styleClass>
+                                          <String fx:value="boxDataPickar" />
+                                          <String fx:value="box" />
+                                       </styleClass></DatePicker>
                                     <ComboBox fx:id="statusFilter" layoutX="491.0" layoutY="11.0" prefHeight="30.0" prefWidth="130.0" promptText="filter" stylesheets="@../Design/combobox.css" AnchorPane.rightAnchor="229.80000000000007" />
                                             </children>
                                             <styleClass>

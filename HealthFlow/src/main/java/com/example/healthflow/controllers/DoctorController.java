@@ -513,44 +513,29 @@ public class DoctorController {
             Exception err = null;
 
             try (Connection c = Database.get()) {
-//                String sql = """
-//                SELECT DISTINCT
-//                     pu.national_id,
-//                     pu.full_name AS patient_name,
-//                     pu.gender,
-//                     p.date_of_birth,
-//                     p.medical_history,
-//                     p.user_id AS patient_user_id
-//                FROM appointments a
-//                JOIN doctors d  ON d.id = a.doctor_id
-//                JOIN users   du ON du.id = d.user_id      -- doctor user
-//                JOIN patients p ON p.id = a.patient_id
-//                JOIN users   pu ON pu.id = p.user_id      -- patient user
-//                WHERE du.id = ?
-//                ORDER BY pu.full_name;
-//                """;
                 String sql = """
-    WITH last_appt AS (
-        SELECT a.patient_id, MAX(a.appointment_date) AS last_dt
-        FROM appointments a
-        JOIN doctors d  ON d.id = a.doctor_id
-        JOIN users   du ON du.id = d.user_id
-        WHERE du.id = ?                -- الدكتور الحالي
-        GROUP BY a.patient_id
-    )
-    SELECT
-         pu.national_id,
-         pu.full_name AS patient_name,
-         pu.gender,
-         p.date_of_birth,
-         p.medical_history,
-         p.user_id AS patient_user_id
-    FROM last_appt la
-    JOIN patients p ON p.id = la.patient_id
-    JOIN users   pu ON pu.id = p.user_id
-    ORDER BY la.last_dt DESC
-    LIMIT 5;
-""";
+                    WITH last_appt AS (
+                        SELECT a.patient_id, MAX(a.appointment_date) AS last_dt
+                        FROM appointments a
+                        JOIN doctors d  ON d.id = a.doctor_id
+                        JOIN users   du ON du.id = d.user_id
+                        WHERE du.id = ?                -- الدكتور الحالي
+                        GROUP BY a.patient_id
+                    )
+                    SELECT
+                         pu.national_id,
+                         pu.full_name AS patient_name,
+                         pu.gender,
+                         p.date_of_birth,
+                         p.medical_history,
+                         p.user_id AS patient_user_id
+                    FROM last_appt la
+                    JOIN patients p ON p.id = la.patient_id
+                    JOIN users   pu ON pu.id = p.user_id
+                    ORDER BY la.last_dt DESC
+                --    LIMIT 5
+                    ;
+                """;
 
                 try (var ps = c.prepareStatement(sql)) {
                     ps.setLong(1, u.getId());
@@ -1852,7 +1837,6 @@ public class DoctorController {
                     prescItemsEditable.addAll(rows);
                 } else if (TablePrescriptionItems != null) {
                     // fallback لو الجدول غير مربوط بلستة خارجية
-//                    TablePrescriptionItems.getItems().addAll(rows);
                     Platform.runLater(this::reloadPrescriptionItemsFromDb);
                 }
                 if (TablePrescriptionItems != null) TablePrescriptionItems.refresh();
@@ -2027,37 +2011,10 @@ public class DoctorController {
                             }
                         }
                     });
-
-//                    btnPresc.setOnAction(e -> {
-//                        PatientRow row = getItem();
-//                        if (row == null) return;
-//
-//                        // مسودة: لا تنشئ وصفة في الداتابيز
-//                        currentPrescriptionId = null;
-//
-//                        // سياق المريض
-//                        selectedPatientUserId      = (row.getUserId() > 0) ? row.getUserId() : null;
-//                        selectedPatientName        = row.getFullName();
-//                        selectedPatientNationalId  = row.getNationalId();
-//
-//                        // نظافة للمسودة
-//                        if (prescItemsEditable != null) prescItemsEditable.clear();
-//
-//                        // افتح واجهة الوصفة كمسودة
-//                        showPrescriptionPane();
-//
-//                        // حدِّث الهيدر + تحسين تجربة الكتابة في الاسم
-//                        Platform.runLater(() -> {
-//                            setPatientHeader(row.getFullName(), row.getNationalId(), false);
-//                            if (PatientNameTF != null) {
-//                                PatientNameTF.positionCaret(PatientNameTF.getText().length());
-//                            }
-//                        });
-//                    });
                     btnPresc.setOnAction(e -> {
                         PatientRow row = getItem();
                         if (row == null) return;
-                        openPrescriptionForPatient(row);   // دالة جديدة بالأسفل
+                        openPrescriptionForPatient(row);
                     });
 
                 }
@@ -2072,21 +2029,6 @@ public class DoctorController {
 
             loadAllPatientsForDoctorAsync();
         }
-        // توزيع أبعاد الأعمدة كنِسَب من عرض الجدول ليتكيّف مع الشاشة
-//        if (patientTable != null) {
-//            var w2 = patientTable.widthProperty().subtract(15);
-//            if (colNationalId != null)     colNationalId.prefWidthProperty().bind(w2.multiply(0.1));
-//            if (colName    != null)        colName.prefWidthProperty().bind(w2.multiply(0.16));
-//            if (colGender  != null)        colGender.prefWidthProperty().bind(w2.multiply(0.6));
-//            if (colDob     != null)        colDob.prefWidthProperty().bind(w2.multiply(0.10));
-//            if (colMedicalHistory != null) colMedicalHistory.prefWidthProperty().bind(w2.multiply(0.22));
-//            if (colAction2 != null) {
-//                colAction2.prefWidthProperty().bind(w2.multiply(0.08));
-//                colAction2.setResizable(true);
-//                colAction2.setSortable(true);
-//                colAction2.setMinWidth(90);
-//            }
-//        }
 
         // --- Bind patients table to filtered/sorted wrappers (one-time) ---
         if (filtered == null) {
@@ -2116,7 +2058,7 @@ public class DoctorController {
 
     /**
      * افتح واجهة الوصفة للمريض (من جدول المرضى) بدون إنشاء وصفة جديدة.
-     * يبحث عن آخر وصفة "اليوم" لنفس الدكتور والمريض؛ إن لم توجد يفتح مسودة فارغة.
+     * يبحث عن آخر وصفة "اليوم" لنفس الدكتور والمريض إن لم توجد يفتح مسودة فارغة.
      */
     private void openPrescriptionForPatient(PatientRow row) {
         try (Connection c = Database.get()) {

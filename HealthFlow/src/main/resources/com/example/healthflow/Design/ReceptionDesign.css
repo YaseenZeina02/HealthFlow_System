@@ -178,26 +178,27 @@
 
 
 
-/* ======= Row selection colors ======= */
-.table-view .table-row-cell:filled:selected,
-.table-view .table-row-cell:filled:selected:hover {
-    -fx-background-color: #0ea5e9;
-}
-.table-view .table-row-cell:filled:selected .text {
-    -fx-fill: white;
-}
-.table-view .table-row-cell:filled:selected .table-cell { -fx-text-fill: white; }
+/*!* ======= Row selection colors ======= *!*/
+/*.table-view .table-row-cell:filled:selected,*/
+/*.table-view .table-row-cell:filled:selected:hover {*/
+/*    -fx-background-color: rgba(14,165,183,0.22);*/
+/*    -fx-background-insets: 0;*/
+/*    -fx-background-radius: 8;}*/
+/*.table-view .table-row-cell:filled:selected .text {*/
+/*    -fx-fill: white;*/
+/*}*/
+/*!*.table-view .table-row-cell:filled:selected .table-cell { -fx-text-fill: white; }*!*/
 
-/* خلي الأزرار تبان كويس فوق الصف المحدد */
-.table-view .table-row-cell:filled:selected .button.btn--ghost {
-    -fx-text-fill: white;
-    -fx-border-color: rgba(255,255,255,0.65);
-}
-.table-view .table-row-cell:filled:selected .button.btn--primary,
-.table-view .table-row-cell:filled:selected .button.btn--info {
-    /* يكفي التأثير؛ الألوان كويسة فوق الخلفية */
-    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.35), 10, 0.25, 0, 1);
-}
+/*!* خلي الأزرار تبان كويس فوق الصف المحدد *!*/
+/*.table-view .table-row-cell:filled:selected .button.btn--ghost {*/
+/*    -fx-text-fill: white;*/
+/*    -fx-border-color: rgba(255,255,255,0.65);*/
+/*}*/
+/*.table-view .table-row-cell:filled:selected .button.btn--primary,*/
+/*.table-view .table-row-cell:filled:selected .button.btn--info {*/
+/*    !* يكفي التأثير؛ الألوان كويسة فوق الخلفية *!*/
+/*    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.35), 10, 0.25, 0, 1);*/
+/*}*/
 
 /* Hover بدون اختيار */
 /*.table-view .table-row-cell:filled:hover {*/
@@ -271,6 +272,66 @@
 .date-picker.boxDataPickar:focused {
     -fx-border-color: #0e7c80;
     -fx-effect: dropshadow(gaussian, rgba(14,124,128,0.25), 8, 0.25, 0, 0);
+}
+
+/* ===== ComboBox with the same look&feel as boxDataPickar DatePicker ===== */
+.combo-box.boxDataPickar,
+.combo-box-base.boxDataPickar {
+    -fx-background-color: white;
+    -fx-background-radius: 12;
+    -fx-border-color: #1aa3a8;
+    -fx-border-width: 1;
+    -fx-border-radius: 12;
+    -fx-padding: 0;                 /* نفس الفكرة: بدون حشوة خارجية */
+}
+
+/* نص الحقل الداخلي */
+.combo-box-base.boxDataPickar > .text-field {
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+    -fx-border-width: 0;
+    -fx-padding: 6 8 6 10;          /* مطابق لـ DatePicker */
+    -fx-font-size: 14px;
+    -fx-text-fill: #222;
+    -fx-prompt-text-fill: #9aa3a7;
+}
+
+/* زر السهم بدون خط فاصل */
+.combo-box-base.boxDataPickar > .arrow-button {
+    -fx-background-color: transparent;
+    -fx-background-radius: 0 12 12 0;
+    -fx-border-color: transparent;
+    -fx-border-width: 0;
+    -fx-padding: 0 10;
+    -fx-cursor: hand;
+}
+.combo-box-base.boxDataPickar > .arrow-button:hover {
+    -fx-background-color: rgba(26,163,168,0.08);
+}
+
+/* تأثير الفوكس */
+.combo-box-base.boxDataPickar:focused {
+    -fx-border-color: #0e7c80;
+    -fx-effect: dropshadow(gaussian, rgba(14,124,128,0.25), 8, 0.25, 0, 0);
+}
+
+/* Popup to match palette */
+.combo-box-popup .list-view {
+    -fx-background-color: white;
+    -fx-background-insets: 0;
+    -fx-padding: 4 0;
+}
+.combo-box-popup .list-cell {
+    -fx-padding: 8 12;
+    -fx-font-size: 14px;
+    -fx-text-fill: black;
+}
+.combo-box-popup .list-cell:hover {
+    -fx-background-color: rgba(26,163,168,0.10);
+}
+.combo-box-popup .list-cell:selected {
+    -fx-background-color: #1976d2;
+    -fx-text-fill: white;
 }
 
 /* تحسين مظهر نافذة التقويم */
@@ -407,11 +468,12 @@
 }
 .date-picker.box > .text-field {
     -fx-background-color: transparent;
-    -fx-padding: 10 14;
-}
-.date-picker.box > .text-field {
+    /*-fx-padding: 10 14;*/
     -fx-padding: 8 12;    /* جرّب 8 بدل 10 لتقريب الارتفاع */
+
 }
+
+
 
 /* ========== Chips لأوقات الحجز ========== */
 /* استعملها على ToggleButton */
@@ -598,20 +660,29 @@
 }
 
 
-/* لما المؤشر يكون على الخلية */
-.table-cell:hover {
-    -fx-font-size: 14px;
-    -fx-wrap-text: true;
-    -fx-background-color: #e0f7fa;
+/* Hover للصفوف ككل */
+.table-view .table-row-cell:filled:hover {
+    -fx-background-color: rgba(14,165,183,0.10);
+    -fx-background-insets: 0;
+    -fx-background-radius: 8;
 }
 
-/* لما الخلية تكون محددة */
-.table-cell:selected {
-    -fx-wrap-text: true;
-    -fx-font-weight: bold;
-    -fx-background-color: #b2ebf2;
-    -fx-text-fill: black;
+/* عندما يكون الصف محدد + Hover: امّا تلغي أو تغيّر اللون */
+.table-view .table-row-cell:filled:selected:hover {
+    /* الغِ تأثير الهوفر أو ضع لون التحديد فقط */
+    -fx-background-color:
+            linear-gradient(to bottom, rgba(14,165,183,0.24), rgba(14,165,183,0.18)),
+            #0ea5b7;             /* نفس لون التحديد عندك */
+    -fx-background-insets: 0, 0 0 0 3;
+    -fx-background-radius: 6, 6;
 }
+/* لما الخلية تكون محددة */
+/*.table-cell:selected {*/
+/*    -fx-wrap-text: true;*/
+/*    -fx-font-weight: bold;*/
+/*    -fx-background-color: #b2ebf2;*/
+/*    -fx-text-fill: black;*/
+/*}*/
 
 /* نمط الخلية لما تتوسع مؤقتًا */
 .table-cell.expanded-cell {
@@ -654,6 +725,65 @@
     -fx-border-radius: 4;
 }
 
-.table-row-cell:selected {
-    -fx-background-color: rgba(0, 0, 0, 0.04);
+/* لتلوين النص العلوي (الشهر والسنة) داخل popup التقويم */
+.date-picker .spinner-label,
+.date-picker-popup .month-year-label,
+.date-picker-popup .label {
+    -fx-text-fill: black; /* اجعل النص أسود */
 }
+
+/* لزرّي السهمين (يمين/يسار الشهر) */
+.date-picker-popup .button {
+    -fx-text-fill: black;
+}
+
+/* لليوم الحالي واليوم المحدد */
+.date-picker-popup .day-cell:selected {
+    -fx-background-color: #1976d2; /* لون أزرق جميل */
+    -fx-text-fill: white;
+}
+.date-picker-popup .day-cell:hover {
+    -fx-background-color: rgba(25, 118, 210, 0.2);
+}
+
+/* لو الخلفية فاتحة جدًا خفف لون الشريط */
+.date-picker-popup .calendar-header {
+    -fx-background-color: rgba(255, 255, 255, 0.9);
+}
+
+
+/* ===== Compact controls used inside table cells ===== */
+.date-picker.mini,
+.combo-box-base.mini {
+    -fx-font-size: 12px;
+    -fx-padding: 0 4 0 4;
+    -fx-pref-width: 90px;   /* small footprint inside column */
+}
+.date-picker.mini > .text-field {
+    -fx-padding: 2 6;       /* tighter text area */
+}
+.date-picker.mini > .arrow-button,
+.combo-box-base.mini > .arrow-button {
+    -fx-padding: 0 4;       /* smaller arrow button */
+}
+/* popup fonts to match */
+.date-picker-popup,
+.combo-box-popup .list-cell {
+    -fx-font-size: 12px;
+}
+
+/* for combobox in table*/
+.date-picker.table-cell {
+    -fx-font-size: 9px;
+    -fx-padding: 0 4 0 4;
+    -fx-pref-width: 90px;
+    -fx-min-height: 22px;
+    -fx-pref-height: 22px;
+
+}
+
+.date-picker.table-cell > .text-field {
+    -fx-padding: 2 ;
+    -fx-alignment: CENTER-LEFT;
+}
+

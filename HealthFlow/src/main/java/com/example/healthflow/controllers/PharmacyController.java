@@ -15,6 +15,7 @@ import java.sql.ResultSet;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 
+import com.example.healthflow.ui.fx.TableUtils;
 import javafx.application.Platform;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.concurrent.Task;
@@ -2043,6 +2044,29 @@ public class PharmacyController {
                 }
             } catch (Throwable ignored) {}
         }
+
+        try {
+            TableUtils.makeAllStringColumnsCopyable(TableToShowMedicineByBatchNumber);
+            TableUtils.makeAllStringColumnsCopyable(PresciptionsTable);
+            TableUtils.makeAllStringColumnsCopyable(TableMedicinesInventory);
+            TableUtils.makeAllStringColumnsCopyable(tblMedSuggest);
+            TableUtils.makeAllStringColumnsCopyable(TablePrescriptionItems);
+
+
+            TableUtils.forceIBeamOnCopyableCells(TableToShowMedicineByBatchNumber);
+            TableUtils.forceIBeamOnCopyableCells(PresciptionsTable);
+            TableUtils.forceIBeamOnCopyableCells(TableMedicinesInventory);
+            TableUtils.forceIBeamOnCopyableCells(tblMedSuggest);
+            TableUtils.forceIBeamOnCopyableCells(TablePrescriptionItems);
+
+//            if (TableINAppointment != null) TableINAppointment.getSelectionModel().setCellSelectionEnabled(true);
+//            if (TableAppInDashboard != null) TableAppInDashboard.getSelectionModel().setCellSelectionEnabled(true);
+//            if (patientTable != null) patientTable.getSelectionModel().setCellSelectionEnabled(true);
+//            if (DocTable_Recption != null) DocTable_Recption.getSelectionModel().setCellSelectionEnabled(true);
+
+
+        } catch (Throwable ignore) { }
+
 
 
         if (saveBtnReceive != null) {
