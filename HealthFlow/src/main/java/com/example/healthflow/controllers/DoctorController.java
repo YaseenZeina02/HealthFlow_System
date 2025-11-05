@@ -164,7 +164,7 @@ public class DoctorController {
     @FXML
     private TableColumn<PatientRow, String> colGender;
     @FXML
-    private TableColumn<PatientRow, Integer> colDob; // age
+    private TableColumn<PatientRow, String> colDob; // age
     @FXML
     private TableColumn<PatientRow, String> colMedicalHistory;
     @FXML
@@ -1882,7 +1882,14 @@ public class DoctorController {
         if (colNationalId != null) colNationalId.setCellValueFactory(new PropertyValueFactory<>("nationalId"));
         if (colName != null) colName.setCellValueFactory(new PropertyValueFactory<>("fullName"));
         if (colGender != null) colGender.setCellValueFactory(new PropertyValueFactory<>("gender"));
-        if (colDob != null) colDob.setCellValueFactory(new PropertyValueFactory<>("age"));
+        if (colDob != null) {
+//            colDob.setCellValueFactory(new PropertyValueFactory<>("age"));
+            colDob.setCellValueFactory(cd -> {
+                var r = cd.getValue(); // النوع حسب صفك (مثلاً PatientRow أو PrescPatientRow)
+                java.time.LocalDate dob = r.getDateOfBirth();
+                return new ReadOnlyStringWrapper(com.example.healthflow.core.time.AgeText.format(dob));
+            });
+        }
         if (colMedicalHistory != null)
             colMedicalHistory.setCellValueFactory(new PropertyValueFactory<>("medicalHistory"));
         if (colAction2 != null) {
