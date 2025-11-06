@@ -2064,26 +2064,6 @@ public class ReceptionController {
             Platform.runLater(() -> showError("Update appointment_date", e));
         }
     }
-//    private void updateAppointmentStartAt(long id, LocalDate d, LocalTime t) {
-//        if (isPastStart(d, t)) {
-//            throw new IllegalArgumentException("Past time not allowed for today's date");
-//        }
-//
-//        if (id <= 0 || d == null || t == null) return;
-//        final String sql = "UPDATE appointments SET appointment_date = ?, updated_at = now() WHERE id = ?";
-//        try (Connection c = Database.get(); PreparedStatement ps = c.prepareStatement(sql)) {
-//            java.time.OffsetDateTime startAt = toAppOffset(d, t); // Asia/Gaza
-//            ps.setObject(1, startAt); // write timestamptz correctly
-//            ps.setLong(2, id);
-//            ps.executeUpdate();
-//            try (PreparedStatement n = c.prepareStatement("SELECT pg_notify('appointments_changed','update')")) {
-//                n.execute();
-//            }
-//            lastApptTs = new java.sql.Timestamp(System.currentTimeMillis());
-//        } catch (SQLException e) {
-//            Platform.runLater(() -> showError("Update appointment_date", e));
-//        }
-//    }
 
     // Delete currently selected appointment
     private void doDeleteAppointment() {

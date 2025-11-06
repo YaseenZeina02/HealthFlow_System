@@ -176,6 +176,54 @@
     -fx-font-size: 13px;      /* ممكن تعدل الحجم لو بدك */
 }
 
+/*.nav-btn{*/
+/*    -fx-background-color: #1b98b5;*/
+/*}*/
+
+/*.nav-btn {*/
+/*    -fx-background-color: transparent;*/
+/*    -fx-text-fill: #white;*/
+/*    -fx-font-weight: bold;*/
+/*}*/
+
+/*.nav-btn.current {*/
+/*    !*-fx-background-color: #1d489c;*!*/
+/*    -fx-background-color: rgba(27, 58, 181, 0.64);*/
+/*    -fx-text-fill: white;*/
+/*    -fx-border-radius: 8;*/
+/*    -fx-background-radius: 8;*/
+/*}*/
+
+/* أزرار القائمة الجانبية */
+.nav-btn {
+    -fx-background-color: transparent;
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+    -fx-background-radius: 8;
+    -fx-border-radius: 8;
+}
+
+/* الزر النشط */
+.nav-btn.current {
+    -fx-background-color: rgba(27, 58, 181, 0.64);
+    -fx-text-fill: white;
+    -fx-border-color: rgba(255,255,255,0.35);
+    -fx-border-width: 1;
+}
+
+/* Hover (لغير النشط) */
+.nav-btn:hover {
+    /*-fx-background-color: rgba(27, 58, 181, 0.25);*/
+    -fx-background-color: rgba(254, 255, 254, 0.71);
+    /*-fx-text-fill: white;*/
+
+}
+
+/* تركيز الكيبورد */
+.nav-btn:focused {
+    -fx-effect: dropshadow(gaussian, rgba(255,255,255,0.18), 8, 0.2, 0, 0);
+}
+
 
 
 /*!* ======= Row selection colors ======= *!*/

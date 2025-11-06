@@ -982,3 +982,168 @@ ALTER TABLE inventory_transactions
     ADD COLUMN IF NOT EXISTS pharmacist_id BIGINT REFERENCES pharmacists(id);
 
 
+ALTER TABLE medicine_batches
+    ADD COLUMN IF NOT EXISTS reason TEXT;
+
+ALTER TABLE medicine_batches
+    ADD COLUMN IF NOT EXISTS type TEXT;
+
+
+-- 1) مزامنة quantity في medicine_batches من inventory_transactions
+CREATE OR REPLACE FUNCTION refresh_batch_quantity(p_batch_id BIGINT)
+RETURNS VOID LANGUAGE plpgsql AS $$
+BEGIN
+UPDATE medicine_batches b
+SET quantity = COALESCE(
+        (SELECT SUM(qty_change) FROM inventory_transactions t
+         WHERE t.batch_id = p_batch_id), 0)
+WHERE b.id = p_batch_id;
+END $$;
+
+-- 2) اجعل الـ AFTER trigger يحدّث الدواء والدفعة
+CREATE OR REPLACE FUNCTION inv_tx_after_change()
+RETURNS TRIGGER LANGUAGE plpgsql AS $$
+DECLARE
+v_med   BIGINT;
+  v_batch BIGINT;
+BEGIN
+  v_med   := COALESCE(NEW.medicine_id, OLD.medicine_id);
+  v_batch := COALESCE(NEW.batch_id,    OLD.batch_id);
+
+  IF v_med IS NOT NULL THEN
+    PERFORM refresh_medicine_available_qty(v_med);  -- كانت موجودة عندك
+END IF;
+  IF v_batch IS NOT NULL THEN
+    PERFORM refresh_batch_quantity(v_batch);        -- جديدة
+END IF;
+
+RETURN COALESCE(NEW, OLD);
+END $$;
+
+-- أعد إنشاء التريغرز الثلاثة لضمان استدعاء النسخة الجديدة
+DROP TRIGGER IF EXISTS inv_tx_after_ins ON inventory_transactions;
+DROP TRIGGER IF EXISTS inv_tx_after_upd ON inventory_transactions;
+DROP TRIGGER IF EXISTS inv_tx_after_del ON inventory_transactions;
+
+CREATE TRIGGER inv_tx_after_ins
+    AFTER INSERT ON inventory_transactions
+    FOR EACH ROW EXECUTE FUNCTION inv_tx_after_change();
+
+CREATE TRIGGER inv_tx_after_upd
+    AFTER UPDATE ON inventory_transactions
+    FOR EACH ROW EXECUTE FUNCTION inv_tx_after_change();
+
+CREATE TRIGGER inv_tx_after_del
+    AFTER DELETE ON inventory_transactions
+    FOR EACH ROW EXECUTE FUNCTION inv_tx_after_change();
+
+
+-- 3) إلزام batch_id لكل العمليات الطبيعية؛ السماح فقط لـ ADJUSTMENT
+CREATE OR REPLACE FUNCTION ensure_batch_for_standard_refs()
+RETURNS TRIGGER LANGUAGE plpgsql AS $$
+BEGIN
+  IF (NEW.ref_type IS NULL OR NEW.ref_type NOT IN ('ADJUSTMENT'))
+     AND NEW.batch_id IS NULL THEN
+    RAISE EXCEPTION 'batch_id is required for inventory_transactions (ref_type=%)', NEW.ref_type;
+END IF;
+RETURN NEW;
+END $$;
+
+DROP TRIGGER IF EXISTS inv_tx_need_batch ON inventory_transactions;
+CREATE TRIGGER inv_tx_need_batch
+    BEFORE INSERT OR UPDATE ON inventory_transactions
+    FOR EACH ROW EXECUTE FUNCTION ensure_batch_for_standard_refs();
+
+
+-- بديل للخطوة 4: إنشاء قيود افتتاحية تسوية بالفرق (Backfill كـ ADJUSTMENT)
+INSERT INTO inventory_transactions (medicine_id, batch_id, qty_change, reason, ref_type, created_at)
+SELECT mb.medicine_id,
+       mb.id,
+       (mb.quantity - COALESCE(tx.sum_tx,0)) AS missing_qty,
+       'Opening balance (backfill)',
+       'ADJUSTMENT',
+       mb.received_at
+FROM medicine_batches mb
+         LEFT JOIN (
+    SELECT batch_id, SUM(qty_change) AS sum_tx
+    FROM inventory_transactions
+    GROUP BY batch_id
+) tx ON tx.batch_id = mb.id
+WHERE (mb.quantity - COALESCE(tx.sum_tx,0)) <> 0     -- أدخِل الفرق سالب/موجب
+  AND COALESCE(tx.sum_tx,0) IS DISTINCT FROM mb.quantity;
+
+
+DO $$
+DECLARE
+r_tx RECORD;           -- السطر غير المعيّن (batch_id IS NULL)
+  r_b  RECORD;           -- دفعة مرشّحة بالتسلسل FIFO
+  remaining INT;         -- الكمية السالبة المتبقية للتوزيع (موجبة القيمة)
+  alloc INT;             -- الكمية التي سنخصمها من الدفعة الحالية
+  cur_balance INT;       -- رصيد الدفعة الحالي من الـ ledger
+BEGIN
+FOR r_tx IN
+SELECT id, medicine_id, qty_change, reason, ref_type, ref_id, created_at
+FROM inventory_transactions
+WHERE batch_id IS NULL
+ORDER BY created_at
+    LOOP
+    -- الحالات الموجبة: اربطها بأقدم دفعة لنفس الدواء (لن تسبب سالب)
+    IF r_tx.qty_change >= 0 THEN
+UPDATE inventory_transactions t
+SET batch_id = (
+    SELECT b.id
+    FROM medicine_batches b
+    WHERE b.medicine_id = r_tx.medicine_id
+    ORDER BY b.received_at ASC
+    LIMIT 1
+    )
+WHERE t.id = r_tx.id;
+CONTINUE;
+END IF;
+
+    -- الحالات السالبة: وزّعها على دفعات بقدر المتاح
+    remaining := ABS(r_tx.qty_change);
+
+FOR r_b IN
+SELECT b.id AS batch_id
+FROM medicine_batches b
+WHERE b.medicine_id = r_tx.medicine_id
+ORDER BY b.received_at ASC
+    LOOP
+      EXIT WHEN remaining <= 0;
+
+-- احصل على الرصيد الحالي للدفعة من الـ ledger (ليس من عمود quantity مباشرة)
+SELECT COALESCE(SUM(t.qty_change),0)
+INTO cur_balance
+FROM inventory_transactions t
+WHERE t.batch_id = r_b.batch_id;
+
+-- لو ما في رصيد، انتقل للدفعة التالية
+IF cur_balance <= 0 THEN
+        CONTINUE;
+END IF;
+
+      alloc := LEAST(cur_balance, remaining);
+
+      -- أنشئ سطرًا جديدًا مخصصًا لهذه الدفعة بالقيمة السالبة المخصصة
+INSERT INTO inventory_transactions
+(medicine_id, batch_id, qty_change, reason, ref_type, ref_id, created_at)
+VALUES
+    (r_tx.medicine_id, r_b.batch_id, -alloc,
+     COALESCE(r_tx.reason,'') || ' [attach FIFO]',
+     COALESCE(r_tx.ref_type, 'ADJUSTMENT'),
+     r_tx.ref_id, r_tx.created_at);
+
+remaining := remaining - alloc;
+END LOOP;
+
+    -- إذا نجحنا في تغطية كامل السالب، احذف السطر الأصلي غير المعيّن
+    IF remaining = 0 THEN
+DELETE FROM inventory_transactions WHERE id = r_tx.id;
+ELSE
+      -- لم نجد رصيدًا كافيًا لتغطية كل السالب → اترك السطر كما هو
+      RAISE NOTICE 'Skipped tx id % (needed %, deficit remains %). Attach more opening/receipt first.',
+                   r_tx.id, ABS(r_tx.qty_change), remaining;
+END IF;
+END LOOP;
+END $$;

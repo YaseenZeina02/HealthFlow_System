@@ -1,8 +1,10 @@
 
 package com.example.healthflow.controllers;
 
+import com.example.healthflow.core.inventory.DeductSupport;
 import com.example.healthflow.dao.PrescriptionDAO;
 import com.example.healthflow.dao.PrescriptionDAO.DashboardRow;
+//import com.example.healthflow.dao.PrescriptionDAO.DeductSuppport.DeductRow;
 import com.example.healthflow.service.AuthService.Session;
 import com.example.healthflow.dao.PrescriptionItemDAO;
 import com.example.healthflow.db.Database;
@@ -154,8 +156,6 @@ public class PharmacyController {
     @FXML
     private Label Prescription_number;
 
-    @FXML
-    private TextArea ReasonOfDeduct;
 
     @FXML
     private AnchorPane ReceivePane;
@@ -176,8 +176,7 @@ public class PharmacyController {
     private DatePicker PrescriptionDatePicker;
 
 
-    @FXML
-    private TableView<?> TableToShowMedicineByBatchNumber;
+
 
     @FXML
     private Label TitleBar;
@@ -297,17 +296,9 @@ public class PharmacyController {
     private TableColumn<DashboardRow, String> colprescriptionStutus;
 
 
-    @FXML
-    private TextField deductBatchNumber;
 
     @FXML
     private AnchorPane deductPane;
-
-    @FXML
-    private TextField guantityToDeduct;
-
-    @FXML
-    private Label lableToShowMedicinesName;
 
     @FXML
     private AnchorPane pharmacyDashboardAnchorPane;
@@ -315,8 +306,6 @@ public class PharmacyController {
     @FXML
     private TextField quantity;
 
-    @FXML
-    private Button saveBtnDeduct;
 
     @FXML private Button saveBtnReceive;
     @FXML private Button downloadTemp;
@@ -354,6 +343,27 @@ public class PharmacyController {
 
     @FXML
     private Label welcomeUser;
+
+
+    /*  Deduct Part  */
+    @FXML private ComboBox<String> cmboTypeOfDeduct;
+    @FXML private TableView<DeductSupport.DeductRow> TableToShowMedicineByBatchNumber;
+    @FXML private TableColumn<DeductSupport.DeductRow,Number> colSerialDeduct ;
+    @FXML private TableColumn<DeductSupport.DeductRow,String> colMedicineNameInventoryDeduct ;
+    @FXML private TableColumn<DeductSupport.DeductRow,Number> colStockQtyInventoryDeduct ;
+    @FXML private TableColumn<DeductSupport.DeductRow,String> colExpiryQtyInventoryDeduct ;
+    @FXML private TextField deductBatchNumber_MN;
+    @FXML private TextArea ReasonOfDeduct;
+    @FXML private TextField quantityToDeduct;
+    @FXML private Button saveBtnDeduct;
+    @FXML private Button plusToQuantity;
+    @FXML private Button minusToQuantity;
+    @FXML private Label sugestMedicinesItem;
+
+    private DeductSupport deductSupport; // from the redy class
+
+
+
 
     private volatile java.time.Instant lastPrescItemsFp = null;   // fingerprint لعناصر الوصفة المفتوحة
     private volatile java.time.Instant lastInventoryFp  = null;   // fingerprint للمخزون
@@ -455,18 +465,6 @@ public class PharmacyController {
                 }
             });
         }
-
-        // دبل-كليك: تفاصيل سريعة
-//        TableMedicinesInventory.setRowFactory(tv -> {
-//            TableRow<InventoryRow> row = new TableRow<>();
-//            row.setOnMouseClicked(e -> {
-//                if (e.getClickCount() == 2 && !row.isEmpty()) {
-//                    InventoryRow r = row.getItem();
-//                    showInventoryQuickDetails(r);
-//                }
-//            });
-//            return row;
-//        });
 
         if (TableMedicinesInventory != null) {
             TableMedicinesInventory.setRowFactory(tv -> {
@@ -2063,6 +2061,23 @@ public class PharmacyController {
         if (saveBtnReceive != null) {
             saveBtnReceive.setOnAction(e -> onSaveReceive());
         }
+        deductSupport = new DeductSupport(
+                cmboTypeOfDeduct,
+                TableToShowMedicineByBatchNumber,
+                colSerialDeduct,
+                colMedicineNameInventoryDeduct,
+                colStockQtyInventoryDeduct,
+                colExpiryQtyInventoryDeduct,
+                deductBatchNumber_MN,
+                quantityToDeduct,
+                ReasonOfDeduct,
+                plusToQuantity,
+                minusToQuantity,
+                saveBtnDeduct,
+                sugestMedicinesItem
+        );
+        deductSupport.setOnSaveCallback(this::reloadInventoryTable);
+        deductSupport.init();
 
         applyInventoryNullPlaceholders();
     }
