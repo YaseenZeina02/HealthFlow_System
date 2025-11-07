@@ -61,9 +61,22 @@ public final class DbNotifications implements AutoCloseable {
     public void listen(String channel, Consumer<String> handler) {
         Objects.requireNonNull(channel, "channel");
         Objects.requireNonNull(handler, "handler");
+        // ✅ Security: Validate channel name to prevent SQL injection
+        if (!isValidChannelName(channel)) {
+            throw new IllegalArgumentException("Invalid channel name: " + channel);
+        }
         handlers.put(channel, handler);
         channels.add(channel);
         ensureListen(channel);
+    }
+
+    /** ✅ Validate PostgreSQL channel/identifier name (alphanumeric + underscore only) */
+    private boolean isValidChannelName(String channel) {
+        if (channel == null || channel.isEmpty() || channel.length() > 63) {
+            return false;
+        }
+        // PostgreSQL identifiers: start with letter or underscore, contain only alphanumeric and underscore
+        return channel.matches("^[a-zA-Z_][a-zA-Z0-9_]*$");
     }
 
     private void startLoop() {

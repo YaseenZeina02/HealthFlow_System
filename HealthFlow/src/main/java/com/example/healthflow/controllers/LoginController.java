@@ -25,10 +25,12 @@ import javafx.scene.layout.StackPane;
 import javafx.stage.Stage;
 import javafx.util.Duration;
 import org.mindrot.jbcrypt.BCrypt;
+import javafx.concurrent.Task;
 
 import java.sql.Connection;
 import java.util.Objects;
 import com.example.healthflow.controllers.ReceptionController;
+
 
 public class LoginController {
 
@@ -40,17 +42,35 @@ public class LoginController {
     @FXML private CheckBox ShowPasswordCheckBox;
     @FXML private AnchorPane rootPane;
     @FXML private Button LoginButton;
-
+    @FXML private Label AlertLabel;
+    private boolean rebindDisableAfterLock;
     // لإظهار/إخفاء كلمة السر
     private final TextField visiblePasswordField = new TextField();
 
     // ====== connectivity ======
     private final ConnectivityMonitor monitor;
 
+    // ====== Rate Limiting (Brute Force Protection) ======
+    private static final java.util.Map<String, java.util.Deque<Long>> loginAttempts = new java.util.concurrent.ConcurrentHashMap<>();    private static final int MAX_ATTEMPTS = 5;
+    private static final long LOCKOUT_TIME_MS = 15 * 60 * 1000; // 15 minutes
+
     // ====== Auto-retry (اختياري) ======
-    private String lastTriedUser;
-    private String lastTriedPass;
+    private char[] lastTriedPass;  // ✅ Changed to char[] for security
     private boolean pendingLogin;
+
+    // ====== Lock UI helpers ======
+    private javafx.animation.Timeline lockCountdown;
+    private long lockExpiresAtMs;
+
+    // UI feedback for login-in-progress
+    private ProgressIndicator loginSpinner;
+    private final javafx.beans.property.BooleanProperty loggingIn =
+            new javafx.beans.property.SimpleBooleanProperty(false);
+
+    // ====== أدوات ======
+    private final Navigation navigation = new Navigation();
+
+
 
     // overlay chip عند الرجوع أونلاين
     private StackPane overlay;
@@ -99,26 +119,106 @@ public class LoginController {
         if (monitor != null && LoginButton != null) {
             OnlineBindings.disableWhenOffline(monitor, LoginButton);
         }
+        if (AlertLabel != null) {
+            AlertLabel.getStyleClass().add("hf-alert");
+            AlertLabel.setText("");
+            AlertLabel.setWrapText(true);
+            AlertLabel.setUnderline(false);
+        }
+
+        // --- login spinner inside button ---
+        if (LoginButton != null) {
+            loginSpinner = new ProgressIndicator();
+            loginSpinner.setPrefSize(16, 16);   // صغير ومرتب
+            loginSpinner.setMaxSize(16, 16);
+            loginSpinner.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
+            loginSpinner.setVisible(false);
+            loginSpinner.setManaged(false);
+
+            // نحطّه يسار نص الزر
+            LoginButton.setContentDisplay(ContentDisplay.LEFT);
+            LoginButton.setGraphic(loginSpinner);
+            loginSpinner.setStyle("-fx-progress-color: white;");
+
+            // لو حاب تأثير بصري خفيف أثناء التحميل
+            LoginButton.getStyleClass().add("hf-btn");
+        }
     }
 
 
-    /** تحقّق مرن: يجرّب BCrypt ثم مساواة نصّية (لبيانات قديمة غير مشفرة) */
+    /** تحقّق باستخدام BCrypt فقط */
     private User authenticate(String emailOrUser, String plainPassword) throws Exception {
-        String key = (emailOrUser == null) ? null : emailOrUser.trim().toLowerCase();
-        User u = userDao.findByEmail(key);       // البريد هو اسم المستخدم
+        // 1. Input validation and sanitization
+        if (emailOrUser == null || plainPassword == null) return null;
+
+        String key = emailOrUser.trim().toLowerCase();
+
+        // 2. Email format validation
+        if (!isValidEmail(key)) return null;
+
+        // 3. Max length check
+        if (key.length() > 255 || plainPassword.length() > 255) return null;
+
+        User u = userDao.findByEmail(key);
         if (u == null || !u.isActive()) return null;
 
         String hash = u.getPasswordHash();
-        boolean ok = false;
 
-        if (hash != null && hash.startsWith("$2")) { // BCrypt
-            ok = BCrypt.checkpw(plainPassword, hash);
+        // ✅ BCrypt only - NO plaintext fallback
+        if (hash != null && hash.startsWith("$2")) {
+            boolean ok = BCrypt.checkpw(plainPassword, hash);
+            return ok ? u : null;
         }
-        if (!ok) {
-            // fallback انتقالياً لو كانت مخزنة كنص عادي
-            ok = Objects.equals(plainPassword, hash);
+
+        return null; // Reject if password is not BCrypt hashed
+    }
+
+    /** التحقق من صحة صيغة البريد الإلكتروني */
+    private boolean isValidEmail(String email) {
+        if (email == null || email.isBlank()) return false;
+        // Simple but effective email validation
+        return email.matches("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$");
+    }
+
+    /** فحص Rate Limiting ومنع Brute Force (خيط-آمن) */
+    /** فحص Rate Limiting ومنع Brute Force (خيط-آمن) + إدارة واجهة القفل */
+    private boolean isAccountLocked(String email) {
+        java.util.Deque<Long> attempts = loginAttempts.get(email);
+        if (attempts == null || attempts.isEmpty()) return false;
+
+        long now = System.currentTimeMillis();
+
+        // نظّف المحاولات القديمة بأمان
+        for (;;) {
+            Long head = attempts.peekFirst();
+            if (head == null) break;
+            if (now - head > LOCKOUT_TIME_MS) {
+                attempts.pollFirst();
+            } else {
+                break;
+            }
         }
-        return ok ? u : null;
+
+        if (attempts.size() >= MAX_ATTEMPTS) {
+            long oldestRecentAttempt = attempts.peekFirst();
+            long timeRemaining = LOCKOUT_TIME_MS - (now - oldestRecentAttempt);
+            if (timeRemaining > 0) {
+                startLockCountdown(timeRemaining, email);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** تسجيل محاولة تسجيل دخول فاشلة (خيط-آمن) */
+    private void recordFailedAttempt(String email) {
+        java.util.Deque<Long> q = loginAttempts.computeIfAbsent(email, k -> new java.util.concurrent.ConcurrentLinkedDeque<>());
+        q.addLast(System.currentTimeMillis());
+    }
+
+    /** مسح محاولات تسجيل الدخول الفاشلة بعد النجاح */
+    private void clearFailedAttempts(String email) {
+        loginAttempts.remove(email);
     }
 
     private void showAlert(String title, String message) {
@@ -129,112 +229,305 @@ public class LoginController {
         alert.showAndWait();
     }
 
+
     @FXML
     public void LoginAction() {
+        String username = null;
+
+        // ابدأ إحساس الضغط فورًا (سبنر + منع نقرات متكررة)
+        startLoginUi();
+
         try {
-            // 0) تحقق من الإنترنت (واجهة فقط)
+            // (0) أوفلاين
             if (monitor != null && !monitor.isOnline()) {
-                lastTriedUser = UserNameTextField.getText();
-                lastTriedPass = ShowPasswordCheckBox.isSelected()
+                String tempPass = ShowPasswordCheckBox.isSelected()
                         ? visiblePasswordField.getText()
                         : PasswordTextField.getText();
+                lastTriedPass = tempPass != null ? tempPass.toCharArray() : null;
                 pendingLogin = true;
-                showAlert("Offline", "No internet connection. We'll retry automatically when you’re back online.");
+                setAlert("You are offline.", "We will retry automatically when you are back online.");
+                stopLoginUi(); // أوقف المؤثر لأننا لن نتابع
                 return;
             }
 
-            // 1) التحقق من مدخلات المستخدم
-            String username = UserNameTextField.getText();
+            // (1) تحقق مدخلات
+            username = UserNameTextField.getText();
             String password = ShowPasswordCheckBox.isSelected()
                     ? visiblePasswordField.getText()
                     : PasswordTextField.getText();
 
             if (username == null || username.isBlank()) {
-                showAlert("Error", "Username (email) is required.");
+                setAlert("Username (email) is required.", "");
+                stopLoginUi();
                 return;
             }
             if (password == null || password.isBlank()) {
-                showAlert("Error", "Password is required.");
+                setAlert("Password is required.", "");
+                stopLoginUi();
                 return;
             }
 
-//            // 2) فحص قاعدة البيانات الآن فقط (ليس عند الإقلاع)
-//            Database.Status dbStatus = Database.ping();
-//            if (dbStatus != Database.Status.ONLINE) {
-//                showAlert("Database Offline",
-//                        switch (dbStatus) {
-//                            case OFFLINE_NETWORK -> "Cannot reach the database server. Check your internet/VPN or DB host.";
-//                            case BAD_CREDENTIALS -> "Database credentials are invalid. Please verify db.user/db.password.";
-//                            case CONFIG_MISSING -> "Database config missing in application.properties.";
-//                            default -> "Database is currently unavailable. Please try again.";
-//                        });
-//                return;
-//            }
+            final String normalizedEmail = username.trim().toLowerCase();
 
-            // 3) تحقّق من القاعدة فعليًا
-            User user = authenticate(username, password);
-            if (user != null) {
-                // خزّن في الجلسة
-                Session.set(user);
+            // (2) حدّ المحاولات قبل الذهاب للداتابيز
+            if (isAccountLocked(normalizedEmail)) {
+                stopLoginUi();
+                return; // شاشة القفل والعدّاد تُدار داخل isAccountLocked()
+            }
 
-                // حدّث آخر تسجيل دخول (غير حرج لو فشل)
-                try { userDao.updateLastLogin(user.getId()); } catch (Exception ignored) {}
+            // (3) المصادقة — نفّذها على خيط خلفي حتى لا تتجمّد الواجهة ويظهر السبينر
+            final String uFinal = username;
+            final String pFinal = password;
 
-                // أغلق نافذة الدخول وافتح الوجهة حسب الدور
-                Stage currentStage = (Stage) rootPane.getScene().getWindow();
+            javafx.concurrent.Task<User> authTask = new javafx.concurrent.Task<>() {
+                @Override
+                protected User call() throws Exception {
+                    return authenticate(uFinal, pFinal);
+                }
+            };
 
-                Role r = user.getRole();
-                if (r == Role.RECEPTIONIST) {
-                    Stage stage = new Stage();
-                    FXMLLoader loader = new FXMLLoader(getClass().getResource(navigation.Reception_Fxml));
-                    Parent root = loader.load();
-                    stage.setScene(new Scene(root));
-                    stage.setTitle("Reception Dashboard");
-                    stage.show();
+            authTask.setOnSucceeded(ev -> {
+                User user = authTask.getValue();
+                if (user != null) {
+                    // نجاح
+                    clearFailedAttempts(normalizedEmail);
+                    Session.set(user);
+                    try {
+                        userDao.updateLastLogin(user.getId());
+                    } catch (Exception e) {
+                        System.err.println("Failed to update last login for user " + user.getId() + ": " + e.getMessage());
+                    }
 
-                    ReceptionController rc = loader.getController();
-                    stage.setOnCloseRequest(e -> rc.shutdown());
+                    // تنظيف الواجهة
+                    if (AlertLabel != null) AlertLabel.setText("");
+                    enableLoginButtonSafely();
+                    if (lockCountdown != null) { lockCountdown.stop(); lockCountdown = null; }
 
-                    currentStage.close(); // close after successful show
+                    // فتح الواجهات حسب الدور
+                    try {
+                        Stage currentStage = (Stage) rootPane.getScene().getWindow();
+                        Role r = user.getRole();
+                        if (r == Role.RECEPTIONIST) {
+                            Stage stage = new Stage();
+                            FXMLLoader loader = new FXMLLoader(getClass().getResource(navigation.Reception_Fxml));
+                            Parent root = loader.load();
+                            stage.setScene(new Scene(root));
+                            stage.setTitle("Reception Dashboard");
+                            stage.show();
+                            ReceptionController rc = loader.getController();
+                            stage.setOnCloseRequest(e2 -> rc.shutdown());
+                            currentStage.close();
 
-                } else if (r == Role.DOCTOR) {
-                    Stage stage = new Stage();
-                    navigation.navigateTo(stage, navigation.Doctor_Fxml);
-                    stage.setTitle("Doctor Dashboard");
-                    stage.show();
-                    currentStage.close();
+                        } else if (r == Role.DOCTOR) {
+                            Stage stage = new Stage();
+                            navigation.navigateTo(stage, navigation.Doctor_Fxml);
+                            stage.setTitle("Doctor Dashboard");
+                            stage.show();
+                            currentStage.close();
 
-                } else if (r == Role.PHARMACIST) {
-                    Stage stage = new Stage();
-                    navigation.navigateTo(stage, navigation.Pharmacy_Fxml);
-                    stage.setTitle("Pharmacy Dashboard");
-                    stage.show();
-                    currentStage.close();
+                        } else if (r == Role.PHARMACIST) {
+                            Stage stage = new Stage();
+                            navigation.navigateTo(stage, navigation.Pharmacy_Fxml);
+                            stage.setTitle("Pharmacy Dashboard");
+                            stage.show();
+                            currentStage.close();
 
-                } else if (r == Role.ADMIN) {
-                    Stage stage = new Stage();
-                    navigation.navigateTo(stage, navigation.Admin_Fxml);
-                    stage.setTitle("Admin Panel");
-                    stage.show();
-                    currentStage.close();
+                        } else if (r == Role.ADMIN) {
+                            Stage stage = new Stage();
+                            navigation.navigateTo(stage, navigation.Admin_Fxml);
+                            stage.setTitle("Admin Panel");
+                            stage.show();
+                            currentStage.close();
 
-                } else if (r == Role.PATIENT) {
-                    showAlert("Access Restricted", "Patient portal is not available in this version.");
+                        } else if (r == Role.PATIENT) {
+                            showAlert("Access Restricted", "Patient portal is not available in this version.");
+                        }
+                    } catch (Exception loadEx) {
+                        System.err.println("Navigation error: " + loadEx.getMessage());
+                        loadEx.printStackTrace();
+                        setAlert("Navigation error.", "Please try again.");
+                    }
+
+                    // مسح الحسّاس
+                    if (lastTriedPass != null) {
+                        java.util.Arrays.fill(lastTriedPass, '\0');
+                        lastTriedPass = null;
+                    }
+                    pendingLogin = false;
+
+                } else {
+                    // فشل
+                    recordFailedAttempt(normalizedEmail);
+                    int attempts = getAttemptsCount(normalizedEmail);
+                    int remaining = Math.max(0, MAX_ATTEMPTS - attempts);
+
+                    // قد يتحول لقفل الآن
+                    if (isAccountLocked(normalizedEmail)) {
+                        // سيبدأ العدّاد ويعطّل الزر ويُحدّث الـLabel
+                        stopLoginUi();
+                        return;
+                    }
+
+                    setAlert(
+                            "Username or password is invalid.",
+                            String.format("Attempts: %d/%d%s", attempts, MAX_ATTEMPTS, (remaining > 0 ? " · " + remaining + " left" : ""))
+                    );
                 }
 
-                // صفّر حالة pending
-                pendingLogin = false;
-                lastTriedUser = null;
-                lastTriedPass = null;
-            } else {
-                showAlert("Login Failed", "Invalid credentials");
-            }
+                // إيقاف المؤثر بعد انتهاء المصادقة (نجاح/فشل)
+                stopLoginUi();
+            });
+
+            authTask.setOnFailed(ev -> {
+                Throwable ex = authTask.getException();
+                System.err.println("Auth task failed: " + (ex != null ? ex.getMessage() : "unknown"));
+                if (ex != null) ex.printStackTrace();
+                setAlert("An error occurred during login.", "Please try again.");
+                stopLoginUi();
+            });
+
+            Thread t = new Thread(authTask, "auth-task");
+            t.setDaemon(true);
+            t.start();
+
+            // لا منطق بعد إطلاق الـ Task؛ الإكمال يحدث في الـ handlers أعلاه
+            return;
+
         } catch (Exception e) {
+            System.err.println("Login error for user: " + username);
             e.printStackTrace();
-            Throwable cause = (e.getCause() != null) ? e.getCause() : e;
-            showAlert("Error", "An unexpected error occurred: " + cause.getMessage());
+            setAlert("An error occurred during login.", "Please try again.");
+            stopLoginUi(); // احتياط في حال الخطأ وقع قبل إطلاق الـ Task
         }
     }
+
+//    @FXML
+//    public void LoginAction() {
+//        String username = null;
+//        startLoginUi(); // ابدأ إحساس الضغط فورًا
+//        try {
+//            // (0) أوفلاين
+//            if (monitor != null && !monitor.isOnline()) {
+//                String tempPass = ShowPasswordCheckBox.isSelected()
+//                        ? visiblePasswordField.getText()
+//                        : PasswordTextField.getText();
+//                lastTriedPass = tempPass != null ? tempPass.toCharArray() : null;
+//                pendingLogin = true;
+//                setAlert("You are offline.", "We will retry automatically when you are back online.");
+//                return; // سيتم إيقاف المؤثر في finally
+//            }
+//
+//            // (1) تحقق مدخلات
+//            username = UserNameTextField.getText();
+//            String password = ShowPasswordCheckBox.isSelected()
+//                    ? visiblePasswordField.getText()
+//                    : PasswordTextField.getText();
+//
+//            if (username == null || username.isBlank()) {
+//                setAlert("Username (email) is required.", "");
+//                return;
+//            }
+//            if (password == null || password.isBlank()) {
+//                setAlert("Password is required.", "");
+//                return;
+//            }
+//
+//            String normalizedEmail = username.trim().toLowerCase();
+//
+//            // (2) حدّ المحاولات قبل الذهاب للداتابيز
+//            if (isAccountLocked(normalizedEmail)) {
+//                return; // شاشة القفل والعدّاد تُدار داخل isAccountLocked()
+//            }
+//
+//            // (3) المصادقة
+//            User user = authenticate(username, password);
+//            if (user != null) {
+//                // نجاح
+//                clearFailedAttempts(normalizedEmail);
+//                Session.set(user);
+//
+//                try {
+//                    userDao.updateLastLogin(user.getId());
+//                } catch (Exception e) {
+//                    System.err.println("Failed to update last login for user " + user.getId() + ": " + e.getMessage());
+//                }
+//
+//                // تنظيف الواجهة
+//                if (AlertLabel != null) AlertLabel.setText("");
+//                enableLoginButtonSafely();
+//                if (lockCountdown != null) { lockCountdown.stop(); lockCountdown = null; }
+//
+//                // فتح الواجهات حسب الدور
+//                Stage currentStage = (Stage) rootPane.getScene().getWindow();
+//                Role r = user.getRole();
+//                if (r == Role.RECEPTIONIST) {
+//                    Stage stage = new Stage();
+//                    FXMLLoader loader = new FXMLLoader(getClass().getResource(navigation.Reception_Fxml));
+//                    Parent root = loader.load();
+//                    stage.setScene(new Scene(root));
+//                    stage.setTitle("Reception Dashboard");
+//                    stage.show();
+//                    ReceptionController rc = loader.getController();
+//                    stage.setOnCloseRequest(e -> rc.shutdown());
+//                    currentStage.close();
+//
+//                } else if (r == Role.DOCTOR) {
+//                    Stage stage = new Stage();
+//                    navigation.navigateTo(stage, navigation.Doctor_Fxml);
+//                    stage.setTitle("Doctor Dashboard");
+//                    stage.show();
+//                    currentStage.close();
+//
+//                } else if (r == Role.PHARMACIST) {
+//                    Stage stage = new Stage();
+//                    navigation.navigateTo(stage, navigation.Pharmacy_Fxml);
+//                    stage.setTitle("Pharmacy Dashboard");
+//                    stage.show();
+//                    currentStage.close();
+//
+//                } else if (r == Role.ADMIN) {
+//                    Stage stage = new Stage();
+//                    navigation.navigateTo(stage, navigation.Admin_Fxml);
+//                    stage.setTitle("Admin Panel");
+//                    stage.show();
+//                    currentStage.close();
+//
+//                } else if (r == Role.PATIENT) {
+//                    showAlert("Access Restricted", "Patient portal is not available in this version.");
+//                }
+//
+//                // مسح الحسّاس
+//                if (lastTriedPass != null) {
+//                    java.util.Arrays.fill(lastTriedPass, '\0');
+//                    lastTriedPass = null;
+//                }
+//                pendingLogin = false;
+//
+//            } else {
+//                // فشل
+//                recordFailedAttempt(normalizedEmail);
+//                int attempts = getAttemptsCount(normalizedEmail);
+//                int remaining = Math.max(0, MAX_ATTEMPTS - attempts);
+//
+//                // قد يتحول لقفل الآن
+//                if (isAccountLocked(normalizedEmail)) {
+//                    return; // سيبدأ العدّاد ويعطّل الزر ويُحدّث الـLabel
+//                }
+//
+//                setAlert(
+//                        "Username or password is invalid.",
+//                        String.format("Attempts: %d/%d%s", attempts, MAX_ATTEMPTS, (remaining > 0 ? " · " + remaining + " left" : ""))
+//                );
+//            }
+//        } catch (Exception e) {
+//            System.err.println("Login error for user: " + username);
+//            e.printStackTrace();
+//            setAlert("An error occurred during login.", "Please try again.");
+//        } finally {
+//            // نوقف التحميل دائمًا مهما كانت النتيجة
+//            stopLoginUi();
+//        }
+//    }
 
     // ================= Reload on Reconnect =================
     /** ينادى من App عندما يعود الانترنت */
@@ -244,18 +537,45 @@ public class LoginController {
             try { Thread.sleep(600); } catch (InterruptedException ignored) {}
             Platform.runLater(() -> {
                 hideReloadOverlay();
-                if (pendingLogin && lastTriedUser != null) {
-                    UserNameTextField.setText(lastTriedUser);
+
+                if (pendingLogin && lastTriedPass != null) {
+                    // ✅ Restore password from char array (لا نلمس الزر هنا)
+                    String tempPass = new String(lastTriedPass);
                     if (ShowPasswordCheckBox.isSelected()) {
-                        visiblePasswordField.setText(lastTriedPass);
+                        visiblePasswordField.setText(tempPass);
                     } else {
-                        PasswordTextField.setText(lastTriedPass);
+                        PasswordTextField.setText(tempPass);
                     }
+
+                    // جرّب الدخول تلقائياً — أي إدارة لقفل/عدّاد ستحدث داخل LoginAction
                     LoginAction();
+
+                    // ✅ امسح الحسّاس من الذاكرة
+                    java.util.Arrays.fill(lastTriedPass, '\0');
+                    lastTriedPass = null;
+                    tempPass = null;
+                    pendingLogin = false;
+
+                    // تنظيف واجهة بسيط: فقط لو ما في عدّاد قيد العمل (أي ليس مقفول)
+                    if (lockCountdown == null) {
+                        if (AlertLabel != null) AlertLabel.setText("");
+
+                        if (LoginButton != null) {
+                            // لو كنا فكّينا الربط أثناء القفل، نعيد ربطه الآن
+                            if (rebindDisableAfterLock) {
+                                OnlineBindings.disableWhenOffline(monitor, LoginButton);
+                                rebindDisableAfterLock = false;
+                            } else if (!LoginButton.disableProperty().isBound()) {
+                                // وإلا فعّل الزر فقط إذا غير مربوط
+                                LoginButton.setDisable(false);
+                            }
+                        }
+                    }
                 }
             });
         }, "reconnect-refresh").start();
     }
+
 
     private void showReloadOverlay() {
         if (overlay != null && rootPane.getChildren().contains(overlay)) return;
@@ -302,6 +622,105 @@ public class LoginController {
         }
     }
 
-    // ====== أدوات ======
-    private final Navigation navigation = new Navigation();
+
+    /** تحديث تنبيه الواجهة في سطرين */
+    private void setAlert(String line1, String line2) {
+        if (AlertLabel == null) return;
+        if (line2 == null || line2.isBlank()) {
+            AlertLabel.setText(line1);
+        } else {
+            AlertLabel.setText(line1 + "\n" + line2);
+        }
+    }
+
+    /** ابدأ مؤثر التحميل على زر الدخول (لا نغيّر disable لتفادي الـ binding) */
+    private void startLoginUi() {
+        loggingIn.set(true);
+        if (LoginButton != null) {
+            if (loginSpinner != null) { loginSpinner.setVisible(true); loginSpinner.setManaged(true); }
+            LoginButton.setText("Logging in…");
+            // امنع النقرات بدل disable (حتى مع binding)
+            LoginButton.setMouseTransparent(true);
+        }
+    }
+
+    /** أوقف مؤثر التحميل مهما كانت النتيجة */
+    private void stopLoginUi() {
+        loggingIn.set(false);
+        if (LoginButton != null) {
+            if (loginSpinner != null) { loginSpinner.setVisible(false); loginSpinner.setManaged(false); }
+            LoginButton.setText("Login");
+            LoginButton.setMouseTransparent(false);
+        }
+    }
+
+    /** أعِد تمكين زر الدخول بأمان بدون كسر أي binding */
+    private void enableLoginButtonSafely() {
+        if (LoginButton == null) return;
+        if (rebindDisableAfterLock) {
+            // كنا فَكّينا الربط أثناء الحظر: نعيد ربطه الآن
+            OnlineBindings.disableWhenOffline(monitor, LoginButton);
+            rebindDisableAfterLock = false;
+        } else if (!LoginButton.disableProperty().isBound()) {
+            // لو غير مربوط أصلاً، مسموح نغيّره يدويًا
+            LoginButton.setDisable(false);
+        }
+        // لو مربوط وما في rebind → لا تلمسه (الربط هو اللي يدير حالته)
+    }
+
+    /** عدد المحاولات الحالية خلال نافذة الحظر */
+    private int getAttemptsCount(String email) {
+        java.util.Deque<Long> q = loginAttempts.get(email);
+        if (q == null) return 0;
+        long now = System.currentTimeMillis();
+        while (!q.isEmpty() && now - q.peekFirst() > LOCKOUT_TIME_MS) q.pollFirst();
+        return q.size();
+    }
+
+    /** بدء عدّاد الحظر وتحديث الواجهة كل ثانية */
+    private void startLockCountdown(long remainingMs, String email) {
+        if (lockCountdown != null) lockCountdown.stop();
+
+        lockExpiresAtMs = System.currentTimeMillis() + Math.max(0, remainingMs);
+
+        // 👇 افصل الربط مؤقتًا ثم عطّل الزر يدويًا
+        if (LoginButton != null) {
+            rebindDisableAfterLock = LoginButton.disableProperty().isBound();
+            if (rebindDisableAfterLock) {
+                LoginButton.disableProperty().unbind();
+            }
+            LoginButton.setDisable(true);
+        }
+
+        lockCountdown = new javafx.animation.Timeline(
+                new javafx.animation.KeyFrame(javafx.util.Duration.seconds(1), ev -> {
+                    long left = lockExpiresAtMs - System.currentTimeMillis();
+                    if (left <= 0) {
+                        // انتهى الحظر → أعد تمكين الزر وأعد الربط إن لزم
+                        if (LoginButton != null) {
+                            if (rebindDisableAfterLock) {
+                                // أعد ربطه بحالة الاتصال
+                                OnlineBindings.disableWhenOffline(monitor, LoginButton);
+                                rebindDisableAfterLock = false;
+                            } else {
+                                LoginButton.setDisable(false);
+                            }
+                        }
+                        if (AlertLabel != null) AlertLabel.setText("");
+                        java.util.Deque<Long> q = loginAttempts.get(email);
+                        if (q != null) q.clear();
+                        lockCountdown.stop();
+                        return;
+                    }
+                    int attempts = getAttemptsCount(email);
+                    long mins = left / 60000;
+                    long secs = (left % 60000) / 1000;
+                    String line1 = "Too many failed login attempts. Account is temporarily locked.";
+                    String line2 = String.format("Attempts: %d/%d · Retry in %02d:%02d", attempts, MAX_ATTEMPTS, mins, secs);
+                    setAlert(line1, line2);
+                })
+        );
+        lockCountdown.setCycleCount(javafx.animation.Animation.INDEFINITE);
+        lockCountdown.play();
+    }
 }

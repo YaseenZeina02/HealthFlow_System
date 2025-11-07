@@ -68,3 +68,15 @@
     -fx-scale-x: 1.02;
     -fx-scale-y: 1.02;
 }
+
+/* Alert label for login errors */
+.hf-alert {
+    -fx-text-fill: #c0392b;
+    -fx-font-weight: 600;
+    -fx-font-style: normal;
+    -fx-underline: false;
+    -fx-padding: 6 4 0 4;
+}
+
+/* في CSS العام */
+.hf-btn:pressed { -fx-opacity: 0.9; }
