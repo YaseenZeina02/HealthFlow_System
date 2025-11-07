@@ -71,14 +71,33 @@ public class App extends Application {
             if (isOnline) controller.onBecameOnline();
         });
 
-        var banner = new ConnectivityBanner(monitor);
-        var root = new BorderPane();
-        root.setTop(banner);
-        root.setCenter(new StackPane(loginRoot));
+        // Fixed-size Login window (consistent with Navigation.showLoginFixed)
+        final double LOGIN_W = 900;
+        final double LOGIN_H = 600;
 
-        var scene = new Scene(root, 900, 600);
+        if (loginRoot instanceof javafx.scene.layout.Region rr) {
+            rr.setPrefSize(LOGIN_W, LOGIN_H);
+            rr.setMinSize(LOGIN_W, LOGIN_H);
+            rr.setMaxSize(LOGIN_W, LOGIN_H);
+            rr.setPadding(javafx.geometry.Insets.EMPTY);
+        }
+
+        var scene = new Scene(loginRoot, LOGIN_W, LOGIN_H);
         stage.setTitle("HealthFlow");
         stage.setScene(scene);
+
+        // Enforce exact size, prevent maximize/shrink to content
+        stage.setFullScreen(false);
+        stage.setMaximized(false);
+        stage.setResizable(false);
+        stage.setMinWidth(LOGIN_W);
+        stage.setMinHeight(LOGIN_H);
+        stage.setMaxWidth(LOGIN_W);
+        stage.setMaxHeight(LOGIN_H);
+        stage.setWidth(LOGIN_W);
+        stage.setHeight(LOGIN_H);
+
+        stage.centerOnScreen();
         stage.show();
 
         // عند إغلاق النافذة: أوقف المونيتور + الغِ مهمة الـ warm-up فورًا

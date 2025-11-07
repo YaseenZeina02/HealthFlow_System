@@ -17,7 +17,8 @@
 <?import javafx.scene.text.Font?>
 <?import org.kordamp.ikonli.javafx.FontIcon?>
 
-<AnchorPane fx:id="rootPane" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="600.0" prefWidth="1100.0" stylesheets="@../Design/Doctrol.css" xmlns="http://javafx.com/javafx/23.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.example.healthflow.controllers.DoctorController">
+<?import java.net.URL?>
+<AnchorPane fx:id="rootPane" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="600.0" prefWidth="1100.0" stylesheets="@../Design/Doctrol.css" xmlns="http://javafx.com/javafx/19" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.example.healthflow.controllers.DoctorController">
 
    <children>
       <BorderPane prefHeight="600.0" prefWidth="1100.0" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
@@ -49,21 +50,25 @@
                      </graphic>
                   </Button>
 
-                  <FontIcon iconColor="#9dbfc7" iconLiteral="fas-hospital" iconSize="64" layoutX="77.0" layoutY="497.0" text="" AnchorPane.bottomAnchor="50.0" />
+                  <FontIcon iconColor="#9dbfc7" iconLiteral="fas-hospital" iconSize="64" layoutX="77.0" layoutY="491.0" text="" AnchorPane.bottomAnchor="59.0" />
                   <Label layoutX="25.0" layoutY="108.0" prefHeight="18.0" prefWidth="56.0" text="Username:" textFill="WHITE" />
                   <Button fx:id="PrescriptionButton" layoutX="5.0" layoutY="360.0" mnemonicParsing="false" prefHeight="40.0" prefWidth="200.0" styleClass="btn-1" stylesheets="@../Design/ReceptionDesign.css" text="Prescription" AnchorPane.leftAnchor="5.0">
                      <graphic>
                         <FontIcon iconColor="#66ccff" iconLiteral="fas-user" iconSize="18" text="" />
                      </graphic>
                   </Button>
-                  <Button fx:id="PrescriptionButton1" layoutX="67.0" layoutY="516.0" mnemonicParsing="false" prefHeight="27.0" prefWidth="76.0" styleClass="btn-1" stylesheets="@../Design/ReceptionDesign.css" text="Log out" AnchorPane.bottomAnchor="15.0">
-                     <graphic>
-                        <FontIcon iconColor="#66ccff" iconLiteral="fas-user" iconSize="9" text="" />
-                     </graphic>
-                     <font>
-                        <Font size="8.0" />
-                     </font>
-                  </Button>
+                   <Button fx:id="LogOutBtn" layoutX="40.0" layoutY="516.0" mnemonicParsing="false" onAction="#handleLogoutAction" prefHeight="33.0" prefWidth="124.0" styleClass="btn-logout" text="Log out" AnchorPane.bottomAnchor="15.0">
+                       <font>
+                           <Font size="8.0" />
+                       </font>
+                       <graphic>
+                           <FontIcon iconColor="WHITE" iconLiteral="fas-sign-out-alt" iconSize="16" layoutX="56.0" layoutY="534.0" rotate="180" text="" />
+                       </graphic>
+                       <stylesheets>
+                           <URL value="@../Design/ReceptionDesign.css" />
+                           <URL value="@../Design/ButtonsStyles.css" />
+                       </stylesheets>
+                   </Button>
                </children>
             </AnchorPane>
          </left>

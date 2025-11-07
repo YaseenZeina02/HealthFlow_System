@@ -10,6 +10,7 @@ import com.example.healthflow.net.ConnectivityMonitor;
 import com.example.healthflow.service.AuthService.Session;
 import com.example.healthflow.model.Appointment.ApptRow;
 import com.example.healthflow.service.PatientService;
+import com.example.healthflow.ui.ConfirmDialog;
 import com.example.healthflow.ui.ConnectivityBanner;
 import com.example.healthflow.ui.OnlineBindings;
 
@@ -65,6 +66,8 @@ import java.util.concurrent.TimeUnit;
 import com.example.healthflow.ui.ComboAnimations;
 
 import javafx.scene.control.TextField;
+
+
 import javafx.scene.control.ContextMenu;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.SeparatorMenuItem;
@@ -78,6 +81,10 @@ import javafx.scene.input.KeyEvent;
 
 public class ReceptionController {
     /* ============ UI ============ */
+    @FXML private Button LogOutBtn;
+    @FXML private Button BackButton;
+
+
     @FXML private AnchorPane DashboardAnchorPane;
     @FXML private AnchorPane PatientAnchorPane;
     @FXML private AnchorPane AppointmentsAnchorPane;
@@ -86,7 +93,6 @@ public class ReceptionController {
     @FXML private Button DachboardButton;
     @FXML private Button PatientsButton;
     @FXML private Button AppointmentsButton;
-    @FXML private Button BackButton;
     @FXML private Button DoctorsButton;
 
     @FXML private Label DateOfDay;
@@ -110,6 +116,7 @@ public class ReceptionController {
     @FXML private Button deleteButton;
     @FXML private Button clearBtn;
 
+
     @FXML private TextField search;
 
     @FXML private TableView<PatientRow> patientTable;
@@ -129,7 +136,6 @@ public class ReceptionController {
 
 
     @FXML private Circle ActiveStatus;
-    @FXML private TableColumn<?, ?> AppointmentIdColumn;
     @FXML private AnchorPane Appointments;
     @FXML private AnchorPane CenterAnchorPane;
     @FXML private AnchorPane Doctors;
@@ -267,7 +273,6 @@ public class ReceptionController {
     private final ObservableList<DoctorRow> doctorData = FXCollections.observableArrayList();
     private FilteredList<DoctorRow> doctorFiltered;
 
-    private final Navigation navigation = new Navigation();
     private final PatientService patientService = new PatientService();
     private final DoctorDAO doctorDAO = new DoctorDAO();
     private final String cssPath = "/com/example/healthflow/Design/ReceptionDesign.css";
@@ -283,6 +288,8 @@ public class ReceptionController {
     // Cache currently-selected patient to survive pane switches / refreshes
     private PatientRow selectedPatient;
     private boolean patientSelHooked = false;
+
+    private final Deque<AnchorPane> navigationHistory = new ArrayDeque<>();
 
     // helpers:
     private static java.time.OffsetDateTime toAppOffset(java.time.LocalDate d, java.time.LocalTime t) {
@@ -3182,10 +3189,10 @@ public class ReceptionController {
         }
 
         DachboardButton.setOnAction(e -> showDashboardPane());
-        PatientsButton.setOnAction(e -> showPatientsPane());
+        PatientsButton.setOnAction(e -> showPatientsPaneAction());
         AppointmentsButton.setOnAction(e -> showAppointmentPane());
         DoctorsButton.setOnAction(e -> showDoctorPane());
-        BackButton.setOnAction(e -> BackAction());
+        BackButton.setOnAction(e -> handleBack());
 
         startClock();
 
@@ -3217,95 +3224,6 @@ public class ReceptionController {
             selectedPatient = null;
             clearForm();
         });
-//        BookAppointmentFromPateint.setOnAction(e -> {
-//            PatientRow row = (patientTable == null) ? null : patientTable.getSelectionModel().getSelectedItem();
-//            if (row == null) {
-//                Alert a = new Alert(Alert.AlertType.WARNING);
-//                a.setTitle("Select a patient");
-//                a.setHeaderText(null);
-//                a.setContentText("Please select a patient from the table first.");
-//                a.showAndWait();
-//                showToast("warn", "Please select a patient from the table first.");
-//                return;
-//            }
-//            if (getPatientName != null) getPatientName.setText(row.getFullName());
-//            if (getPatientID != null) getPatientID.setText(row.getNationalId());
-//            selectNearestSlotOnNextRefresh = true;
-//            showAppointmentPane();
-//            if (DoctorspecialtyApp != null && DoctorspecialtyApp.getItems().isEmpty()) loadSpecialtiesAsync();
-//            addOrFocusDraftForPatient(row);
-//        });
-
-    //          work but some problem
-//        BookAppointmentFromPateint.setOnAction(e -> {
-//            // 1) من الكاش/SelectionModel
-//            ensurePatientSelectionHook();
-//            PatientRow p = getSelectedPatientOrNull();
-//
-//            // 2) إن ما لقى—استنتج من حقول النموذج (الاسم/الرقم القومي الظاهرين تحت)
-//            if (p == null) {
-//                String nidTxt  = (getPatientID   != null && getPatientID.getText()   != null) ? getPatientID.getText().trim()   : "";
-//                String nameTxt = (getPatientName != null && getPatientName.getText() != null) ? getPatientName.getText().trim() : "";
-//                if (!nidTxt.isEmpty() || !nameTxt.isEmpty()) {
-//                    if (patientTable != null && patientTable.getItems() != null) {
-//                        for (Object o : patientTable.getItems()) {
-//                            if (!(o instanceof PatientRow pr)) continue;
-//                            boolean nidMatch  = !nidTxt.isEmpty()  && nidTxt.equalsIgnoreCase(String.valueOf(pr.getNationalId()));
-//                            boolean nameMatch = !nameTxt.isEmpty() && nameTxt.equalsIgnoreCase(String.valueOf(pr.getFullName()));
-//                            if (nidMatch || nameMatch) { p = pr; break; }
-//                        }
-//                    }
-//                }
-//            }
-//
-//            // 3) آخر محاولة: الصف المُركّز عليه حتى لو ما اتعمل له select رسمي
-//            if (p == null && patientTable != null && patientTable.getFocusModel() != null) {
-//                int fi = patientTable.getFocusModel().getFocusedIndex();
-//                if (fi >= 0 && fi < patientTable.getItems().size()) {
-//                    Object o = patientTable.getItems().get(fi);
-//                    if (o instanceof PatientRow pr) p = pr;
-//                }
-//            }
-//
-//            // لو لسه null → التحذير المعتاد
-//            if (p == null) {
-//                Alert a = new Alert(Alert.AlertType.WARNING);
-//                a.setTitle("Select a patient");
-//                a.setHeaderText(null);
-//                a.setContentText("Please select a patient from the table first.");
-//                a.showAndWait();
-//                showToast("warn", "Please select a patient from the table first.");
-//                return;
-//            }
-//
-//            System.out.println("BookAppointmentFromPateint: " + p.getFullName()+"  Age :"+p.getAge());
-//
-//            // الانتقال لشاشة المواعيد
-//            if (AppointmentsButton != null) {
-//                AppointmentsButton.fire();
-//            } else {
-//                showAppointmentPane();
-//            }
-//
-//            // تعبئة الحقول
-//            if (getPatientName != null) getPatientName.setText(p.getFullName());
-//            if (getPatientID   != null) getPatientID.setText(p.getNationalId());
-//
-//            // تحميل التخصصات إذا لزم
-//            if (DoctorspecialtyApp != null &&
-//                    (DoctorspecialtyApp.getItems() == null || DoctorspecialtyApp.getItems().isEmpty())) {
-//                loadSpecialtiesAsync();
-//            }
-//
-//            // ركّز/أنشئ مسودة لهذا المريض
-//            addOrFocusDraftForPatient(p);
-//
-//            // اختيار أقرب Slot بعد التحديث
-//            selectNearestSlotOnNextRefresh = true;
-//
-//            // تأكيد فلترة اليوم المختار
-//            Platform.runLater(this::applyAppointmentFilters);
-//        });
 
         BookAppointmentFromPateint.setOnAction(e -> {
             // --- تشخيص سريع ---
@@ -3788,6 +3706,111 @@ public class ReceptionController {
 
             return cell; // keep original graphic/text behavior
         });
+    }
+
+    // Helper: resolve the current Stage safely from rootPane or logout button
+    // To Turn on LogOut Btn
+
+    private Stage getCurrentStageSafely() {
+        try {
+            if (rootPane != null && rootPane.getScene() != null) {
+                return (Stage) rootPane.getScene().getWindow();
+            }
+        } catch (Throwable ignore) {}
+
+        try {
+            if (LogOutBtn != null && LogOutBtn.getScene() != null) {
+                return (Stage) LogOutBtn.getScene().getWindow();
+            }
+        } catch (Throwable ignore) {}
+
+        return null;
+    }
+
+    // ---- Logout (single confirmation attached to this window) ----
+    @FXML
+    private void handleLogoutAction() {
+        Stage stage = getCurrentStageSafely();
+
+        // Single app-attached confirmation (no duplicate prompts)
+        Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+        alert.setTitle("Confirm Logout");
+        alert.setHeaderText(null);
+        alert.setContentText("Are you sure you want to log out?");
+        if (stage != null) {
+            alert.initOwner(stage);
+            alert.initModality(javafx.stage.Modality.WINDOW_MODAL);
+        }
+
+        Optional<ButtonType> result = alert.showAndWait();
+        if (result.isEmpty() || result.get() != ButtonType.OK) {
+            return; // user cancelled
+        }
+
+        // Proceed with logout and return to fixed-size Login
+        doLogout(stage);
+    }
+
+    private void doLogout(Stage stage) {
+        try {
+            shutdown(); // graceful cleanup
+
+            if (stage == null) {
+                stage = getCurrentStageSafely();
+            }
+
+            // Navigate back to Login with fixed size (handled by Navigation)
+            new Navigation().showLoginFixed(stage, monitor);
+
+        } catch (Exception e) {
+            showError("Logout", e);
+        }
+    }
+
+    /** تنفيذ الخروج بدون أي حوارات إضافية */
+
+    @FXML
+    private void handleBack() {
+        if (!navigationHistory.isEmpty()) {
+            AnchorPane previous = navigationHistory.pop();
+            // أخفِ الكل
+            DashboardAnchorPane.setVisible(false);
+            PatientAnchorPane.setVisible(false);
+            AppointmentsAnchorPane.setVisible(false);
+            DoctorAnchorPane.setVisible(false);
+
+            // أظهر السابقة
+            previous.setVisible(true);
+            BackButton.setDisable(navigationHistory.isEmpty());
+        }
+    }
+    private AnchorPane getCurrentPane() {
+        if (DashboardAnchorPane.isVisible()) return DashboardAnchorPane;
+        if (PatientAnchorPane.isVisible()) return PatientAnchorPane;
+        if (AppointmentsAnchorPane.isVisible()) return AppointmentsAnchorPane;
+        if (DoctorAnchorPane.isVisible()) return DoctorAnchorPane;
+        return null;
+    }
+    private void switchPane(AnchorPane paneToShow) {
+        // خزن الصفحة الحالية قبل التبديل
+        if (getCurrentPane() != paneToShow) {
+            navigationHistory.push(getCurrentPane());
+        }
+
+        // أخفِ الكل
+        DashboardAnchorPane.setVisible(false);
+        PatientAnchorPane.setVisible(false);
+        AppointmentsAnchorPane.setVisible(false);
+        DoctorAnchorPane.setVisible(false);
+
+        // أظهر الصفحة الجديدة
+        paneToShow.setVisible(true);
+        BackButton.setDisable(navigationHistory.isEmpty());
+    }
+    @FXML
+    private void showPatientsPaneAction() {
+        switchPane(PatientAnchorPane);
+        markNavActive(PatientsButton);
     }
 
 }

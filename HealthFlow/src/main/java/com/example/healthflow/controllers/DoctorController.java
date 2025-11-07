@@ -54,10 +54,16 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Optional;
+
+import static com.example.healthflow.db.Database.shutdown;
 
 public class DoctorController {
 
     /* ====== Cards / header / nav ====== */
+    @FXML private Button LogOutBtn;
+
+
     @FXML
     private AnchorPane Appointments;
     @FXML
@@ -3503,6 +3509,64 @@ private void wirePrescriptionItemsTable() {
                 });
             } catch (Throwable ignore) { }
         });
+    }
+
+
+    // To Turn on LogOut Btn
+    private Stage getCurrentStageSafely() {
+        try {
+            if (rootPane != null && rootPane.getScene() != null) {
+                return (Stage) rootPane.getScene().getWindow();
+            }
+        } catch (Throwable ignore) {}
+
+        try {
+            if (LogOutBtn != null && LogOutBtn.getScene() != null) {
+                return (Stage) LogOutBtn.getScene().getWindow();
+            }
+        } catch (Throwable ignore) {}
+
+        return null;
+    }
+
+    // ---- Logout (single confirmation attached to this window) ----
+    @FXML
+    private void handleLogoutAction() {
+        Stage stage = getCurrentStageSafely();
+
+        // Single app-attached confirmation (no duplicate prompts)
+        Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+        alert.setTitle("Confirm Logout");
+        alert.setHeaderText(null);
+        alert.setContentText("Are you sure you want to log out?");
+        if (stage != null) {
+            alert.initOwner(stage);
+            alert.initModality(javafx.stage.Modality.WINDOW_MODAL);
+        }
+
+        Optional<ButtonType> result = alert.showAndWait();
+        if (result.isEmpty() || result.get() != ButtonType.OK) {
+            return; // user cancelled
+        }
+
+        // Proceed with logout and return to fixed-size Login
+        doLogout(stage);
+    }
+
+    private void doLogout(Stage stage) {
+        try {
+            shutdown(); // graceful cleanup
+
+            if (stage == null) {
+                stage = getCurrentStageSafely();
+            }
+
+            // Navigate back to Login with fixed size (handled by Navigation)
+            new Navigation().showLoginFixed(stage, monitor);
+
+        } catch (Exception e) {
+            showError("Logout", e);
+        }
     }
 
 

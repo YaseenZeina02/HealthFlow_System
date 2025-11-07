@@ -16,6 +16,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.Optional;
 
 import com.example.healthflow.ui.fx.TableUtils;
 import javafx.application.Platform;
@@ -29,6 +30,7 @@ import com.example.healthflow.core.packaging.PackagingSupport.PackagingInfo;
 import com.example.healthflow.core.packaging.PackagingSupport.PackSuggestion;
 import javafx.concurrent.Task; // (لو مش موجود بس)
 import javafx.scene.layout.*;
+import javafx.stage.Stage;
 import javafx.util.Duration;
 import com.example.healthflow.net.ConnectivityMonitor;
 import com.example.healthflow.ui.ConnectivityBanner;
@@ -49,7 +51,11 @@ import com.example.healthflow.dao.PharmacyQueries;
 import javafx.collections.transformation.FilteredList;
 import javafx.collections.transformation.SortedList;
 
+import static com.example.healthflow.db.Database.shutdown;
+
 public class PharmacyController {
+
+    @FXML private Button LogOutBtn;
 
     private final ConnectivityMonitor monitor;
     // Controller state
@@ -2736,10 +2742,32 @@ public class PharmacyController {
         });
     }
 
+    private void showError(String title, Exception ex) {
+        ex.printStackTrace();
+        javafx.application.Platform.runLater(() -> {
+            var alert = new javafx.scene.control.Alert(javafx.scene.control.Alert.AlertType.ERROR);
+            alert.setTitle(title);
+            alert.setHeaderText(null);
+            alert.setContentText(ex.getMessage());
+            alert.showAndWait();
+        });
+    }
+
+    // Overloads to support calls that pass only a message, or (title, message)
     private void showError(String msg) {
         javafx.application.Platform.runLater(() -> {
             var alert = new javafx.scene.control.Alert(javafx.scene.control.Alert.AlertType.ERROR);
             alert.setTitle("Error");
+            alert.setHeaderText(null);
+            alert.setContentText(msg);
+            alert.showAndWait();
+        });
+    }
+
+    private void showError(String title, String msg) {
+        javafx.application.Platform.runLater(() -> {
+            var alert = new javafx.scene.control.Alert(javafx.scene.control.Alert.AlertType.ERROR);
+            alert.setTitle(title);
             alert.setHeaderText(null);
             alert.setContentText(msg);
             alert.showAndWait();
@@ -3365,4 +3393,62 @@ public class PharmacyController {
             }
         });
     }
+
+    // To Turn on LogOut Btn
+    private Stage getCurrentStageSafely() {
+        try {
+            if (rootPane != null && rootPane.getScene() != null) {
+                return (Stage) rootPane.getScene().getWindow();
+            }
+        } catch (Throwable ignore) {}
+
+        try {
+            if (LogOutBtn != null && LogOutBtn.getScene() != null) {
+                return (Stage) LogOutBtn.getScene().getWindow();
+            }
+        } catch (Throwable ignore) {}
+
+        return null;
+    }
+
+    // ---- Logout (single confirmation attached to this window) ----
+    @FXML
+    private void handleLogoutAction() {
+        Stage stage = getCurrentStageSafely();
+
+        // Single app-attached confirmation (no duplicate prompts)
+        Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+        alert.setTitle("Confirm Logout");
+        alert.setHeaderText(null);
+        alert.setContentText("Are you sure you want to log out?");
+        if (stage != null) {
+            alert.initOwner(stage);
+            alert.initModality(javafx.stage.Modality.WINDOW_MODAL);
+        }
+
+        Optional<ButtonType> result = alert.showAndWait();
+        if (result.isEmpty() || result.get() != ButtonType.OK) {
+            return; // user cancelled
+        }
+
+        // Proceed with logout and return to fixed-size Login
+        doLogout(stage);
+    }
+
+    private void doLogout(Stage stage) {
+        try {
+            shutdown(); // graceful cleanup
+
+            if (stage == null) {
+                stage = getCurrentStageSafely();
+            }
+
+            // Navigate back to Login with fixed size (handled by Navigation)
+            new Navigation().showLoginFixed(stage, monitor);
+
+        } catch (Exception e) {
+            showError("Logout", e);
+        }
+    }
+
 }

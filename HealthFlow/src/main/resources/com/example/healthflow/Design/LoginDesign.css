@@ -77,6 +77,3 @@
     -fx-underline: false;
     -fx-padding: 6 4 0 4;
 }
-
-/* في CSS العام */
-.hf-btn:pressed { -fx-opacity: 0.9; }

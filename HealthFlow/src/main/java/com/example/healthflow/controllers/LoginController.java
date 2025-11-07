@@ -13,6 +13,8 @@ import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.geometry.Insets;
+import javafx.geometry.Rectangle2D;
+import javafx.stage.Screen;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
@@ -313,6 +315,16 @@ public class LoginController {
                             Parent root = loader.load();
                             stage.setScene(new Scene(root));
                             stage.setTitle("Reception Dashboard");
+
+                            // ✅ Fill screen by default
+                            stage.setResizable(true);
+                            stage.setMaximized(true);
+                            Rectangle2D boundsR = Screen.getPrimary().getVisualBounds();
+                            stage.setX(boundsR.getMinX());
+                            stage.setY(boundsR.getMinY());
+                            stage.setWidth(boundsR.getWidth());
+                            stage.setHeight(boundsR.getHeight());
+
                             stage.show();
                             ReceptionController rc = loader.getController();
                             stage.setOnCloseRequest(e2 -> rc.shutdown());
@@ -322,6 +334,16 @@ public class LoginController {
                             Stage stage = new Stage();
                             navigation.navigateTo(stage, navigation.Doctor_Fxml);
                             stage.setTitle("Doctor Dashboard");
+
+                            // ✅ Fill screen by default
+                            stage.setResizable(true);
+                            stage.setMaximized(true);
+                            Rectangle2D boundsD = Screen.getPrimary().getVisualBounds();
+                            stage.setX(boundsD.getMinX());
+                            stage.setY(boundsD.getMinY());
+                            stage.setWidth(boundsD.getWidth());
+                            stage.setHeight(boundsD.getHeight());
+
                             stage.show();
                             currentStage.close();
 
@@ -329,6 +351,16 @@ public class LoginController {
                             Stage stage = new Stage();
                             navigation.navigateTo(stage, navigation.Pharmacy_Fxml);
                             stage.setTitle("Pharmacy Dashboard");
+
+                            // ✅ Fill screen by default
+                            stage.setResizable(true);
+                            stage.setMaximized(true);
+                            Rectangle2D boundsP = Screen.getPrimary().getVisualBounds();
+                            stage.setX(boundsP.getMinX());
+                            stage.setY(boundsP.getMinY());
+                            stage.setWidth(boundsP.getWidth());
+                            stage.setHeight(boundsP.getHeight());
+
                             stage.show();
                             currentStage.close();
 
@@ -336,6 +368,16 @@ public class LoginController {
                             Stage stage = new Stage();
                             navigation.navigateTo(stage, navigation.Admin_Fxml);
                             stage.setTitle("Admin Panel");
+
+                            // ✅ Fill screen by default
+                            stage.setResizable(true);
+                            stage.setMaximized(true);
+                            Rectangle2D boundsA = Screen.getPrimary().getVisualBounds();
+                            stage.setX(boundsA.getMinX());
+                            stage.setY(boundsA.getMinY());
+                            stage.setWidth(boundsA.getWidth());
+                            stage.setHeight(boundsA.getHeight());
+
                             stage.show();
                             currentStage.close();
 
@@ -400,134 +442,6 @@ public class LoginController {
             stopLoginUi(); // احتياط في حال الخطأ وقع قبل إطلاق الـ Task
         }
     }
-
-//    @FXML
-//    public void LoginAction() {
-//        String username = null;
-//        startLoginUi(); // ابدأ إحساس الضغط فورًا
-//        try {
-//            // (0) أوفلاين
-//            if (monitor != null && !monitor.isOnline()) {
-//                String tempPass = ShowPasswordCheckBox.isSelected()
-//                        ? visiblePasswordField.getText()
-//                        : PasswordTextField.getText();
-//                lastTriedPass = tempPass != null ? tempPass.toCharArray() : null;
-//                pendingLogin = true;
-//                setAlert("You are offline.", "We will retry automatically when you are back online.");
-//                return; // سيتم إيقاف المؤثر في finally
-//            }
-//
-//            // (1) تحقق مدخلات
-//            username = UserNameTextField.getText();
-//            String password = ShowPasswordCheckBox.isSelected()
-//                    ? visiblePasswordField.getText()
-//                    : PasswordTextField.getText();
-//
-//            if (username == null || username.isBlank()) {
-//                setAlert("Username (email) is required.", "");
-//                return;
-//            }
-//            if (password == null || password.isBlank()) {
-//                setAlert("Password is required.", "");
-//                return;
-//            }
-//
-//            String normalizedEmail = username.trim().toLowerCase();
-//
-//            // (2) حدّ المحاولات قبل الذهاب للداتابيز
-//            if (isAccountLocked(normalizedEmail)) {
-//                return; // شاشة القفل والعدّاد تُدار داخل isAccountLocked()
-//            }
-//
-//            // (3) المصادقة
-//            User user = authenticate(username, password);
-//            if (user != null) {
-//                // نجاح
-//                clearFailedAttempts(normalizedEmail);
-//                Session.set(user);
-//
-//                try {
-//                    userDao.updateLastLogin(user.getId());
-//                } catch (Exception e) {
-//                    System.err.println("Failed to update last login for user " + user.getId() + ": " + e.getMessage());
-//                }
-//
-//                // تنظيف الواجهة
-//                if (AlertLabel != null) AlertLabel.setText("");
-//                enableLoginButtonSafely();
-//                if (lockCountdown != null) { lockCountdown.stop(); lockCountdown = null; }
-//
-//                // فتح الواجهات حسب الدور
-//                Stage currentStage = (Stage) rootPane.getScene().getWindow();
-//                Role r = user.getRole();
-//                if (r == Role.RECEPTIONIST) {
-//                    Stage stage = new Stage();
-//                    FXMLLoader loader = new FXMLLoader(getClass().getResource(navigation.Reception_Fxml));
-//                    Parent root = loader.load();
-//                    stage.setScene(new Scene(root));
-//                    stage.setTitle("Reception Dashboard");
-//                    stage.show();
-//                    ReceptionController rc = loader.getController();
-//                    stage.setOnCloseRequest(e -> rc.shutdown());
-//                    currentStage.close();
-//
-//                } else if (r == Role.DOCTOR) {
-//                    Stage stage = new Stage();
-//                    navigation.navigateTo(stage, navigation.Doctor_Fxml);
-//                    stage.setTitle("Doctor Dashboard");
-//                    stage.show();
-//                    currentStage.close();
-//
-//                } else if (r == Role.PHARMACIST) {
-//                    Stage stage = new Stage();
-//                    navigation.navigateTo(stage, navigation.Pharmacy_Fxml);
-//                    stage.setTitle("Pharmacy Dashboard");
-//                    stage.show();
-//                    currentStage.close();
-//
-//                } else if (r == Role.ADMIN) {
-//                    Stage stage = new Stage();
-//                    navigation.navigateTo(stage, navigation.Admin_Fxml);
-//                    stage.setTitle("Admin Panel");
-//                    stage.show();
-//                    currentStage.close();
-//
-//                } else if (r == Role.PATIENT) {
-//                    showAlert("Access Restricted", "Patient portal is not available in this version.");
-//                }
-//
-//                // مسح الحسّاس
-//                if (lastTriedPass != null) {
-//                    java.util.Arrays.fill(lastTriedPass, '\0');
-//                    lastTriedPass = null;
-//                }
-//                pendingLogin = false;
-//
-//            } else {
-//                // فشل
-//                recordFailedAttempt(normalizedEmail);
-//                int attempts = getAttemptsCount(normalizedEmail);
-//                int remaining = Math.max(0, MAX_ATTEMPTS - attempts);
-//
-//                // قد يتحول لقفل الآن
-//                if (isAccountLocked(normalizedEmail)) {
-//                    return; // سيبدأ العدّاد ويعطّل الزر ويُحدّث الـLabel
-//                }
-//
-//                setAlert(
-//                        "Username or password is invalid.",
-//                        String.format("Attempts: %d/%d%s", attempts, MAX_ATTEMPTS, (remaining > 0 ? " · " + remaining + " left" : ""))
-//                );
-//            }
-//        } catch (Exception e) {
-//            System.err.println("Login error for user: " + username);
-//            e.printStackTrace();
-//            setAlert("An error occurred during login.", "Please try again.");
-//        } finally {
-//            // نوقف التحميل دائمًا مهما كانت النتيجة
-//            stopLoginUi();
-//        }
-//    }
 
     // ================= Reload on Reconnect =================
     /** ينادى من App عندما يعود الانترنت */
@@ -723,4 +637,6 @@ public class LoginController {
         lockCountdown.setCycleCount(javafx.animation.Animation.INDEFINITE);
         lockCountdown.play();
     }
+
+
 }
