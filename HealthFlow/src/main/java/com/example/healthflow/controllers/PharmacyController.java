@@ -785,7 +785,7 @@ public class PharmacyController {
                     data.total     = dao.countTotalOnDate(c, day);
                     data.waiting   = dao.countPendingOnDate(c, day);
                     data.completed = dao.countCompletedOnDate(c, day);
-                    data.rows      = dao.listDashboardRowsByDate(c, day);
+                    data.rows      = dao.listDashboardRowsByDateAndStatus(c, day, null);
                 }
                 return data;
             }
@@ -1286,6 +1286,7 @@ public class PharmacyController {
         if (colprescriptionStutus != null) {
             colprescriptionStutus.setCellValueFactory(cd -> new javafx.beans.property.SimpleStringProperty(
                     cd.getValue().status == null ? "" : switch (cd.getValue().status) {
+                        case DRAFT -> "DRAFT";
                         case PENDING -> "PENDING";
                         case APPROVED -> "Approved";
                         case REJECTED -> "Rejected";

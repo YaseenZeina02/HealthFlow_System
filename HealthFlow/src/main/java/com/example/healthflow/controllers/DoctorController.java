@@ -2,22 +2,18 @@ package com.example.healthflow.controllers;
 
 import com.example.healthflow.dao.DoctorDAO;
 import com.example.healthflow.db.Database;
-import com.example.healthflow.model.Role;
-import com.example.healthflow.model.User;
-import com.example.healthflow.model.PatientRow;
+import com.example.healthflow.model.*;
 import com.example.healthflow.ui.fx.TableUtils;
 import javafx.beans.property.ReadOnlyStringWrapper;
-import javafx.beans.property.ReadOnlyIntegerWrapper;
 import com.example.healthflow.model.dto.MedicineRow;
 import com.example.healthflow.model.dto.PrescItemRow;
+//import com.example.healthflow.model.dto.Appointment;
 import com.example.healthflow.dao.PrescriptionItemDAO;
 import com.example.healthflow.dao.PrescriptionDAO;
-import com.example.healthflow.model.PrescriptionItem;
 import com.example.healthflow.net.ConnectivityMonitor;
 import com.example.healthflow.service.AuthService.Session;
 import com.example.healthflow.service.DoctorDashboardService;
 import com.example.healthflow.service.DoctorDashboardService.Appt;
-import com.example.healthflow.service.DoctorDashboardService.Stats;
 import com.example.healthflow.ui.ComboAnimations;
 import com.example.healthflow.ui.ConnectivityBanner;
 import javafx.animation.ScaleTransition;
@@ -42,7 +38,6 @@ import javafx.scene.layout.*;
 import javafx.scene.shape.Circle;
 import javafx.stage.Stage;
 import javafx.util.Duration;
-import org.kordamp.ikonli.javafx.FontIcon;
 
 
 import java.io.IOException;
@@ -51,7 +46,6 @@ import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.sql.Types;
 import java.time.LocalDate;
-import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Optional;
@@ -360,7 +354,7 @@ public class DoctorController {
             // Make PatientNameTF editable with placeholder so user can type "name • NID"
             setPatientHeader("", null, true);
         });
-        Add_Medication.setOnAction(e -> showPrescriptionPaneToAddMedication());
+//        Add_Medication.setOnAction(e -> showPrescriptionPaneToAddMedication());
 
         Add_Medication.setOnAction(e -> {
             System.out.println("[ADD_MEDICATION BUTTON] Current patient context -> userId="
@@ -499,7 +493,7 @@ public class DoctorController {
 
         // When doctor finishes composing the draft and wants to send to pharmacy:
         if (sendToPharmacy != null) {
-            sendToPharmacy.setOnAction(e -> handleSendToPharmacy());
+            sendToPharmacy.setOnAction(e -> sendToPharmacy());
         }
 
         try {
@@ -973,7 +967,6 @@ public class DoctorController {
     private static String nullToEmpty(String s) {
         return s == null ? "" : s;
     }
-
 
     private void loadPatientsAsync() { // kept for compatibility in other calls
         var d = (datePickerPatientsWithDoctor != null && datePickerPatientsWithDoctor.getValue() != null)
@@ -1742,6 +1735,90 @@ public class DoctorController {
         }
     }
 
+
+    /**
+     * Ensure a DRAFT prescription exists for a specific appointment (doctor+patient).
+     * Returns the prescription id.
+     */
+    private Long ensureDraftPrescriptionFor(Long appointmentId, long doctorId, long patientId) throws Exception {
+        try (java.sql.Connection c = com.example.healthflow.db.Database.get()) {
+            Long foundId = null;
+
+            if (appointmentId == null) {
+                try (java.sql.PreparedStatement ps = c.prepareStatement(
+                        "SELECT id FROM prescriptions " +
+                                "WHERE appointment_id IS NULL AND doctor_id = ? AND patient_id = ? " +
+                                "ORDER BY id DESC LIMIT 1")) {
+                    ps.setLong(1, doctorId);
+                    ps.setLong(2, patientId);
+                    try (java.sql.ResultSet rs = ps.executeQuery()) {
+                        if (rs.next()) foundId = rs.getLong(1);
+                    }
+                }
+            } else {
+                try (java.sql.PreparedStatement ps = c.prepareStatement(
+                        "SELECT id FROM prescriptions " +
+                                "WHERE appointment_id = ? AND doctor_id = ? AND patient_id = ? " +
+                                "ORDER BY id DESC LIMIT 1")) {
+                    ps.setLong(1, appointmentId);
+                    ps.setLong(2, doctorId);
+                    ps.setLong(3, patientId);
+                    try (java.sql.ResultSet rs = ps.executeQuery()) {
+                        if (rs.next()) foundId = rs.getLong(1);
+                    }
+                }
+            }
+
+            if (foundId != null) {
+                currentPrescriptionId = foundId;
+                return foundId;
+            }
+
+            String diagnosisText = (DiagnosisTF != null && DiagnosisTF.getText() != null)
+                    ? DiagnosisTF.getText().trim() : null;
+
+            try (java.sql.PreparedStatement ps = c.prepareStatement(
+                    "INSERT INTO prescriptions (appointment_id, doctor_id, patient_id, pharmacist_id, status, diagnosis) " +
+                            "VALUES (?, ?, ?, NULL, 'DRAFT', ?) RETURNING id")) {
+                if (appointmentId == null) ps.setNull(1, java.sql.Types.BIGINT);
+                else                       ps.setLong(1, appointmentId);
+                ps.setLong(2, doctorId);
+                ps.setLong(3, patientId);
+                if (diagnosisText == null || diagnosisText.isBlank()) ps.setNull(4, java.sql.Types.VARCHAR);
+                else                                                   ps.setString(4, diagnosisText);
+                try (java.sql.ResultSet rs = ps.executeQuery()) {
+                    rs.next();
+                    long newId = rs.getLong(1);
+                    currentPrescriptionId = newId;
+                    return newId;
+                }
+            }
+        }
+    }
+
+    /** Always create a fresh DRAFT (never reuse). */
+    private Long createNewDraftFor(Long appointmentId, long doctorId, long patientId) throws Exception {
+        try (java.sql.Connection c = com.example.healthflow.db.Database.get()) {
+            String diagnosisText = (DiagnosisTF != null && DiagnosisTF.getText() != null)
+                    ? DiagnosisTF.getText().trim() : null;
+            try (java.sql.PreparedStatement ps = c.prepareStatement(
+                    "INSERT INTO prescriptions (appointment_id, doctor_id, patient_id, pharmacist_id, status, diagnosis) " +
+                            "VALUES (?, ?, ?, NULL, 'DRAFT', ?) RETURNING id")) {
+                if (appointmentId == null) ps.setNull(1, java.sql.Types.BIGINT);
+                else                       ps.setLong(1, appointmentId);
+                ps.setLong(2, doctorId);
+                ps.setLong(3, patientId);
+                if (diagnosisText == null || diagnosisText.isBlank()) ps.setNull(4, java.sql.Types.VARCHAR);
+                else                                                   ps.setString(4, diagnosisText);
+                try (java.sql.ResultSet rs = ps.executeQuery()) {
+                    rs.next();
+                    currentPrescriptionId = rs.getLong(1);
+                    return currentPrescriptionId;
+                }
+            }
+        }
+    }
+
     /**
      * Load items for a given prescription and push into the items table.
      */
@@ -2080,13 +2157,11 @@ public class DoctorController {
         patientTable.setItems(patientData);
     }
 
-    /**
-     * افتح واجهة الوصفة للمريض (من جدول المرضى) بدون إنشاء وصفة جديدة.
-     * يبحث عن آخر وصفة "اليوم" لنفس الدكتور والمريض إن لم توجد يفتح مسودة فارغة.
-     */
     private void openPrescriptionForPatient(PatientRow row) {
+        if (row == null) return;
+
         try (Connection c = Database.get()) {
-            var u = Session.get();
+            var u = com.example.healthflow.service.AuthService.Session.get();
             if (u == null) { showWarn("Prescription", "No logged-in user."); return; }
 
             Long doctorId = doctorDAO.findDoctorIdByUserId(c, u.getId());
@@ -2096,50 +2171,62 @@ public class DoctorController {
             }
             if (doctorId == null) { showWarn("Prescription", "Doctor profile missing."); return; }
 
-            // resolve patient_user_id
-            Long patientUserId = (row.getUserId() > 0) ? row.getUserId() : null;
-            if (patientUserId == null && row.getNationalId() != null && !row.getNationalId().isBlank()) {
-                patientUserId = doctorDAO.findPatientUserIdByNationalId(c, row.getNationalId());
-            }
-            if (patientUserId == null) { showWarn("Prescription", "Patient user id not found."); return; }
-
-            Long patientId = doctorDAO.findPatientIdByUserId(c, patientUserId);
+            Long patientId = doctorDAO.findPatientIdByUserId(c, row.getUserId());
             if (patientId == null) { showWarn("Prescription", "Patient profile not found."); return; }
 
-            // ابحث عن وصفة موجودة اليوم لنفس الدكتور والمريض (اختياري: ORDER BY id DESC)
-            Long existingPrescId = null;
-            try (var ps = c.prepareStatement(
-                    "SELECT id FROM prescriptions " +
-                            "WHERE doctor_id=? AND patient_id=? AND created_at::date = CURRENT_DATE " +
-                            "ORDER BY id DESC LIMIT 1")) {
-                ps.setLong(1, doctorId);
-                ps.setLong(2, patientId);
-                try (var rs = ps.executeQuery()) {
-                    if (rs.next()) existingPrescId = rs.getLong(1);
+            // 1) حاول أخذ appointment_id من السطر المحدّد في جدول المواعيد لنفس المريض
+            Long apptId = null;
+            if (AppointmentsTable != null) {
+                AppointmentRow sel = AppointmentsTable.getSelectionModel().getSelectedItem();
+                if (sel != null) {
+                    boolean matchByUser = (row.getUserId() > 0) && (sel.getPatientUserId() == row.getUserId());
+                    boolean matchByNid  = (row.getNationalId() != null) && row.getNationalId().equals(sel.getNationalId());
+                    if (matchByUser || matchByNid) apptId = sel.getId();
                 }
             }
 
-            // خزّن سياق المريض للـ UI
-            this.selectedPatientUserId     = patientUserId;
-            this.selectedPatientName       = row.getFullName();
-            this.selectedPatientNationalId = row.getNationalId();
-
-            if (existingPrescId != null) {
-                this.currentPrescriptionId = existingPrescId;
-                showPrescriptionPane();
-                loadPrescriptionItemsFromDb(existingPrescId);
-            } else {
-                this.currentPrescriptionId = null;          // مسودة
-                if (prescItemsEditable != null) prescItemsEditable.clear();
-                showPrescriptionPane();
+            // 2) لو ما في تحديد، جرّب إيجاد موعد نشط لنفس اليوم لنفس الطبيب/المريض
+            if (apptId == null) {
+                try (var ps = c.prepareStatement(
+                        "SELECT a.id FROM appointments a " +
+                                "JOIN patients p ON p.id = a.patient_id " +
+                                "WHERE a.doctor_id = ? AND p.user_id = ? " +
+                                "AND a.appointment_date::date = CURRENT_DATE " +
+                                "AND a.status NOT IN ('COMPLETED','CANCELLED') " +
+                                "ORDER BY a.appointment_date LIMIT 1")) {
+                    ps.setLong(1, doctorId);
+                    ps.setLong(2, row.getUserId());
+                    try (var rs = ps.executeQuery()) {
+                        if (rs.next()) apptId = rs.getLong(1);
+                    }
+                }
             }
 
-            Platform.runLater(() -> {
-                setPatientHeader(row.getFullName(), row.getNationalId(), false);
-                if (PatientNameTF != null) PatientNameTF.positionCaret(PatientNameTF.getText().length());
-            });
+            // خزّن سياق المريض في الهيدر
+            this.selectedPatientUserId = row.getUserId();
+            this.selectedPatientName   = row.getFullName();
+            this.selectedPatientNationalId = row.getNationalId();
+
+            Long prescId;
+
+            if (apptId != null) {
+                // عندنا موعد: يجوز إعادة استخدام وصفة نفس الموعد
+                prescId = ensureDraftPrescriptionFor(apptId, doctorId, patientId);
+                this.currentPrescriptionId = prescId;
+                showPrescriptionPane();
+                loadPrescriptionItemsFromDb(prescId); // لو فيها عناصر سيُعاد تحميلها
+            } else {
+                // بدون موعد: أنشئ مسودة جديدة دائمًا (لا تعيد استخدام آخر مسودة)
+                prescId = createNewDraftFor(null, doctorId, patientId);
+                this.currentPrescriptionId = prescId;
+                if (prescItemsEditable != null) prescItemsEditable.clear();
+                showPrescriptionPane();
+                // لا تحميل عناصر: مسودة جديدة فارغة
+            }
+
+            Platform.runLater(() -> setPatientHeader(row.getFullName(), row.getNationalId(), false));
         } catch (Exception ex) {
-            showWarn("Prescription", "Open failed: " + ex.getMessage());
+            showError("Open Prescription", ex);
         }
     }
 
@@ -2686,12 +2773,12 @@ private void wirePrescriptionItemsTable() {
                 throw new IllegalStateException("Patient profile not found for userId=" + patientUserId + " (patients.id lookup failed)");
             }
 
-            // 4) خُذ التشخيص من الهيدر (نخزّنه في prescriptions.notes)
+            // 4) خُذ التشخيص من الهيدر (نخزّنه في prescriptions.diagnosis)
             String diagnosisText = (DiagnosisTF != null) ? DiagnosisTF.getText() : null;
 
             // 5) أنشئ وصفة بحالة DRAFT (بدون موعد)
             try (var ps = c.prepareStatement(
-                    "INSERT INTO prescriptions (appointment_id, doctor_id, patient_id, pharmacist_id, status, notes) " +
+                    "INSERT INTO prescriptions (appointment_id, doctor_id, patient_id, pharmacist_id, status, diagnosis) " +
                             "VALUES (NULL, ?, ?, NULL, 'DRAFT', ?) RETURNING id")) {
                 ps.setLong(1, doctorId);
                 ps.setLong(2, realPatientId);
@@ -2704,6 +2791,42 @@ private void wirePrescriptionItemsTable() {
 
             toast("Draft prescription #" + currentPrescriptionId + " created.", "ok");
             return currentPrescriptionId;
+        }
+    }
+
+    /**
+     * Send current draft prescription to Pharmacy:
+     * - saves Diagnosis (from DiagnosisTF) into prescriptions.diagnosis
+     * - moves status from DRAFT -> PENDING
+     */
+    @FXML
+    private void sendToPharmacy() {
+        try {
+            Long prescId = ensureDraftPrescription(); // make sure DB row exists and currentPrescriptionId set
+            String diagnosisText = (DiagnosisTF != null && DiagnosisTF.getText() != null)
+                    ? DiagnosisTF.getText().trim() : null;
+
+            try (java.sql.Connection c = Database.get()) {
+                c.setAutoCommit(true);
+                try (java.sql.PreparedStatement ps = c.prepareStatement(
+                        "UPDATE prescriptions " +
+                                "SET diagnosis = ?, status = 'PENDING' " +
+                                "WHERE id = ?")) {
+                    if (diagnosisText == null || diagnosisText.isBlank()) {
+                        ps.setNull(1, java.sql.Types.VARCHAR);
+                    } else {
+                        ps.setString(1, diagnosisText);
+                    }
+                    ps.setLong(2, prescId);
+                    ps.executeUpdate();
+                }
+            }
+
+            toast("Prescription #" + prescId + " sent to Pharmacy (status: PENDING).", "ok");
+            // اختياري: أعد تحميل عناصر الوصفة بعد الإرسال
+            try { loadPrescriptionItemsFromDb(prescId); } catch (Throwable ignore) {}
+        } catch (Exception ex) {
+            showError("Send to Pharmacy", ex);
         }
     }
 

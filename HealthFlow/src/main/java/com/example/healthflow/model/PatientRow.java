@@ -81,4 +81,7 @@ public class PatientRow {
     public String getMedicalHistory() { return medicalHistory.get(); }
     public void setMedicalHistory(String v) { medicalHistory.set(v); }
     public StringProperty medicalHistoryProperty() { return medicalHistory; }
+
+//    for alias used by som UIs
+    public long getId() { return getPatientId(); }
 }

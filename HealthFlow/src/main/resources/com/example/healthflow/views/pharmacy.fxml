@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <?import java.lang.String?>
+<?import java.net.URL?>
 <?import javafx.scene.control.Button?>
 <?import javafx.scene.control.ComboBox?>
 <?import javafx.scene.control.DatePicker?>
@@ -20,7 +21,6 @@
 <?import org.controlsfx.control.SegmentedButton?>
 <?import org.kordamp.ikonli.javafx.FontIcon?>
 
-<?import java.net.URL?>
 <VBox fx:id="rootPane" fillWidth="true" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" spacing="0" xmlns="http://javafx.com/javafx/19" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.example.healthflow.controllers.PharmacyController">
    <children>
       <BorderPane prefHeight="600.0" prefWidth="1100.0" stylesheets="@../Design/ReceptionDesign.css" VBox.vgrow="ALWAYS">
@@ -125,7 +125,7 @@
          <center>
             <AnchorPane fx:id="CenterAnchorPane" stylesheets="@../Design/ReceptionDesign.css" BorderPane.alignment="CENTER">
                <children>
-                  <AnchorPane fx:id="pharmacyDashboardAnchorPane" style="-fx-background-color: #ededed;" stylesheets="@../Design/ReceptionDesign.css" visible="false" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+                  <AnchorPane fx:id="pharmacyDashboardAnchorPane" style="-fx-background-color: #ededed;" stylesheets="@../Design/ReceptionDesign.css" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
                      <children>
                         <AnchorPane layoutX="14.0" layoutY="14.0" prefHeight="135.0" prefWidth="870.0" AnchorPane.leftAnchor="14.0" AnchorPane.rightAnchor="8.399999999999977" AnchorPane.topAnchor="14.0">
                            <styleClass>
@@ -234,7 +234,7 @@
                                  </columnResizePolicy>
                               </TableView>
                               <DatePicker fx:id="PrescriptionDatePicker" layoutX="508.0" layoutY="12.0" prefHeight="30.0" prefWidth="130.0" styleClass="boxDataPickar" stylesheets="@../Design/ReceptionDesign.css" AnchorPane.rightAnchor="227.20000000000005" />
-                              <Button fx:id="clearSelectionDach" layoutX="793.0" layoutY="13.0" mnemonicParsing="false" prefHeight="29.0" prefWidth="60.0" styleClass="btn-2" stylesheets="@../Design/ReceptionDesign.css" text="Clear" />
+                              <Button fx:id="clearSelectionDach" layoutX="793.0" layoutY="13.0" mnemonicParsing="false" prefHeight="29.0" prefWidth="60.0" styleClass="btn-2" stylesheets="@../Design/ReceptionDesign.css" text="Clear" AnchorPane.rightAnchor="13.799999999999955" />
                            </children>
                         </AnchorPane>
                      </children>
@@ -416,7 +416,7 @@
                         </AnchorPane>
                      </children>
                   </AnchorPane>
-                  <AnchorPane fx:id="InventoryAnchorPane" layoutY="-2.0" prefHeight="560.0" prefWidth="890.0" style="-fx-background-color: #ededed;" stylesheets="@../Design/ReceptionDesign.css" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="-2.0">
+                  <AnchorPane fx:id="InventoryAnchorPane" layoutY="-2.0" prefHeight="560.0" prefWidth="890.0" style="-fx-background-color: #ededed;" stylesheets="@../Design/ReceptionDesign.css" visible="false" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="-2.0">
                      <children>
                         <AnchorPane layoutX="10.0" layoutY="11.0" prefHeight="538.0" prefWidth="870.0" stylesheets="@../Design/ReceptionDesign.css" AnchorPane.bottomAnchor="11.0" AnchorPane.leftAnchor="10.0" AnchorPane.rightAnchor="10.0" AnchorPane.topAnchor="11.0">
                            <styleClass>

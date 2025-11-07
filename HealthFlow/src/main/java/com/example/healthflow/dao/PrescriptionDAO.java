@@ -41,11 +41,12 @@ public class PrescriptionDAO {
         throw new SQLException("Failed to create prescription");
     }
 
-    /** Count all prescriptions created on a specific calendar date (by created_at::date). */
+    /** Count all prescriptions created on a specific calendar date (by created_at range). */
     public int countTotalOnDate(Connection c, LocalDate day) throws SQLException {
-        final String sql = "SELECT COUNT(*) FROM prescriptions WHERE created_at::date = ?";
+        final String sql = "SELECT COUNT(*) FROM prescriptions WHERE created_at >= ? AND created_at < ?";
         try (PreparedStatement ps = c.prepareStatement(sql)) {
-            ps.setObject(1, day);
+            ps.setObject(1, day.atStartOfDay());
+            ps.setObject(2, day.plusDays(1).atStartOfDay());
             try (ResultSet rs = ps.executeQuery()) {
                 return rs.next() ? rs.getInt(1) : 0;
             }
@@ -54,9 +55,10 @@ public class PrescriptionDAO {
 
     /** Count PENDING prescriptions (waiting review) created on a given date. */
     public int countPendingOnDate(Connection c, LocalDate day) throws SQLException {
-        final String sql = "SELECT COUNT(*) FROM prescriptions WHERE created_at::date = ? AND status = 'PENDING'::prescription_status";
+        final String sql = "SELECT COUNT(*) FROM prescriptions WHERE created_at >= ? AND created_at < ? AND status = 'PENDING'::prescription_status";
         try (PreparedStatement ps = c.prepareStatement(sql)) {
-            ps.setObject(1, day);
+            ps.setObject(1, day.atStartOfDay());
+            ps.setObject(2, day.plusDays(1).atStartOfDay());
             try (ResultSet rs = ps.executeQuery()) {
                 return rs.next() ? rs.getInt(1) : 0;
             }
@@ -66,9 +68,10 @@ public class PrescriptionDAO {
     /** Count completed (processed by pharmacist) prescriptions created on a given date.
      * Completed = any status other than PENDING (APPROVED/REJECTED/DISPENSED). */
     public int countCompletedOnDate(Connection c, LocalDate day) throws SQLException {
-        final String sql = "SELECT COUNT(*) FROM prescriptions WHERE created_at::date = ? AND status <> 'PENDING'::prescription_status";
+        final String sql = "SELECT COUNT(*) FROM prescriptions WHERE created_at >= ? AND created_at < ? AND status IN ('APPROVED','REJECTED','DISPENSED')";
         try (PreparedStatement ps = c.prepareStatement(sql)) {
-            ps.setObject(1, day);
+            ps.setObject(1, day.atStartOfDay());
+            ps.setObject(2, day.plusDays(1).atStartOfDay());
             try (ResultSet rs = ps.executeQuery()) {
                 return rs.next() ? rs.getInt(1) : 0;
             }
@@ -97,7 +100,7 @@ public class PrescriptionDAO {
             Prescription p = create(c, appointmentId, doctorId, patientId, notes);
             if (items != null && !items.isEmpty()) {
                 itemDao.addItems(c, p.getId(), items);
-                
+
             }
             c.commit();
             return p;
@@ -113,94 +116,67 @@ public class PrescriptionDAO {
      * Rows for Pharmacy Dashboard table for a given calendar date (by prescriptions.created_at::date).
      * Includes patient & doctor names, appointment datetime, status and notes (diagnosis).
      */
-    public List<DashboardRow> listDashboardRowsByDate(Connection c, LocalDate day) throws SQLException {
-        final String sql = """
-            SELECT p.id AS prescription_id,
-                   p.appointment_id,
-                   p.created_at,
-                   p.status,
-                   p.notes,
-                   a.appointment_date,
-                   udoc.full_name AS doctor_name,
-                   upat.full_name AS patient_name,
-                   upat.national_id AS patient_nid
-            FROM prescriptions p
-            LEFT JOIN appointments a ON a.id = p.appointment_id
-            JOIN doctors d   ON d.id  = p.doctor_id
-            JOIN users  udoc ON udoc.id = d.user_id
-            JOIN patients pat ON pat.id = p.patient_id
-            JOIN users  upat ON upat.id = pat.user_id
-            WHERE p.created_at::date = ?
-            ORDER BY p.created_at DESC
-            """;
-        try (PreparedStatement ps = c.prepareStatement(sql)) {
-            ps.setObject(1, day);
-            try (ResultSet rs = ps.executeQuery()) {
-                List<DashboardRow> out = new ArrayList<>();
-                while (rs.next()) {
-                    DashboardRow r = new DashboardRow();
-                    r.prescriptionId = rs.getLong("prescription_id");
-                    r.appointmentId  = (Long) rs.getObject("appointment_id");
-                    r.createdAt      = rs.getObject("created_at", OffsetDateTime.class);
-                    r.status         = PrescriptionStatus.fromString(rs.getString("status"));
-                    r.diagnosisNote  = rs.getString("notes");
-                    r.appointmentDateTime = rs.getObject("appointment_date", OffsetDateTime.class);
-                    r.doctorName     = rs.getString("doctor_name");
-                    r.patientName    = rs.getString("patient_name");
-                    r.patientNid     = rs.getString("patient_nid");
-                    out.add(r);
-                }
-                return out;
-            }
-        }
-    }
-
+//    public List<DashboardRow> listDashboardRowsByDate(Connection c, LocalDate day) throws SQLException {
     public List<DashboardRow> listDashboardRowsByDateAndStatus(Connection c, LocalDate day, PrescriptionStatus st) throws SQLException {
-        final String sql = """
+            final String sql = """
         SELECT p.id AS prescription_id, p.appointment_id, p.created_at, p.status, p.notes,
-               a.appointment_date, udoc.full_name AS doctor_name, upat.full_name AS patient_name, upat.national_id AS patient_nid
+               a.appointment_date,
+               udoc.full_name AS doctor_name,
+               upat.full_name  AS patient_name,
+               upat.national_id AS patient_nid
         FROM prescriptions p
         LEFT JOIN appointments a ON a.id = p.appointment_id
         JOIN doctors d   ON d.id  = p.doctor_id
         JOIN users  udoc ON udoc.id = d.user_id
         JOIN patients pat ON pat.id = p.patient_id
         JOIN users  upat ON upat.id = pat.user_id
-        WHERE p.created_at::date = ? AND (? IS NULL OR p.status = ?::prescription_status)
+        WHERE p.created_at >= ? AND p.created_at < ?
+          AND (
+                (? IS NULL AND p.status <> 'DRAFT'::prescription_status)
+             OR (? IS NOT NULL AND p.status = ?::prescription_status)
+          )
         ORDER BY p.created_at DESC
     """;
 
-        try (PreparedStatement ps = c.prepareStatement(sql)) {
-            ps.setObject(1, day);
-            if (st == null) {
-                ps.setNull(2, java.sql.Types.VARCHAR);
-                ps.setNull(3, java.sql.Types.VARCHAR);
-            } else {
-                ps.setString(2, st.name());
-                ps.setString(3, st.name());
-            }
+            try (PreparedStatement ps = c.prepareStatement(sql)) {
+                // نطاق اليوم [start .. next day) — أسرع من created_at::date
+                ps.setObject(1, day.atStartOfDay());
+                ps.setObject(2, day.plusDays(1).atStartOfDay());
 
-            try (ResultSet rs = ps.executeQuery()) {
-                List<DashboardRow> out = new ArrayList<>();
-                while (rs.next()) {
-                    DashboardRow r = new DashboardRow();
-                    r.prescriptionId = rs.getLong("prescription_id");
-                    r.appointmentId  = (Long) rs.getObject("appointment_id");
-                    r.createdAt      = rs.getObject("created_at", OffsetDateTime.class);
-                    r.status         = PrescriptionStatus.fromString(rs.getString("status"));
-                    r.diagnosisNote  = rs.getString("notes");
-                    r.appointmentDateTime = rs.getObject("appointment_date", OffsetDateTime.class);
-                    r.doctorName     = rs.getString("doctor_name");
-                    r.patientName    = rs.getString("patient_name");
-                    r.patientNid     = rs.getString("patient_nid");
-                    out.add(r);
+                if (st == null) {
+                    ps.setNull(3, java.sql.Types.VARCHAR); // (? IS NULL ...)
+                    ps.setNull(4, java.sql.Types.VARCHAR); // (? IS NOT NULL ...)
+                    ps.setNull(5, java.sql.Types.VARCHAR); // (... = ?::prescription_status)
+                } else {
+                    String s = st.name();
+                    ps.setString(3, s);
+                    ps.setString(4, s);
+                    ps.setString(5, s);
                 }
-                return out; // ✅ هنا السطر المهم
+
+                try (ResultSet rs = ps.executeQuery()) {
+                    List<DashboardRow> out = new ArrayList<>();
+                    while (rs.next()) {
+                        DashboardRow r = new DashboardRow();
+                        r.prescriptionId       = rs.getLong("prescription_id");
+                        r.appointmentId        = (Long) rs.getObject("appointment_id");
+                        r.createdAt            = rs.getObject("created_at", OffsetDateTime.class);
+                        r.status               = PrescriptionStatus.fromDb(rs.getString("status"));
+                        r.diagnosisNote        = rs.getString("notes");
+                        r.appointmentDateTime  = rs.getObject("appointment_date", OffsetDateTime.class);
+                        r.doctorName           = rs.getString("doctor_name");
+                        r.patientName          = rs.getString("patient_name");
+                        r.patientNid           = rs.getString("patient_nid");
+                        out.add(r);
+                    }
+                    return out;
+                }
             }
         }
-    }
+
 
     public List<DashboardRow> listDashboardRowsByDate(LocalDate day) throws SQLException {
-        try (Connection c = Database.get()) { return listDashboardRowsByDate(c, day); }
+        try (Connection c = Database.get()) { return listDashboardRowsByDateAndStatus(c, day, null); }
     }
 
     public Prescription findById(Connection c, Long id) throws SQLException {
@@ -263,7 +239,7 @@ public class PrescriptionDAO {
         p.setDoctorId(rs.getLong("doctor_id"));
         p.setPatientId(rs.getLong("patient_id"));
         p.setPharmacistId((Long) rs.getObject("pharmacist_id"));
-        p.setStatus(PrescriptionStatus.fromString(rs.getString("status")));
+        p.setStatus(PrescriptionStatus.fromDb(rs.getString("status")));
         p.setDecisionAt(rs.getObject("decision_at", OffsetDateTime.class));
         p.setDecisionNote(rs.getString("decision_note"));
         p.setNotes(rs.getString("notes"));

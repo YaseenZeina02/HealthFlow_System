@@ -1147,3 +1147,44 @@ ELSE
 END IF;
 END LOOP;
 END $$;
+
+
+-- Rename prescriptions.decision_note -> prescriptions.diagnosis
+DO $$
+BEGIN
+  IF EXISTS (
+      SELECT 1
+      FROM information_schema.columns
+      WHERE table_name = 'prescriptions'
+        AND column_name = 'decision_note'
+  ) THEN
+    EXECUTE 'ALTER TABLE prescriptions RENAME COLUMN decision_note TO diagnosis';
+END IF;
+END $$;
+
+
+-- امنع تحويل الوصفة إلى PENDING إن لم يكن لها عناصر
+CREATE OR REPLACE FUNCTION presc_require_items_on_pending()
+RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  IF NEW.status = 'PENDING' THEN
+    IF NOT EXISTS (SELECT 1 FROM prescription_items i WHERE i.prescription_id = NEW.id) THEN
+      RAISE EXCEPTION 'Cannot set PENDING without at least one prescription item (id=%)', NEW.id;
+END IF;
+END IF;
+RETURN NEW;
+END $$;
+
+
+DROP TRIGGER IF EXISTS trg_presc_require_items ON prescriptions;
+CREATE TRIGGER trg_presc_require_items
+    BEFORE UPDATE ON prescriptions
+    FOR EACH ROW EXECUTE FUNCTION presc_require_items_on_pending();
+
+
+-- “ممنوع يكون في وصفة بحالة PENDING بدون أدوية”.
+DROP TRIGGER IF EXISTS trg_presc_require_items ON prescriptions;
+CREATE TRIGGER trg_presc_require_items
+    BEFORE INSERT OR UPDATE ON prescriptions
+    FOR EACH ROW EXECUTE FUNCTION presc_require_items_on_pending();
+
