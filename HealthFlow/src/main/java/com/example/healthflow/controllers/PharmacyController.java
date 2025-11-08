@@ -631,26 +631,42 @@ public class PharmacyController {
         return selectedRow != null && selectedRow.status != null && "DISPENSED".equalsIgnoreCase(selectedRow.status.name());
     }
 
-    /** Resolve pharmacist_id strictly (no auto-create). */
     private Long requireCurrentPharmacistId() {
-        Long userId = null; String email = null; String role = null;
-        try { var u = Session.get(); if (u != null) { userId = u.getId(); email = u.getEmail(); } } catch (Throwable ignored) {}
+        Long userId = null;
+        String email = null;
+        String role  = null;
+
+        // 1) Session
+        try {
+            var u = Session.get();
+            if (u != null) { userId = u.getId(); email = u.getEmail(); }
+        } catch (Throwable ignored) {}
+
         if (userId == null) {
-            new javafx.scene.control.Alert(javafx.scene.control.Alert.AlertType.ERROR, "No logged-in user. Please re-login.").showAndWait();
+            new Alert(Alert.AlertType.ERROR, "No logged-in user. Please log in again.").showAndWait();
             return null;
         }
+
         try (Connection c = Database.get()) {
-            // role + email
+            // 2) Resolve role + email (fallback)
             try (PreparedStatement ps = c.prepareStatement("SELECT role, email FROM users WHERE id = ?")) {
                 ps.setLong(1, userId);
-                try (ResultSet rs = ps.executeQuery()) { if (rs.next()) { role = rs.getString(1); if (email == null) email = rs.getString(2); } }
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) {
+                        role  = rs.getString("role");
+                        if (email == null) email = rs.getString("email");
+                    }
+                }
             }
+
             if (role == null || !"PHARMACIST".equalsIgnoreCase(role)) {
-                new javafx.scene.control.Alert(javafx.scene.control.Alert.AlertType.ERROR,
-                        "You are not authorized as a pharmacist (role='" + String.valueOf(role) + "').").showAndWait();
+                new Alert(Alert.AlertType.ERROR,
+                        "You are not authorized as a pharmacist.\n(Your role: " + String.valueOf(role) + ")")
+                        .showAndWait();
                 return null;
             }
-            // by user_id
+
+            // 3) Try by user_id
             Long pharmId = null;
             try (PreparedStatement ps = c.prepareStatement("SELECT id FROM pharmacists WHERE user_id = ?")) {
                 ps.setLong(1, userId);
@@ -658,23 +674,26 @@ public class PharmacyController {
             }
             if (pharmId != null) return pharmId;
 
-            // by email join (handles migrated data)
+            // 4) Fallback by email (legacy/migrated)
             if (email != null && !email.isBlank()) {
                 try (PreparedStatement ps = c.prepareStatement(
-                        "SELECT p.id FROM pharmacists p JOIN users u ON u.id = p.user_id WHERE LOWER(u.email)=LOWER(?) LIMIT 1")) {
-                    ps.setString(1, email);
+                        "SELECT p.id FROM pharmacists p JOIN users u ON u.id = p.user_id " +
+                                "WHERE LOWER(u.email)=LOWER(?) LIMIT 1")) {
+                    ps.setString(1, email.trim());
                     try (ResultSet rs = ps.executeQuery()) { if (rs.next()) pharmId = rs.getLong(1); }
                 }
                 if (pharmId != null) return pharmId;
             }
         } catch (Exception ex) {
             System.err.println("[PharmacyController] requireCurrentPharmacistId error: " + ex);
-            new javafx.scene.control.Alert(javafx.scene.control.Alert.AlertType.ERROR,
-                    "Failed to resolve pharmacist: " + ex.getMessage()).showAndWait();
+            new Alert(Alert.AlertType.ERROR, "Failed to resolve pharmacist.\n" + ex.getMessage()).showAndWait();
             return null;
         }
-        new javafx.scene.control.Alert(javafx.scene.control.Alert.AlertType.ERROR,
-                "Your account has role PHARMACIST but is not linked in pharmacists table. Please ask admin to link it.").showAndWait();
+
+        new Alert(Alert.AlertType.ERROR,
+                "Your account has pharmacist role but is not linked in the pharmacists table.\n" +
+                        "Please contact the administrator to link your account.")
+                .showAndWait();
         return null;
     }
 
@@ -980,7 +999,7 @@ public class PharmacyController {
         PackagingSupport.PackagingInfo p =
                 (r.getMedicineId() > 0) ? fetchPackaging(r.getMedicineId()) : null;
 
-        // suggested to preselect
+        // Suggested default from helper
         PackagingSupport.PackSuggestion sugg = PackagingSupport.suggestPackFor(requested, p);
 
         Dialog<DispenseDecision> dlg = new Dialog<>();
@@ -990,19 +1009,22 @@ public class PharmacyController {
         ButtonType okType = new ButtonType("OK", ButtonBar.ButtonData.OK_DONE);
         dlg.getDialogPane().getButtonTypes().addAll(ButtonType.CANCEL, okType);
 
+        // Modes
         ToggleGroup mode = new ToggleGroup();
         RadioButton byPack  = new RadioButton("By pack");
-        RadioButton byUnits = new RadioButton("By units (فراطة)");
-        byPack.setToggleGroup(mode); byUnits.setToggleGroup(mode); byPack.setSelected(true);
+        RadioButton byUnits = new RadioButton("By units");
+        byPack.setToggleGroup(mode);
+        byUnits.setToggleGroup(mode);
+        byPack.setSelected(true);
 
-        // limits
+        // Limits line
         Label limits = new Label("Prescribed: " + prescribed + "  |  In stock: " + inStock);
 
-        // pack choice
+        // Pack choice
         ChoiceBox<String> unitChoice = new ChoiceBox<>();
         java.util.List<String> opts = new java.util.ArrayList<>();
         if (p != null) {
-            if (p.mlPerBottle != null)      opts.add("BOTTLE");
+            if (p.mlPerBottle != null)       opts.add("BOTTLE");
             else if (p.gramsPerTube != null) opts.add("TUBE");
             else {
                 if (p.blistersPerBox != null && p.tabletsPerBlister != null) opts.add("BOX");
@@ -1014,37 +1036,11 @@ public class PharmacyController {
         String defaultUnit = (sugg != null && opts.contains(sugg.unit)) ? sugg.unit : opts.get(0);
         unitChoice.getSelectionModel().select(defaultUnit);
 
-        Spinner<Integer> packCount = new Spinner<>(1, 10_000, Math.max(1, (sugg != null ? sugg.count : 1)));
+        // Spinner (we'll clamp later based on unit)
+        Spinner<Integer> packCount = new Spinner<>();
         packCount.setEditable(true);
 
-        // breakdown
-        Label breakdown = new Label();
-        breakdown.setWrapText(true);
-
-        // units (free) +/-
-        TextField unitsField = new TextField(String.valueOf(requested));
-        Button btnMinus = new Button("–");
-        Button btnPlus  = new Button("+");
-        unitsField.setDisable(true); btnMinus.setDisable(true); btnPlus.setDisable(true);
-        HBox unitsRow = new HBox(6, new Label("Units:"), btnMinus, unitsField, btnPlus);
-        unitsRow.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
-
-        // result + warnings
-        Label calc = new Label(); calc.setWrapText(true);
-        Label warn = new Label(); warn.getStyleClass().add("text-danger");
-
-        VBox box = new VBox(8,
-                limits,
-                new HBox(10, byPack, byUnits),
-                new HBox(10, new Label("Pack:"), unitChoice, new Label("Count:"), packCount),
-                breakdown,
-                unitsRow,
-                calc,
-                warn
-        );
-        dlg.getDialogPane().setContent(box);
-
-        // helper: units per selected pack
+        // Helper: units per selected pack
         java.util.function.Function<String, Integer> unitsPerPack = u -> {
             if (p == null) return 1;
             if ("BOX".equals(u) && p.tabletsPerBlister != null && p.blistersPerBox != null)
@@ -1053,10 +1049,79 @@ public class PharmacyController {
                 return p.tabletsPerBlister;
             if ("BOTTLE".equals(u) || "TUBE".equals(u))
                 return 1;
-            return 1;
+            return 1; // UNIT
         };
 
+        // Set spinner bounds/initial value based on current unit + limits
+        Runnable initPackSpinner = () -> {
+            String u0 = unitChoice.getSelectionModel().getSelectedItem();
+            int perPack = Math.max(1, unitsPerPack.apply(u0));
+            int maxByPrescribed = (prescribed <= 0) ? 10_000 : Math.max(1, prescribed / perPack);
+            int maxByStock      = (inStock    <= 0) ? 10_000 : Math.max(1, inStock    / perPack);
+            int max             = Math.max(1, Math.min(maxByPrescribed, maxByStock));
+
+            int suggested = (sugg != null && u0 != null && u0.equals(sugg.unit)) ? Math.max(1, sugg.count) : 1;
+            int defVal    = Math.min(suggested, max); // no arbitrary default like 5
+
+            SpinnerValueFactory.IntegerSpinnerValueFactory vf =
+                    new SpinnerValueFactory.IntegerSpinnerValueFactory(1, max, defVal);
+            packCount.setValueFactory(vf);
+        };
+
+        // Breakdown lines
+        Label breakdown = new Label(); breakdown.setWrapText(true);
+        Label countHint = new Label(); countHint.setWrapText(true); // e.g., "= 3 × 10 = 30 units"
+
+        // Units free entry (+/-)
+        TextField unitsField = new TextField(String.valueOf(requested));
+        Button btnMinus = new Button("–");
+        Button btnPlus  = new Button("+");
+        unitsField.setDisable(true); btnMinus.setDisable(true); btnPlus.setDisable(true);
+        HBox unitsRow = new HBox(6, new Label("Units:"), btnMinus, unitsField, btnPlus);
+        unitsRow.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+
+        // Results and warnings
+        Label reverse = new Label(); reverse.setWrapText(true);  // e.g., "42 units ≈ 4 BLISTER + 2 UNIT"
+        Label calc = new Label();    calc.setWrapText(true);
+        Label warn = new Label();    warn.getStyleClass().add("text-danger");
+
+        VBox box = new VBox(8,
+                limits,
+                new HBox(10, byPack, byUnits),
+                new HBox(10, new Label("Pack:"), unitChoice, new Label("Count:"), packCount),
+                breakdown,
+                countHint,
+                unitsRow,
+                reverse,
+                calc,
+                warn
+        );
+        dlg.getDialogPane().setContent(box);
+
         final Button okBtn = (Button) dlg.getDialogPane().lookupButton(okType);
+
+        // Compute reverse (units -> packs)
+        java.util.function.Function<Integer, String> reversePacks = (Integer units) -> {
+            if (p == null || units == null) return "";
+            Integer perBlister = p.tabletsPerBlister;
+            Integer blistersPerBox = p.blistersPerBox;
+            if (perBlister == null && blistersPerBox == null) return "";
+            int u = Math.max(0, units);
+            StringBuilder sb = new StringBuilder("≈ ");
+            boolean any = false;
+            if (perBlister != null && blistersPerBox != null) {
+                int perBox = perBlister * blistersPerBox;
+                int nBox = (perBox > 0) ? (u / perBox) : 0; u = (perBox > 0) ? (u % perBox) : u;
+                if (nBox > 0) { sb.append(nBox).append(" BOX"); any = true; }
+            }
+            if (perBlister != null) {
+                int nBl = (perBlister > 0) ? (u / perBlister) : 0; u = (perBlister > 0) ? (u % perBlister) : u;
+                if (any && nBl > 0) sb.append(" + ");
+                if (nBl > 0) { sb.append(nBl).append(" BLISTER"); any = true; }
+            }
+            if (u > 0) { if (any) sb.append(" + "); sb.append(u).append(" UNIT"); any = true; }
+            return any ? sb.toString() : "";
+        };
 
         Runnable recompute = () -> {
             boolean free = byUnits.isSelected();
@@ -1088,23 +1153,27 @@ public class PharmacyController {
             if (free) {
                 try { units = Math.max(0, Integer.parseInt(unitsField.getText().trim())); }
                 catch (Exception e) { units = 0; }
+                countHint.setText("");
             } else {
-                int cnt = packCount.getValue();
+                int cnt = safeSpinnerInt(packCount);
                 int per = unitsPerPack.apply(u);
                 units = cnt * Math.max(1, per);
+                countHint.setText("= " + cnt + " × " + Math.max(1, per) + " = " + units + " units");
             }
+
+            // Reverse hint when typing free units
+            reverse.setText(free ? reversePacks.apply(units) : "");
 
             String note;
             if (!free && p != null && p.tabletsPerBlister != null) {
                 int perBlister = Math.max(1, p.tabletsPerBlister);
                 note = (units % perBlister == 0) ? "Full pack" : "فراطة (not a full blister)";
             } else {
-                note = "فراطة";
+                note = "Units";
             }
             calc.setText("Will dispense " + units + " units — " + note);
 
-            String w = "";
-            boolean ok = true;
+            String w = ""; boolean ok = true;
             if (units > prescribed) { w = "Exceeds prescribed (" + prescribed + ")."; ok = false; }
             if (units > inStock)     { w = (w.isEmpty()? "" : w + " ") + "Exceeds stock (" + inStock + ")."; ok = false; }
             warn.setText(w);
@@ -1113,31 +1182,43 @@ public class PharmacyController {
             final int unitsFinal = units;
             dlg.setResultConverter(btn -> (btn == okType)
                     ? new DispenseDecision(
-                    free ? null : u,
-                    free ? 0    : packCount.getValue(),
-                    unitsFinal,
-                    free
-            )
+                            free ? null : u,
+                            free ? 0    : safeSpinnerInt(packCount),
+                            unitsFinal,
+                            free)
                     : null);
         };
 
-        unitChoice.getSelectionModel().selectedItemProperty().addListener((obs,a,b) -> recompute.run());
+        unitChoice.getSelectionModel().selectedItemProperty().addListener((obs,a,b) -> { initPackSpinner.run(); recompute.run(); });
         packCount.valueProperty().addListener((obs,a,b) -> recompute.run());
         unitsField.textProperty().addListener((obs,a,b) -> recompute.run());
         byPack.setOnAction(e -> recompute.run());
         byUnits.setOnAction(e -> recompute.run());
 
-        btnMinus.setOnAction(e -> {
-            try { int v = Integer.parseInt(unitsField.getText().trim()); if (v > 0) unitsField.setText(String.valueOf(v - 1)); }
-            catch (Exception ignored) {}
-        });
-        btnPlus.setOnAction(e -> {
-            try { int v = Integer.parseInt(unitsField.getText().trim()); unitsField.setText(String.valueOf(v + 1)); }
-            catch (Exception ignored) {}
-        });
+        btnMinus.setOnAction(e -> { try { int v = Integer.parseInt(unitsField.getText().trim()); if (v > 0) unitsField.setText(String.valueOf(v - 1)); } catch (Exception ignored) {} });
+        btnPlus.setOnAction(e -> { try { int v = Integer.parseInt(unitsField.getText().trim()); unitsField.setText(String.valueOf(v + 1)); } catch (Exception ignored) {} });
 
+        // Initialize spinner and compute defaults
+        initPackSpinner.run();
         recompute.run();
         return dlg.showAndWait().orElse(null);
+    }
+
+
+
+
+    private static int safeSpinnerInt(Spinner<Integer> sp) {
+        if (sp == null) return 1;
+        try { sp.commitValue(); } catch (Throwable ignored) { }
+        Integer v = null;
+        try { v = sp.getValue(); } catch (Throwable ignored) { }
+        if (v == null && sp.getValueFactory() != null) {
+            try { v = sp.getValueFactory().getValue(); } catch (Throwable ignored) { }
+        }
+        if (v == null && sp.getValueFactory() instanceof SpinnerValueFactory.IntegerSpinnerValueFactory vf) {
+            try { v = vf.getMin(); } catch (Throwable ignored) { }
+        }
+        return v == null ? 1 : v;
     }
 
     /** بديل بسيط للاستخدام داخل زر Accept */
@@ -1288,9 +1369,9 @@ public class PharmacyController {
                     cd.getValue().status == null ? "" : switch (cd.getValue().status) {
                         case DRAFT -> "DRAFT";
                         case PENDING -> "PENDING";
-                        case APPROVED -> "Approved";
-                        case REJECTED -> "Rejected";
-                        case DISPENSED -> "Dispensed";
+                        case APPROVED -> "APPROVED";
+                        case REJECTED -> "REJECTED";
+                        case DISPENSED -> "DISPENSED";
                     }
             ));
         }
@@ -1541,91 +1622,127 @@ public class PharmacyController {
 
     private void onApproveItem(int rowIndex) {
         if (rowIndex < 0 || rowIndex >= itemRows.size() || selectedRow == null) return;
-        PrescItemRow r = itemRows.get(rowIndex);
+        PrescItemRow row = itemRows.get(rowIndex);
 
-        // 1) Ask pharmacist how many to dispense (allow partial)
-        int prescribed = Math.max(0, r.getQuantity());
-        int inStock    = Math.max(0, r.getStockAvailable()); // 0 if null
+        // 1) الحوار
+        DispenseDecision d = showPackAwareDispenseDialog(row);
+        if (d == null) return;
 
-        int units = promptDispenseQuantity(r);
-        if (units < 0) return; // Cancel
+        int prescribed = Math.max(0, row.getQuantity());
+        int inStock    = Math.max(0, row.getStockAvailable());
+        int unitsToDispense = Math.max(0, d.unitsTotal);
 
-        int dispense = units;   // اسم موحّد للمتغيّر
-
-        // 2) Validate bounds (مرة واحدة فقط)
-        if (dispense < 0) {
-            new javafx.scene.control.Alert(javafx.scene.control.Alert.AlertType.ERROR, "Dispense must be >= 0").showAndWait();
+        if (unitsToDispense == 0) {
+            new Alert(Alert.AlertType.INFORMATION, "No units selected to dispense.").showAndWait();
             return;
         }
-        if (dispense > prescribed) {
-            new javafx.scene.control.Alert(javafx.scene.control.Alert.AlertType.ERROR,
-                    "Cannot dispense more than prescribed (" + prescribed + ")").showAndWait();
+        if (unitsToDispense > prescribed) {
+            new Alert(Alert.AlertType.ERROR, "Cannot dispense more than prescribed (" + prescribed + ")").showAndWait();
             return;
         }
-        if (dispense > inStock) {
-            new javafx.scene.control.Alert(javafx.scene.control.Alert.AlertType.ERROR,
-                    "Not enough stock (available: " + inStock + ")").showAndWait();
+        if (unitsToDispense > inStock) {
+            new Alert(Alert.AlertType.ERROR, "Not enough stock (available: " + inStock + ")").showAndWait();
             return;
         }
 
-        // 3) Persist, **including inventory deduction now** (not only on finish)
         try (Connection c = Database.get()) {
+            c.setAutoCommit(false);
             try {
-                c.setAutoCommit(false);
-
-                PrescriptionItemDAO dao = new PrescriptionItemDAO();
-                ItemStatus newStatus = (dispense > 0) ? ItemStatus.APPROVED : ItemStatus.CANCELLED;
-                dao.updateDispensed(c, r.getId(), dispense, newStatus, null);
-
-                // Deduct inventory immediately so Stock reflects the change
-                Long medId = r.getMedicineId();
-                if (medId == null) {
-                    // Try to resolve medicine id by name (case-insensitive)
+                // Resolve medicine_id (fallback by name)
+                Long medicineId = row.getMedicineId();
+                if (medicineId == null || medicineId <= 0) {
                     try (PreparedStatement ps = c.prepareStatement(
                             "SELECT id FROM medicines WHERE LOWER(name)=LOWER(?) LIMIT 1")) {
-                        ps.setString(1, r.getMedicineName());
+                        ps.setString(1, row.getMedicineName());
                         try (ResultSet rs = ps.executeQuery()) {
-                            if (rs.next()) medId = rs.getLong(1);
+                            if (rs.next()) medicineId = rs.getLong(1);
                         }
                     }
                 }
-                if (medId != null && dispense > 0) {
-                    try (PreparedStatement ps = c.prepareStatement(
-                            "INSERT INTO inventory_transactions (medicine_id, qty_change, reason, ref_type, ref_id)\n" +
-                                    "VALUES (?, ?, ?, ?, ?)")) {
-                        ps.setLong(1, medId);
-                        ps.setInt(2, -dispense);                 // negative = outflow
-                        ps.setString(3, "DISPENSE");              // reason
-                        ps.setString(4, "prescription_item");     // ref_type
-                        ps.setLong(5, r.getId());                 // ref_id = item id
-                        ps.executeUpdate();
-                    }
+                if (medicineId == null || medicineId <= 0)
+                    throw new IllegalStateException("Cannot resolve medicine id for '" + row.getMedicineName() + "'.");
+
+                // Resolve batch (treat 0 as null)
+                Long batchId = row.getBatchId();
+                if (batchId == null || batchId <= 0) {
+                    batchId = queries.fifoBatchId(c, medicineId, unitsToDispense);
+                }
+                if (batchId == null || batchId <= 0) {
+                    c.rollback();
+                    new Alert(Alert.AlertType.ERROR,
+                            "No suitable batch with enough balance.\nPlease select a batch from inventory.")
+                            .showAndWait();
+                    return;
+                }
+
+                // Pharmacist
+                Long pharmacistId = requireCurrentPharmacistId();
+                if (pharmacistId == null) { c.rollback(); return; }
+
+                // Update item
+                new PrescriptionItemDAO().updateDispensed(c, row.getId(), unitsToDispense, ItemStatus.APPROVED, null);
+
+                // Insert inventory transaction (STRICT: must have batch)
+                try (PreparedStatement ps = c.prepareStatement(
+                        "INSERT INTO inventory_transactions " +
+                                "(medicine_id, batch_id, qty_change, reason, ref_type, ref_id, pharmacist_id, created_at) " +
+                                "VALUES (?,?,?,?,?,?,?, NOW())")) {
+                    ps.setLong(1, medicineId);
+                    ps.setLong(2, batchId);
+                    ps.setInt(3, -Math.abs(unitsToDispense));
+                    ps.setString(4, "Prescription dispense");
+                    ps.setString(5, "PRESCRIPTION_ITEM");
+                    ps.setLong(6, row.getId());
+                    ps.setLong(7, pharmacistId);
+                    ps.executeUpdate();
                 }
 
                 c.commit();
 
-                // Update UI model
-                r.setQtyDispensed(dispense);
-                r.setStatus(newStatus.name());
-                if (dispense > 0) {
-                    int newStock = Math.max(0, inStock - dispense);
-                    r.setStockAvailable(newStock);
-                }
-                TablePrescriptionItems.refresh();
-
-                // Refresh side counts (optional)
+                // UI
+                row.setQtyDispensed(unitsToDispense);
+                row.setStatus(ItemStatus.APPROVED.name());
+                row.setBatchId(batchId);
+                row.setStockAvailable(Math.max(0, inStock - unitsToDispense));
+                if (TablePrescriptionItems != null) TablePrescriptionItems.refresh();
                 refreshPharmacyDashboardCounts();
-            } catch (Exception txErr) {
+                refreshPharmacyTables();
+
+            } catch (Exception tx) {
                 try { c.rollback(); } catch (Exception ignored) {}
-                throw txErr;
-            } finally {
-                try { c.setAutoCommit(true); } catch (Exception ignored) {}
-            }
+                throw tx;
+            } finally { try { c.setAutoCommit(true); } catch (Exception ignored) {} }
         } catch (Exception ex) {
-            System.err.println("[PharmacyController] approve item error: " + ex);
-            new javafx.scene.control.Alert(javafx.scene.control.Alert.AlertType.ERROR,
-                    "Failed to update item: " + ex.getMessage()).showAndWait();
+            System.err.println("[PharmacyController] onApproveItem error: " + ex);
+            new Alert(Alert.AlertType.ERROR, "Failed to approve item: " + ex.getMessage()).showAndWait();
         }
+    }
+
+
+    public void onApproveItem(PrescItemRow row) {
+        if (row == null) return;
+        int idx = itemRows.indexOf(row);
+        onApproveItem(idx);
+    }
+
+    // Refresh dashboard + current prescription items and side counters safely
+    private void refreshPharmacyTables() {
+        try {
+            // Dashboard list
+            loadDashboardTable();
+        } catch (Throwable ignored) {}
+
+        try {
+            // Current prescription items (if a prescription is open)
+            if (selectedRow != null && selectedRow.prescriptionId > 0) {
+                loadPrescriptionItems(selectedRow.prescriptionId);
+            }
+        } catch (Throwable ignored) {}
+
+        try {
+            // Summary counters
+            refreshPharmacyDashboardCounts();
+        } catch (Throwable ignored) {}
     }
 
     private void onRejectItem(int rowIndex) {
@@ -1656,14 +1773,14 @@ public class PharmacyController {
         try (Connection c = Database.get();
              PreparedStatement ps = c.prepareStatement(
                      "UPDATE prescriptions\n" +
-                     "SET status = 'DISPENSED',\n" +
-                     "    pharmacist_id = ?,\n" +
-                     "    decision_at   = COALESCE(decision_at, NOW()),\n" +
-                     "    approved_at   = COALESCE(approved_at, decision_at),\n" +
-                     "    approved_by   = COALESCE(approved_by, ?),\n" +
-                     "    dispensed_at  = NOW(),\n" +
-                     "    dispensed_by  = ?\n" +
-                     "WHERE id = ? AND status <> 'DISPENSED'")) {
+                             "SET status = 'DISPENSED',\n" +
+                             "    pharmacist_id = ?,\n" +
+                             "    decision_at   = COALESCE(decision_at, NOW()),\n" +
+                             "    approved_at   = COALESCE(approved_at, COALESCE(decision_at, NOW())),\n" + // ✅
+                             "    approved_by   = COALESCE(approved_by, ?),\n" +
+                             "    dispensed_at  = NOW(),\n" +
+                             "    dispensed_by  = ?\n" +
+                             "WHERE id = ? AND status <> 'DISPENSED'")) {
             ps.setLong(1, pharmacistId);  // pharmacist_id
             ps.setLong(2, pharmacistId);  // approved_by (fallback if null)
             ps.setLong(3, pharmacistId);  // dispensed_by
@@ -1671,21 +1788,37 @@ public class PharmacyController {
             int changed = ps.executeUpdate();
 
             if (changed > 0) {
-                // Reflect in memory row and UI
                 selectedRow.status = com.example.healthflow.model.PrescriptionStatus.DISPENSED;
                 if (Finish_Prescription != null) Finish_Prescription.setDisable(true);
-                // Force items column actions to re-evaluate disabled state
                 if (TablePrescriptionItems != null) TablePrescriptionItems.refresh();
                 refreshPharmacyDashboardCounts();
                 loadDashboardTable();
-                new javafx.scene.control.Alert(javafx.scene.control.Alert.AlertType.INFORMATION, "Prescription marked as completed.").showAndWait();
+
+                // ✅ unified alert
+                showOk("Finish Prescription", "The prescription has been successfully.");
             } else {
-                new javafx.scene.control.Alert(javafx.scene.control.Alert.AlertType.INFORMATION, "Already completed.").showAndWait();
+                showOk("Finish Prescription", "This prescription is already marked as DISPENSED.");
             }
         } catch (Exception ex) {
             System.err.println("[PharmacyController] finish prescription error: " + ex);
-            new javafx.scene.control.Alert(javafx.scene.control.Alert.AlertType.ERROR, "Failed to complete prescription: " + ex.getMessage()).showAndWait();
+            showError("Finish Prescription", "Failed to complete prescription:\n" + ex.getMessage());
         }
+    }
+    // --- Unified alerts (same look across app) ---
+    private static void showOk(String title, String message) {
+        javafx.scene.control.Alert a = new javafx.scene.control.Alert(javafx.scene.control.Alert.AlertType.INFORMATION);
+        a.setTitle(title);
+        a.setHeaderText(null); // like other screens (no header line)
+        a.setContentText(message);
+        a.showAndWait();
+    }
+
+    private static void showError(String title, String message, Throwable ex) {
+        javafx.scene.control.Alert a = new javafx.scene.control.Alert(javafx.scene.control.Alert.AlertType.ERROR);
+        a.setTitle(title);
+        a.setHeaderText(null); // keep consistent
+        a.setContentText(message + (ex != null ? "\n" + ex.getMessage() : ""));
+        a.showAndWait();
     }
 
     private void showPrescriptionsPane() {
@@ -3451,5 +3584,7 @@ public class PharmacyController {
             showError("Logout", e);
         }
     }
+
+
 
 }

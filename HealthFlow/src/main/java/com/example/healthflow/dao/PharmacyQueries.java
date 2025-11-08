@@ -240,4 +240,33 @@ public class PharmacyQueries {
             ps.executeUpdate();
         }
     }
+
+    /** FIFO resolver: pick earliest non-expired batch that has enough balance. */
+    public Long fifoBatchId(Connection c, long medicineId, int needUnits) throws SQLException {
+        String sql = """
+        WITH bal AS (
+          SELECT b.id AS batch_id,
+                 b.expiry_date,
+                 COALESCE(SUM(t.qty_change),0) AS balance
+          FROM medicine_batches b
+          LEFT JOIN inventory_transactions t ON t.batch_id = b.id
+          WHERE b.medicine_id = ?
+                AND (b.expiry_date IS NULL OR b.expiry_date >= CURRENT_DATE)
+          GROUP BY b.id, b.expiry_date
+        )
+        SELECT batch_id
+        FROM bal
+        WHERE balance >= ?
+        ORDER BY expiry_date NULLS LAST, batch_id
+        LIMIT 1
+        """;
+        try (PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setLong(1, medicineId);
+            ps.setInt(2, needUnits);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) return rs.getLong(1);
+            }
+        }
+        return null; // مهم: لا ترجع 0
+    }
 }

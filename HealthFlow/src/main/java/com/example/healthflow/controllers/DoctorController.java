@@ -222,7 +222,7 @@ public class DoctorController {
     private TableColumn<PrescItemRow, String> colPresesStatus;
 
     // In-memory draft prescription items (source list for the table)
-    private final ObservableList<PrescItemRow> prescItemsEditable = FXCollections.observableArrayList();
+    private ObservableList<PrescItemRow> prescItemsEditable = FXCollections.observableArrayList();
 
     // Medicine autocomplete suggestions
 
@@ -2651,26 +2651,76 @@ private void wirePrescriptionItemsTable() {
         return r;
     }
 
-    private void reloadPrescriptionItemsFromDb() {
-        if (currentPrescriptionId == null || currentPrescriptionId <= 0) return;
+private void reloadPrescriptionItemsFromDb() {
+    if (currentPrescriptionId == null || currentPrescriptionId <= 0) return;
+
+    // Capture current selection to restore it later
+    final Long selId = (TablePrescriptionItems != null && TablePrescriptionItems.getSelectionModel().getSelectedItem() != null)
+            ? TablePrescriptionItems.getSelectionModel().getSelectedItem().getId()
+            : null;
+    final int selIndex = (TablePrescriptionItems != null)
+            ? TablePrescriptionItems.getSelectionModel().getSelectedIndex()
+            : -1;
+
+    // Load on background thread to keep UI responsive
+    new Thread(() -> {
         try (java.sql.Connection conn = Database.get()) {
-            // Backfill suggestions so Pack values are available even when opening from Prescription button
+            conn.setAutoCommit(true);
             try {
-                conn.setAutoCommit(true);
+                // Ensure packaging suggestions are populated
                 new com.example.healthflow.dao.PrescriptionItemDAO().backfillSuggestions(conn, currentPrescriptionId);
-            } catch (Throwable ignore) { /* non-fatal; continue loading */ }
+            } catch (Throwable ignore) { /* non-fatal */ }
+
             java.util.List<com.example.healthflow.model.PrescriptionItem> fresh =
                     new com.example.healthflow.dao.PrescriptionItemDAO().listByPrescription(conn, currentPrescriptionId);
-            javafx.collections.ObservableList<PrescItemRow> rows = javafx.collections.FXCollections.observableArrayList();
+
+            // Map to UI rows
+            java.util.List<PrescItemRow> mapped = new java.util.ArrayList<>();
             for (var it : fresh) {
-                PrescItemRow r = toRow(it);    // تحويل موحّد
-                rows.add(r);
+                mapped.add(toRow(it));
             }
-            if (TablePrescriptionItems != null) TablePrescriptionItems.setItems(rows);
+
+            javafx.application.Platform.runLater(() -> {
+                // Ensure backing list exists
+                if (prescItemsEditable == null) {
+                    prescItemsEditable = javafx.collections.FXCollections.observableArrayList();
+                }
+
+                // In-place update to preserve bindings/listeners
+                prescItemsEditable.setAll(mapped);
+
+                // Keep the table bound to the canonical backing list
+                if (TablePrescriptionItems != null && TablePrescriptionItems.getItems() != prescItemsEditable) {
+                    TablePrescriptionItems.setItems(prescItemsEditable);
+                }
+
+                if (TablePrescriptionItems != null) {
+                    // Try restore selection by id first, then by previous index
+                    boolean restored = false;
+                    if (selId != null) {
+                        for (int i = 0; i < prescItemsEditable.size(); i++) {
+                            if (prescItemsEditable.get(i) != null && prescItemsEditable.get(i).getId() == selId) {
+                                TablePrescriptionItems.getSelectionModel().select(i);
+                                TablePrescriptionItems.scrollTo(i);
+                                restored = true;
+                                break;
+                            }
+                        }
+                    }
+                    if (!restored && selIndex >= 0 && selIndex < prescItemsEditable.size()) {
+                        TablePrescriptionItems.getSelectionModel().select(selIndex);
+                        TablePrescriptionItems.scrollTo(selIndex);
+                    }
+
+                    TablePrescriptionItems.refresh();
+                }
+            });
         } catch (Exception ex) {
-            toast("Failed to reload items: " + ex.getMessage(), "warn");
+            javafx.application.Platform.runLater(() -> toast("Failed to reload items: " + ex.getMessage(), "warn"));
         }
-    }
+    }, "reload-presc-items").start();
+}
+
 
     private Long ensurePatientFromHeaderIfPossible(Connection c) {
         try {
@@ -2842,30 +2892,100 @@ private void wirePrescriptionItemsTable() {
      */
     @FXML
     private void sendToPharmacy() {
-        try {
-            Long prescId = ensureDraftPrescription(); // make sure DB row exists and currentPrescriptionId set
-            String diagnosisText = (DiagnosisTF != null && DiagnosisTF.getText() != null)
-                    ? DiagnosisTF.getText().trim() : null;
+//        try {
+//            Long prescId = ensureDraftPrescription(); // make sure DB row exists and currentPrescriptionId set
+//            String diagnosisText = (DiagnosisTF != null && DiagnosisTF.getText() != null)
+//                    ? DiagnosisTF.getText().trim() : null;
+//
+//            try (java.sql.Connection c = Database.get()) {
+//                c.setAutoCommit(true);
+//                try (java.sql.PreparedStatement ps = c.prepareStatement(
+//                        "UPDATE prescriptions " +
+//                                "SET diagnosis = ?, status = 'PENDING' " +
+//                                "WHERE id = ?")) {
+//                    if (diagnosisText == null || diagnosisText.isBlank()) {
+//                        ps.setNull(1, java.sql.Types.VARCHAR);
+//                    } else {
+//                        ps.setString(1, diagnosisText);
+//                    }
+//                    ps.setLong(2, prescId);
+//                    ps.executeUpdate();
+//                }
+//            }
+//
+//            toast("Prescription #" + prescId + " sent to Pharmacy (status: PENDING).", "ok");
+//            // اختياري: أعد تحميل عناصر الوصفة بعد الإرسال
+//            try { loadPrescriptionItemsFromDb(prescId); } catch (Throwable ignore) {}
+//        } catch (Exception ex) {
+//            showError("Send to Pharmacy", ex);
+//        }
 
-            try (java.sql.Connection c = Database.get()) {
-                c.setAutoCommit(true);
-                try (java.sql.PreparedStatement ps = c.prepareStatement(
-                        "UPDATE prescriptions " +
-                                "SET diagnosis = ?, status = 'PENDING' " +
-                                "WHERE id = ?")) {
-                    if (diagnosisText == null || diagnosisText.isBlank()) {
-                        ps.setNull(1, java.sql.Types.VARCHAR);
-                    } else {
-                        ps.setString(1, diagnosisText);
-                    }
-                    ps.setLong(2, prescId);
-                    ps.executeUpdate();
+        try {
+            var u = com.example.healthflow.service.AuthService.Session.get();
+            if (u == null) { showWarn("Prescription", "No logged-in user."); return; }
+
+            // 1) استخرج doctor_id
+            Long doctorId;
+            try (java.sql.Connection c0 = com.example.healthflow.db.Database.get()) {
+                doctorId = doctorDAO.findDoctorIdByUserId(c0, u.getId());
+                if (doctorId == null) {
+                    doctorDAO.ensureProfileForUser(c0, u.getId());
+                    doctorId = doctorDAO.findDoctorIdByUserId(c0, u.getId());
                 }
             }
+            if (doctorId == null) { showWarn("Prescription", "Doctor profile missing."); return; }
 
-            toast("Prescription #" + prescId + " sent to Pharmacy (status: PENDING).", "ok");
-            // اختياري: أعد تحميل عناصر الوصفة بعد الإرسال
-            try { loadPrescriptionItemsFromDb(prescId); } catch (Throwable ignore) {}
+            // 2) استنتج سياق المريض
+            Long patientUserId = this.selectedPatientUserId;
+            if (patientUserId == null && selectedPatientNationalId != null && !selectedPatientNationalId.isBlank()) {
+                try (java.sql.Connection c1 = com.example.healthflow.db.Database.get()) {
+                    patientUserId = doctorDAO.findPatientUserIdByNationalId(c1, selectedPatientNationalId);
+                }
+            }
+            if (patientUserId == null) { showWarn("Prescription", "Select a patient first."); return; }
+
+            Long patientId;
+            try (java.sql.Connection c2 = com.example.healthflow.db.Database.get()) {
+                patientId = doctorDAO.findPatientIdByUserId(c2, patientUserId);
+            }
+            if (patientId == null) { showWarn("Prescription", "Patient profile not found."); return; }
+
+            // 3) لو في Appointment محدد حاليًا اربطه، وإلا خليه NULL
+            Long appointmentId = null;
+            if (AppointmentsTable != null) {
+                var sel = AppointmentsTable.getSelectionModel().getSelectedItem();
+                if (sel != null) appointmentId = sel.getId();
+            }
+
+            // 4) تأكد من وجود Prescription (DRAFT) ولا تشترط COMPLETED
+            Long prescId = ensureDraftPrescriptionFor(appointmentId, doctorId, patientId);
+            if (prescId == null) { showWarn("Prescription", "Could not create/find draft."); return; }
+
+            // 5) تحقّق أن فيها عناصر
+            int itemCount = 0;
+            try {
+                if (TablePrescriptionItems != null && TablePrescriptionItems.getItems() != null) {
+                    itemCount = TablePrescriptionItems.getItems().size();
+                } else if (prescItemsEditable != null) {
+                    itemCount = prescItemsEditable.size();
+                }
+            } catch (Throwable ignore) {}
+            if (itemCount <= 0) { showWarn("Prescription", "Add at least one item before sending."); return; }
+
+            // 6) غيّر الحالة إلى SUBMITTED (أو SENT) فورًا
+            try (java.sql.Connection c = com.example.healthflow.db.Database.get();
+                 java.sql.PreparedStatement ps = c.prepareStatement(
+                         "UPDATE prescriptions SET status = 'SUBMITTED', updated_at = NOW() WHERE id = ?")) {
+                ps.setLong(1, prescId);
+                ps.executeUpdate();
+            }
+
+            toast("Prescription sent to Pharmacy.", "ok");
+
+            // مزامنة محلية بسيطة
+            try { if (currentPrescriptionId == null) currentPrescriptionId = prescId; } catch (Throwable ignore) {}
+            try { reloadPrescriptionItemsFromDb(); } catch (Throwable ignore) {}
+
         } catch (Exception ex) {
             showError("Send to Pharmacy", ex);
         }
