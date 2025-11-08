@@ -2259,7 +2259,7 @@ private void wirePrescriptionItemsTable() {
     if (TablePrescriptionItems == null) return;
 
     TablePrescriptionItems.setItems(prescItemsEditable);
-    TablePrescriptionItems.setColumnResizePolicy(TableView.UNCONSTRAINED_RESIZE_POLICY);
+    //TablePrescriptionItems.setColumnResizePolicy(TableView.UNCONSTRAINED_RESIZE_POLICY);
 
     final double actionBase = (colPresesAction == null) ? 0 : Math.max(180, colPresesAction.getPrefWidth());
     final double actionMax  = 240; // cap expansion so we don't kill H-scroll

@@ -118,7 +118,7 @@ public class ReceptionController {
 
 
     @FXML private TextField search;
-
+    @FXML private Button clearSelectionPatient;
     @FXML private TableView<PatientRow> patientTable;
     @FXML private TableColumn<PatientRow, String> colNationalId;
     @FXML private TableColumn<PatientRow, String> colName;
@@ -160,6 +160,7 @@ public class ReceptionController {
     @FXML private Button clearSelectionDach;
     @FXML private TextField searchAppointmentDach;
     @FXML private TextField searchDoctor;
+    @FXML private Button clearSelectionDoctor;
     @FXML private Button insertAppointments;
     @FXML private Label TotalPatients;
     @FXML private Button BookAppointmentFromPateint;
@@ -3388,6 +3389,36 @@ public class ReceptionController {
             if (TableAppInDashboard != null) TableAppInDashboard.getSelectionModel().clearSelection();
             if (searchAppointmentDach != null) searchAppointmentDach.clear();
         });
+        if (clearSelectionDoctor != null) {
+            clearSelectionDoctor.setOnAction(e -> {
+                // إزالة التحديد من جدول الأطباء
+                if (DocTable_Recption != null)
+                    DocTable_Recption.getSelectionModel().clearSelection();
+
+                // مسح النص داخل مربع البحث
+                if (searchDoctor != null)
+                    searchDoctor.clear();
+
+                // إعادة التركيز لحقل البحث بعد المسح (اختياري)
+                if (searchDoctor != null)
+                    searchDoctor.requestFocus();
+            });
+        }
+        if (clearSelectionPatient != null) {
+            clearSelectionPatient.setOnAction(e -> {
+                // إزالة أي تحديد داخل جدول المرضى
+                if (patientTable != null)
+                    patientTable.getSelectionModel().clearSelection();
+
+                // مسح النص من مربع البحث
+                if (search != null)
+                    search.clear();
+
+                // إعادة التركيز لحقل البحث بعد المسح (اختياري)
+                if (search != null)
+                    search.requestFocus();
+            });
+        }
 
         // CRUD buttons
         if (insertAppointments != null) insertAppointments.setOnAction(e -> doInsertAppointment());

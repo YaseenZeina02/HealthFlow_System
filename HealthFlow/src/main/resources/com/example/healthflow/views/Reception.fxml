@@ -22,7 +22,7 @@
 <?import javafx.scene.text.Font?>
 <?import org.kordamp.ikonli.javafx.FontIcon?>
 
-<StackPane fx:id="rootPane" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="600.0" prefWidth="1100.0" stylesheets="@../Design/ReceptionDesign.css" xmlns="http://javafx.com/javafx/19" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.example.healthflow.controllers.ReceptionController">
+<StackPane fx:id="rootPane" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="600.0" prefWidth="1100.0" stylesheets="@../Design/ReceptionDesign.css" xmlns="http://javafx.com/javafx/23.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.example.healthflow.controllers.ReceptionController">
 
     <children>
         <AnchorPane prefHeight="200.0" prefWidth="200.0">
@@ -98,7 +98,7 @@
                                 <Line endX="86.99998474121094" endY="-1.52587890625E-5" layoutX="107.0" layoutY="189.0" startX="-90.19999694824219" startY="-1.52587890625E-5" />
                                 <Label layoutX="15.0" layoutY="206.0" text="Feature" textFill="WHITE" />
 
-                                <Button fx:id="DachboardButton" layoutX="6.0" layoutY="226.0" mnemonicParsing="false" prefHeight="40.0" prefWidth="200.0" styleClass="btn-1" stylesheets="@../Design/ReceptionDesign.css" text="Dashboard">
+                                <Button fx:id="DachboardButton" layoutX="5.0" layoutY="226.0" mnemonicParsing="false" prefHeight="40.0" prefWidth="200.0" styleClass="btn-1" stylesheets="@../Design/ReceptionDesign.css" text="Dashboard">
 
                                     <graphic>
                                         <FontIcon iconColor="#66ccff" iconLiteral="fas-tachometer-alt" iconSize="18" />
@@ -148,7 +148,7 @@
                             <children>
 
                                 <!-- ===== Dashboard ===== -->
-                                <AnchorPane fx:id="DashboardAnchorPane" prefHeight="558.4" prefWidth="889.6" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+                                <AnchorPane fx:id="DashboardAnchorPane" prefHeight="558.4" prefWidth="889.6" visible="false" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
                                     <children>
 
                                         <AnchorPane layoutY="184.8" prefHeight="360.0" prefWidth="600.0" stylesheets="@../Design/ReceptionDesign.css" AnchorPane.bottomAnchor="14.0" AnchorPane.leftAnchor="11.0" AnchorPane.rightAnchor="273.0" AnchorPane.topAnchor="185.0">
@@ -174,7 +174,7 @@
                                                     </columnResizePolicy>
                                                 </TableView>
                                                 <TextField fx:id="searchAppointmentDach" layoutX="394.0" layoutY="6.0" prefHeight="0.0" prefWidth="130.0" promptText="search" styleClass="box" AnchorPane.rightAnchor="81.19999999999993" AnchorPane.topAnchor="6.0" />
-                                                <Button fx:id="clearSelectionDach" layoutX="532.0" layoutY="10.0" mnemonicParsing="false" prefHeight="20.0" prefWidth="60.0" styleClass="btn-2" text="Clear" AnchorPane.rightAnchor="13.599999999999909" AnchorPane.topAnchor="10.0">
+                                                <Button fx:id="clearSelectionDach" layoutX="532.0" layoutY="10.0" mnemonicParsing="false" prefHeight="30.0" prefWidth="60.0" styleClass="btn-2" text="Clear" AnchorPane.rightAnchor="13.599999999999909" AnchorPane.topAnchor="10.0">
                                        <stylesheets>
                                           <URL value="@../Design/ButtonsStyles.css" />
                                           <URL value="@../Design/ReceptionDesign.css" />
@@ -336,7 +336,7 @@
                                 </AnchorPane>
 
                                 <!-- ===== Doctors Table ===== -->
-                                <AnchorPane fx:id="DoctorAnchorPane" layoutX="345.0" prefHeight="563.0" prefWidth="892.0" stylesheets="@../Design/ReceptionDesign.css" visible="false" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+                                <AnchorPane fx:id="DoctorAnchorPane" layoutX="345.0" prefHeight="563.0" prefWidth="892.0" stylesheets="@../Design/ReceptionDesign.css" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
                                     <children>
                                         <Label layoutX="19.0" layoutY="27.0" prefHeight="20.0" prefWidth="120.0" styleClass="header-top" stylesheets="@../Design/ReceptionDesign.css" text="Doctors Details">
                                             <font>
@@ -357,7 +357,13 @@
                                                 <TableView fx:constant="CONSTRAINED_RESIZE_POLICY" />
                                             </columnResizePolicy>
                                         </TableView>
-                                        <TextField fx:id="searchDoctor" layoutX="670.0" layoutY="20.0" prefHeight="30.0" prefWidth="200.0" promptText="searchDoctor" styleClass="box" AnchorPane.rightAnchor="19.600000000000023" />
+                                        <TextField fx:id="searchDoctor" layoutX="597.0" layoutY="21.0" prefHeight="30.0" prefWidth="200.0" promptText="searchDoctor" styleClass="box" AnchorPane.rightAnchor="92.60000000000002" />
+                              <Button fx:id="clearSelectionDoctor" layoutX="810.0" layoutY="23.0" mnemonicParsing="false" prefHeight="30.0" prefWidth="60.0" styleClass="btn-2" text="Clear" AnchorPane.rightAnchor="19.600000000000023">
+                                 <stylesheets>
+                                    <URL value="@../Design/ButtonsStyles.css" />
+                                    <URL value="@../Design/ReceptionDesign.css" />
+                                 </stylesheets>
+                              </Button>
                                     </children>
                                     <styleClass>
                                         <String fx:value="radius" />
@@ -389,7 +395,13 @@
                                                         <TableView fx:constant="CONSTRAINED_RESIZE_POLICY" />
                                                     </columnResizePolicy>
                                                 </TableView>
-                                                <TextField fx:id="search" layoutX="655.0" layoutY="13.0" prefHeight="30.0" prefWidth="200.0" promptText="search" styleClass="box" AnchorPane.rightAnchor="11.399999999999977" AnchorPane.topAnchor="13.0" />
+                                                <TextField fx:id="search" layoutX="575.0" layoutY="13.0" prefHeight="30.0" prefWidth="200.0" promptText="search" styleClass="box" AnchorPane.rightAnchor="91.39999999999998" AnchorPane.topAnchor="13.0" />
+                                    <Button fx:id="clearSelectionDach11" layoutX="786.0" layoutY="15.0" mnemonicParsing="false" prefHeight="30.0" prefWidth="60.0" styleClass="btn-2" text="Clear" AnchorPane.rightAnchor="20.399999999999977">
+                                       <stylesheets>
+                                          <URL value="@../Design/ButtonsStyles.css" />
+                                          <URL value="@../Design/ReceptionDesign.css" />
+                                       </stylesheets>
+                                    </Button>
                                             </children>
                                             <styleClass>
                                                 <String fx:value="radius" />
@@ -406,22 +418,22 @@
                                                     </font>
                                                 </Label>
 
-                                                <Button fx:id="InsertButton" layoutX="121.0" layoutY="256.0" mnemonicParsing="false" prefHeight="30.0" prefWidth="100.0" styleClass="btn-2" text="Insert">
+                                                <Button fx:id="InsertButton" layoutX="94.0" layoutY="253.0" mnemonicParsing="false" prefHeight="30.0" prefWidth="100.0" styleClass="btn-2" text="Insert">
                                        <stylesheets>
                                           <URL value="@../Design/ButtonsStyles.css" />
                                           <URL value="@../Design/ReceptionDesign.css" />
                                        </stylesheets></Button>
-                                                <Button fx:id="UpdateButton" layoutX="336.0" layoutY="256.0" mnemonicParsing="false" prefHeight="30.0" prefWidth="100.0" styleClass="btn-2" text="Update">
+                                                <Button fx:id="UpdateButton" layoutX="309.0" layoutY="253.0" mnemonicParsing="false" prefHeight="30.0" prefWidth="100.0" styleClass="btn-2" text="Update">
                                        <stylesheets>
                                           <URL value="@../Design/ButtonsStyles.css" />
                                           <URL value="@../Design/ReceptionDesign.css" />
                                        </stylesheets></Button>
-                                                <Button fx:id="clearBtn" layoutX="229.0" layoutY="256.0" mnemonicParsing="false" prefHeight="30.0" prefWidth="100.0" styleClass="btn-2" text="Clear">
+                                                <Button fx:id="clearBtn" layoutX="202.0" layoutY="253.0" mnemonicParsing="false" prefHeight="30.0" prefWidth="100.0" styleClass="btn-2" text="Clear">
                                        <stylesheets>
                                           <URL value="@../Design/ButtonsStyles.css" />
                                           <URL value="@../Design/ReceptionDesign.css" />
                                        </stylesheets></Button>
-                                                <Button fx:id="deleteButton" layoutX="440.0" layoutY="256.0" mnemonicParsing="false" prefHeight="30.0" prefWidth="100.0" styleClass="btn-2" text="Delete">
+                                                <Button fx:id="deleteButton" layoutX="413.0" layoutY="253.0" mnemonicParsing="false" prefHeight="30.0" prefWidth="100.0" styleClass="btn-2" text="Delete">
                                        <stylesheets>
                                           <URL value="@../Design/ButtonsStyles.css" />
                                           <URL value="@../Design/ReceptionDesign.css" />
@@ -473,12 +485,7 @@
                                                     </font>
                                                 </Label>
                                                 <TextField fx:id="PhoneTextField" layoutX="520.0" layoutY="121.0" prefHeight="30.0" prefWidth="180.0" styleClass="box" />
-                                                <Button fx:id="BookAppointmentFromPateint" layoutX="547.0" layoutY="256.0" mnemonicParsing="false" prefHeight="30.0" prefWidth="180.0" styleClass="btn-2" text="Book an appointment" AnchorPane.bottomAnchor="20.0">
-                                       <stylesheets>
-                                          <URL value="@../Design/ButtonsStyles.css" />
-                                          <URL value="@../Design/ReceptionDesign.css" />
-                                       </stylesheets></Button>
-                                    <Button fx:id="InsertButton1" layoutX="14.0" layoutY="256.0" mnemonicParsing="false" prefHeight="30.0" prefWidth="100.0" styleClass="btn-2" text="search">
+                                                <Button fx:id="BookAppointmentFromPateint" layoutX="520.0" layoutY="253.0" mnemonicParsing="false" prefHeight="30.0" prefWidth="180.0" styleClass="btn-2" text="Book an appointment" AnchorPane.bottomAnchor="23.0">
                                        <stylesheets>
                                           <URL value="@../Design/ButtonsStyles.css" />
                                           <URL value="@../Design/ReceptionDesign.css" />
@@ -494,7 +501,7 @@
                                 </AnchorPane>
 
                                 <!-- ===== Appointments Pane ===== -->
-                                <AnchorPane fx:id="AppointmentsAnchorPane" layoutY="1.0" prefHeight="558.0" prefWidth="890.0" style="-fx-background-color: #ededed;" stylesheets="@../Design/ReceptionDesign.css" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="1.0">
+                                <AnchorPane fx:id="AppointmentsAnchorPane" layoutY="1.0" prefHeight="558.0" prefWidth="890.0" style="-fx-background-color: #ededed;" stylesheets="@../Design/ReceptionDesign.css" visible="false" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="1.0">
                                     <children>
                                         <AnchorPane layoutX="16.0" layoutY="14.0" prefHeight="110.0" prefWidth="850.0" style="-fx-background-color: #ffffff; -fx-background-radius: 5;" styleClass="shadow" AnchorPane.leftAnchor="19.0" AnchorPane.rightAnchor="21.0">
                                             <children>
