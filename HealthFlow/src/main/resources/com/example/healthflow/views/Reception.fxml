@@ -373,7 +373,7 @@
                                 </AnchorPane>
 
                                 <!-- ===== Patients Pane ===== -->
-                                <AnchorPane fx:id="PatientAnchorPane" prefHeight="558.4" prefWidth="889.6" visible="false" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+                                <AnchorPane fx:id="PatientAnchorPane" prefHeight="558.4" prefWidth="889.6" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
                                     <children>
                                         <AnchorPane layoutX="11.0" layoutY="14.0" prefHeight="200.0" prefWidth="867.0" stylesheets="@../Design/ReceptionDesign.css" AnchorPane.bottomAnchor="343.0" AnchorPane.leftAnchor="11.0" AnchorPane.rightAnchor="12.0" AnchorPane.topAnchor="14.0">
                                             <children>
@@ -541,22 +541,17 @@
                                           <TableView fx:constant="CONSTRAINED_RESIZE_POLICY" />
                                        </columnResizePolicy>
                                                 </TableView>
-                                                <Button fx:id="addNewRow" layoutX="806.0" layoutY="13.0" mnemonicParsing="false" prefHeight="7.0" prefWidth="16.0" styleClass="btn-2" text="+" AnchorPane.rightAnchor="19.33333333333337">
+                                                <Button fx:id="insertAppointments" layoutX="498.0" layoutY="370.0" mnemonicParsing="false" prefHeight="30.0" prefWidth="100.0" styleClass="btn-2" text="Insert" AnchorPane.bottomAnchor="10.800000000000068" AnchorPane.rightAnchor="253.20000000000005">
                                        <stylesheets>
                                           <URL value="@../Design/ButtonsStyles.css" />
                                           <URL value="@../Design/ReceptionDesign.css" />
                                        </stylesheets></Button>
-                                                <Button fx:id="insertAppointments" layoutX="390.0" layoutY="363.0" mnemonicParsing="false" prefHeight="30.0" prefWidth="100.0" styleClass="btn-2" text="Insert" AnchorPane.bottomAnchor="10.0" AnchorPane.rightAnchor="362.0">
+                                                <Button fx:id="updateAppointments" layoutX="614.0" layoutY="370.0" mnemonicParsing="false" prefHeight="30.0" prefWidth="100.0" styleClass="btn-2" text="Update" AnchorPane.bottomAnchor="10.800000000000068" AnchorPane.rightAnchor="137.20000000000005">
                                        <stylesheets>
                                           <URL value="@../Design/ButtonsStyles.css" />
                                           <URL value="@../Design/ReceptionDesign.css" />
                                        </stylesheets></Button>
-                                                <Button fx:id="updateAppointments" layoutX="506.0" layoutY="363.0" mnemonicParsing="false" prefHeight="30.0" prefWidth="100.0" styleClass="btn-2" text="Update" AnchorPane.bottomAnchor="10.0" AnchorPane.rightAnchor="246.0">
-                                       <stylesheets>
-                                          <URL value="@../Design/ButtonsStyles.css" />
-                                          <URL value="@../Design/ReceptionDesign.css" />
-                                       </stylesheets></Button>
-                                                <Button fx:id="clear_Appointments" layoutX="618.0" layoutY="363.0" mnemonicParsing="false" prefHeight="30.0" prefWidth="100.0" styleClass="btn-2" text="Clear" AnchorPane.bottomAnchor="10.0" AnchorPane.rightAnchor="134.0">
+                                                <Button fx:id="clear_Appointments" layoutX="737.0" layoutY="12.0" mnemonicParsing="false" prefHeight="30.0" prefWidth="60.0" styleClass="btn-2" text="Clear" AnchorPane.rightAnchor="14.200000000000045">
                                        <stylesheets>
                                           <URL value="@../Design/ButtonsStyles.css" />
                                           <URL value="@../Design/ReceptionDesign.css" />
@@ -566,17 +561,12 @@
                                           <URL value="@../Design/ButtonsStyles.css" />
                                           <URL value="@../Design/ReceptionDesign.css" />
                                        </stylesheets></Button>
-                                                <Button fx:id="deleteRowApptTable" layoutX="772.0" layoutY="14.0" mnemonicParsing="false" prefHeight="15.0" prefWidth="29.0" styleClass="btn-2" text="-" AnchorPane.rightAnchor="51.0">
-                                       <stylesheets>
-                                          <URL value="@../Design/ButtonsStyles.css" />
-                                          <URL value="@../Design/ReceptionDesign.css" />
-                                       </stylesheets></Button>
-                                                <DatePicker fx:id="dataPickerAppointment" cache="true" layoutX="627.0" layoutY="12.0" minHeight="-Infinity" prefHeight="30.0" prefWidth="130.0" AnchorPane.rightAnchor="95.0">
+                                                <DatePicker fx:id="dataPickerAppointment" cache="true" layoutX="498.0" layoutY="12.0" minHeight="-Infinity" prefHeight="30.0" prefWidth="130.0" AnchorPane.rightAnchor="222.80000000000007">
                                        <styleClass>
                                           <String fx:value="boxDataPickar" />
                                           <String fx:value="box" />
                                        </styleClass></DatePicker>
-                                    <ComboBox fx:id="statusFilter" layoutX="491.0" layoutY="11.0" prefHeight="30.0" prefWidth="130.0" promptText="filter" stylesheets="@../Design/combobox.css" AnchorPane.rightAnchor="229.80000000000007" />
+                                    <ComboBox fx:id="statusFilter" layoutX="638.0" layoutY="12.0" prefHeight="30.0" prefWidth="130.0" promptText="filter" stylesheets="@../Design/combobox.css" AnchorPane.rightAnchor="82.80000000000007" />
                                             </children>
                                             <styleClass>
                                                 <String fx:value="white-bg" />
