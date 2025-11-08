@@ -21,7 +21,7 @@
 <?import org.controlsfx.control.SegmentedButton?>
 <?import org.kordamp.ikonli.javafx.FontIcon?>
 
-<VBox fx:id="rootPane" fillWidth="true" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" spacing="0" xmlns="http://javafx.com/javafx/19" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.example.healthflow.controllers.PharmacyController">
+<VBox fx:id="rootPane" fillWidth="true" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" spacing="0" xmlns="http://javafx.com/javafx/23.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.example.healthflow.controllers.PharmacyController">
    <children>
       <BorderPane prefHeight="600.0" prefWidth="1100.0" stylesheets="@../Design/ReceptionDesign.css" VBox.vgrow="ALWAYS">
          <top>
@@ -29,16 +29,11 @@
                <children>
                   <AnchorPane prefHeight="40.0" prefWidth="210.0" stylesheets="@../Design/ReceptionDesign.css">
                      <children>
-                        <Label layoutX="66.0" layoutY="9.0" prefHeight="23.0" prefWidth="130.0" text="HealthFlow System" textFill="WHITE">
+                        <Label layoutX="40.0" layoutY="8.0" prefHeight="23.0" prefWidth="130.0" text="HealthFlow System" textFill="WHITE">
                            <font>
                               <Font size="15.0" />
                            </font>
                         </Label>
-                        <Button fx:id="BackButton" layoutX="4.0" layoutY="8.0" minWidth="38.0" mnemonicParsing="false" prefHeight="22.0" prefWidth="36.0" styleClass="btn-1" stylesheets="@../Design/ReceptionDesign.css">
-                           <graphic>
-                              <FontIcon fx:id="back" iconColor="TURQUOISE" iconLiteral="fas-arrow-left" iconSize="18" />
-                           </graphic>
-                        </Button>
                      </children>
                      <styleClass>
                         <String fx:value="bg-color-1" />
@@ -214,7 +209,7 @@
                                     <Font size="14.0" />
                                  </font>
                               </Label>
-                              <TextField fx:id="searchDashbord" layoutX="653.0" layoutY="12.0" prefHeight="30.0" prefWidth="130.0" promptText="search" AnchorPane.rightAnchor="82.20000000000005">
+                              <TextField fx:id="searchDashbord" layoutX="650.0" layoutY="12.0" prefHeight="30.0" prefWidth="130.0" promptText="search" AnchorPane.rightAnchor="85.20000000000005">
                                  <styleClass>
                                     <String fx:value="combo-box" />
                                     <String fx:value="box" />
@@ -233,8 +228,8 @@
                                     <TableView fx:constant="CONSTRAINED_RESIZE_POLICY" />
                                  </columnResizePolicy>
                               </TableView>
-                              <DatePicker fx:id="PrescriptionDatePicker" layoutX="508.0" layoutY="12.0" prefHeight="30.0" prefWidth="130.0" styleClass="boxDataPickar" stylesheets="@../Design/ReceptionDesign.css" AnchorPane.rightAnchor="227.20000000000005" />
-                              <Button fx:id="clearSelectionDach" layoutX="793.0" layoutY="13.0" mnemonicParsing="false" prefHeight="29.0" prefWidth="60.0" styleClass="btn-2" stylesheets="@../Design/ReceptionDesign.css" text="Clear" AnchorPane.rightAnchor="13.799999999999955" />
+                              <DatePicker fx:id="PrescriptionDatePicker" layoutX="509.0" layoutY="12.0" prefHeight="30.0" prefWidth="130.0" styleClass="boxDataPickar" stylesheets="@../Design/ReceptionDesign.css" AnchorPane.rightAnchor="226.20000000000005" />
+                              <Button fx:id="clearSelectionDach" layoutX="792.0" layoutY="14.0" mnemonicParsing="false" prefHeight="30.0" prefWidth="60.0" styleClass="btn-2" stylesheets="@../Design/ReceptionDesign.css" text="Clear" AnchorPane.rightAnchor="13.600000000000023" />
                            </children>
                         </AnchorPane>
                      </children>
