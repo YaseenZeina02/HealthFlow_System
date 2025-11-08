@@ -373,7 +373,7 @@
                                 </AnchorPane>
 
                                 <!-- ===== Patients Pane ===== -->
-                                <AnchorPane fx:id="PatientAnchorPane" prefHeight="558.4" prefWidth="889.6" visible="false" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+                                <AnchorPane fx:id="PatientAnchorPane" prefHeight="558.4" prefWidth="889.6" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
                                     <children>
                                         <AnchorPane layoutX="11.0" layoutY="14.0" prefHeight="200.0" prefWidth="867.0" stylesheets="@../Design/ReceptionDesign.css" AnchorPane.bottomAnchor="343.0" AnchorPane.leftAnchor="11.0" AnchorPane.rightAnchor="12.0" AnchorPane.topAnchor="14.0">
                                             <children>
@@ -501,7 +501,7 @@
                                 </AnchorPane>
 
                                 <!-- ===== Appointments Pane ===== -->
-                                <AnchorPane fx:id="AppointmentsAnchorPane" layoutY="1.0" prefHeight="558.0" prefWidth="890.0" style="-fx-background-color: #ededed;" stylesheets="@../Design/ReceptionDesign.css" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="1.0">
+                                <AnchorPane fx:id="AppointmentsAnchorPane" layoutY="1.0" prefHeight="558.0" prefWidth="890.0" style="-fx-background-color: #ededed;" stylesheets="@../Design/ReceptionDesign.css" visible="false" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="1.0">
                                     <children>
                                         <AnchorPane layoutX="16.0" layoutY="14.0" prefHeight="110.0" prefWidth="850.0" style="-fx-background-color: #ffffff; -fx-background-radius: 5;" styleClass="shadow" AnchorPane.leftAnchor="19.0" AnchorPane.rightAnchor="21.0">
                                             <children>
