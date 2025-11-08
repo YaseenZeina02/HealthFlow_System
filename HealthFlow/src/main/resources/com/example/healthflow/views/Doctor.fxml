@@ -28,11 +28,11 @@
             <AnchorPane prefHeight="560.0" prefWidth="210.0" styleClass="bg-color-1" stylesheets="@../Design/ReceptionDesign.css" BorderPane.alignment="CENTER">
                <children>
                   <FontIcon iconColor="WHITE" iconLiteral="fas-user" iconSize="80" layoutX="73.0" layoutY="83.0" />
-                  <Label fx:id="UsernameLabel" layoutX="86.0" layoutY="108.0" prefHeight="18.0" prefWidth="100.0" text="User name" textFill="WHITE">
+                  <Label fx:id="UsernameLabel" layoutX="102.0" layoutY="108.0" prefHeight="20.0" prefWidth="100.0" text="User name" textFill="WHITE">
                      <font><Font name="System Bold" size="13.0" /></font>
                   </Label>
-                  <Label layoutX="25.0" layoutY="134.0" prefHeight="18.0" prefWidth="56.0" text="UserID:" textFill="WHITE" />
-                  <Label fx:id="UserIdLabel" layoutX="88.0" layoutY="134.0" prefHeight="18.0" prefWidth="100.0" text="user id" textFill="WHITE">
+                  <Label layoutX="18.0" layoutY="134.0" prefHeight="20.0" prefWidth="70.0" text="UserID:" textFill="WHITE" />
+                  <Label fx:id="UserIdLabel" layoutX="102.0" layoutY="134.0" prefHeight="20.0" prefWidth="100.0" text="user id" textFill="WHITE">
                      <font><Font name="System Bold" size="13.0" /></font>
                   </Label>
                   <Line endX="87.0" layoutX="107.0" layoutY="189.0" startX="-90.2" />
@@ -51,7 +51,7 @@
                   </Button>
 
                   <FontIcon iconColor="#9dbfc7" iconLiteral="fas-hospital" iconSize="64" layoutX="77.0" layoutY="491.0" text="" AnchorPane.bottomAnchor="59.0" />
-                  <Label layoutX="25.0" layoutY="108.0" prefHeight="18.0" prefWidth="56.0" text="Username:" textFill="WHITE" />
+                  <Label layoutX="18.0" layoutY="108.0" prefHeight="20.0" prefWidth="70.0" text="Username:" textFill="WHITE" />
                   <Button fx:id="PrescriptionButton" layoutX="5.0" layoutY="360.0" mnemonicParsing="false" prefHeight="40.0" prefWidth="200.0" styleClass="btn-1" stylesheets="@../Design/ReceptionDesign.css" text="Prescription" AnchorPane.leftAnchor="5.0">
                      <graphic>
                         <FontIcon iconColor="#66ccff" iconLiteral="fas-user" iconSize="18" text="" />
@@ -80,7 +80,7 @@
                <children>
 
                   <!-- ===== Dashboard (with icons) ===== -->
-                  <AnchorPane fx:id="DashboardAnchorPane" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+                  <AnchorPane fx:id="DashboardAnchorPane" visible="false" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
                      <children>
 
                         <!-- Stat cards -->
@@ -219,9 +219,9 @@
                                     <TableView fx:constant="CONSTRAINED_RESIZE_POLICY" />
                                  </columnResizePolicy>
                               </TableView>
-                              <TextField fx:id="search" layoutX="650.0" layoutY="5.0" prefHeight="30.0" prefWidth="130.0" promptText="search" styleClass="box" AnchorPane.rightAnchor="85.20000000000005" />
-                              <DatePicker fx:id="datePickerPatientsWithDoctorDash" cache="true" layoutX="507.0" layoutY="9.0" minHeight="-Infinity" prefHeight="30.0" prefWidth="130.0" styleClass="boxDataPickar" AnchorPane.rightAnchor="228.20000000000005" />
-                              <Button fx:id="clearSelectionDach" layoutX="790.0" layoutY="9.0" mnemonicParsing="false" prefHeight="20.0" prefWidth="60.0" styleClass="btn-2" stylesheets="@../Design/ReceptionDesign.css" text="Clear" AnchorPane.rightAnchor="15.600000000000023" />
+                              <TextField fx:id="search" layoutX="647.0" layoutY="7.0" prefHeight="30.0" prefWidth="130.0" promptText="search" styleClass="box" AnchorPane.rightAnchor="88.20000000000005" />
+                              <DatePicker fx:id="datePickerPatientsWithDoctorDash" cache="true" layoutX="506.0" layoutY="9.0" minHeight="-Infinity" prefHeight="30.0" prefWidth="130.0" styleClass="boxDataPickar" AnchorPane.rightAnchor="229.20000000000005" />
+                              <Button fx:id="clearSelectionDach" layoutX="790.0" layoutY="9.0" mnemonicParsing="false" prefHeight="30.0" prefWidth="60.0" styleClass="btn-2" stylesheets="@../Design/ReceptionDesign.css" text="Clear" AnchorPane.rightAnchor="15.600000000000023" />
                            </children>
                         </AnchorPane>
                      </children>
@@ -252,7 +252,6 @@
                               <TextField fx:id="searchLabel" layoutX="651.0" layoutY="9.0" prefHeight="30.0" prefWidth="130.0" promptText="search" styleClass="box" AnchorPane.rightAnchor="85.0" />
                               <DatePicker fx:id="datePickerPatientsWithDoctor" cache="true" layoutX="510.0" layoutY="11.0" minHeight="-Infinity" prefHeight="30.0" prefWidth="130.0" styleClass="boxDataPickar" AnchorPane.rightAnchor="226.0" />
                               <Button fx:id="clearSelectionPatient" layoutX="792.0" layoutY="12.0" mnemonicParsing="false" prefHeight="20.0" prefWidth="60.0" styleClass="btn-2" stylesheets="@../Design/ReceptionDesign.css" text="Clear" AnchorPane.rightAnchor="14.399999999999977" />
-                              <Button fx:id="searchDB" layoutX="360.0" layoutY="11.0" mnemonicParsing="false" prefHeight="30.0" prefWidth="120.0" styleClass="btn-2" stylesheets="@../Design/ReceptionDesign.css" text="حذف" AnchorPane.bottomAnchor="491.4" AnchorPane.rightAnchor="386.4" />
                            </children>
                            <styleClass>
                               <String fx:value="radius" />
@@ -262,7 +261,7 @@
                         </AnchorPane>
                      </children>
                   </AnchorPane>
-                  <AnchorPane fx:id="PrescriptionAnchorPane" stylesheets="@../Design/ReceptionDesign.css" visible="false" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+                  <AnchorPane fx:id="PrescriptionAnchorPane" stylesheets="@../Design/ReceptionDesign.css" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
                      <children>
                         <AnchorPane layoutX="10.0" layoutY="14.0" prefHeight="180.0" prefWidth="1080.0" AnchorPane.leftAnchor="9.599999999999909" AnchorPane.rightAnchor="10.0" AnchorPane.topAnchor="14.0">
                            <children>
@@ -437,16 +436,11 @@
                <children>
                   <AnchorPane prefHeight="40.0" prefWidth="210.0" stylesheets="@../Design/ReceptionDesign.css">
                      <children>
-                        <Label layoutX="54.0" layoutY="8.0" prefHeight="23.0" prefWidth="130.0" text="HealthFlow System" textFill="WHITE">
+                        <Label layoutX="40.0" layoutY="8.0" prefHeight="23.0" prefWidth="130.0" text="HealthFlow System" textFill="WHITE">
                            <font>
                               <Font size="15.0" />
                            </font>
                         </Label>
-                        <Button fx:id="BackButton" layoutX="4.0" layoutY="5.0" mnemonicParsing="false" prefHeight="18.0" prefWidth="18.0" styleClass="btn-1" stylesheets="@../Design/ReceptionDesign.css">
-                           <graphic>
-                              <FontIcon iconColor="TURQUOISE" iconLiteral="fas-arrow-left" iconSize="18" text="" />
-                           </graphic>
-                        </Button>
                      </children>
                      <styleClass>
                         <String fx:value="bg-color-1" />
@@ -466,9 +460,9 @@
                         <Font name="System Bold" size="13.0" />
                      </font>
                   </Label>
-                  <Circle fill="DODGERBLUE" layoutX="995.0" layoutY="24.0" radius="15.0" stroke="BLACK" strokeType="INSIDE" strokeWidth="0.0" AnchorPane.rightAnchor="90.0" />
-                  <Label layoutX="1016.0" layoutY="13.0" prefHeight="18.0" prefWidth="51.0" text="Active" AnchorPane.rightAnchor="33.0" />
-                  <Circle fx:id="ActiveStatus" fill="#24c756" layoutX="1082.0" layoutY="20.0" radius="4.0" stroke="BLACK" strokeType="INSIDE" strokeWidth="0.0" AnchorPane.rightAnchor="14.0" />
+                  <Label fx:id="ActiveLabel" layoutX="1014.0" layoutY="11.0" prefHeight="18.0" prefWidth="51.0" text="Active" AnchorPane.rightAnchor="34.799999999999955" />
+                  <Circle fill="DODGERBLUE" layoutX="993.0" layoutY="21.0" radius="15.0" stroke="BLACK" strokeType="INSIDE" strokeWidth="0.0" AnchorPane.rightAnchor="92.0" />
+                  <Circle fx:id="ActiveStatus" fill="#24c756" layoutX="1069.0" layoutY="22.0" radius="4.0" stroke="BLACK" strokeType="INSIDE" strokeWidth="0.0" AnchorPane.rightAnchor="27.0" />
                </children>
                <styleClass>
                   <String fx:value="border-top" />
