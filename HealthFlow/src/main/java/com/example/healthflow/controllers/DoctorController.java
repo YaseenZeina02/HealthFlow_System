@@ -75,8 +75,7 @@ public class DoctorController {
     @FXML
     private Label AppointmentRemainingWithSpecificDoctor;
 
-    @FXML
-    private Button BackButton;
+
     @FXML
     private Button DachboardButton;
     @FXML
@@ -371,9 +370,6 @@ public class DoctorController {
             showPrescriptionPaneToAddMedication();
         });
         cancelAddMedication.setOnAction(e -> showPrescriptionPane());
-
-
-        BackButton.setOnAction(e -> goBackToLogin());
 
 
         if (searchDB != null) {
@@ -720,40 +716,6 @@ public class DoctorController {
     }
     private static void setNullableInt(PreparedStatement ps, int idx, Integer value) throws SQLException {
         if (value == null) ps.setNull(idx, Types.INTEGER); else ps.setInt(idx, value);
-    }
-    private void goBackToLogin() {
-        Stage stage = (Stage) BackButton.getScene().getWindow();
-        try {
-            FXMLLoader loader = new FXMLLoader(getClass().getResource(new Navigation().Login_Fxml));
-            loader.setControllerFactory(type ->
-                    type == LoginController.class ? new LoginController(monitor) : null
-            );
-
-            Parent loginRoot = loader.load();
-
-            ConnectivityBanner banner = new ConnectivityBanner(monitor);
-            AnchorPane.setTopAnchor(banner, 0.0);
-            AnchorPane container = new AnchorPane(loginRoot);
-            container.setPrefSize(900, 600);
-            AnchorPane.setTopAnchor(loginRoot, 0.0);
-            AnchorPane.setRightAnchor(loginRoot, 0.0);
-            AnchorPane.setBottomAnchor(loginRoot, 0.0);
-            AnchorPane.setLeftAnchor(loginRoot, 0.0);
-
-            AnchorPane root = new AnchorPane();
-            AnchorPane.setTopAnchor(container, 0.0);
-            AnchorPane.setRightAnchor(container, 0.0);
-            AnchorPane.setBottomAnchor(container, 0.0);
-            AnchorPane.setLeftAnchor(container, 0.0);
-            root.getChildren().addAll(container, banner);
-
-            stage.setTitle("HealthFlow");
-            stage.setScene(new Scene(root));
-            stage.setResizable(false);
-            stage.show();
-        } catch (IOException e) {
-            showError("Navigation", e);
-        }
     }
 
     /* ================= User & role ================= */
