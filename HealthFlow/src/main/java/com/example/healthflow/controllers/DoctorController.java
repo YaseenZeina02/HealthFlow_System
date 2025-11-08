@@ -298,7 +298,11 @@ public class DoctorController {
     private final ObservableList<AppointmentRow> apptData = FXCollections.observableArrayList();
     private FilteredList<AppointmentRow> apptFiltered = new FilteredList<>(apptData, r -> true);
     private SortedList<AppointmentRow> apptSorted = new SortedList<>(apptFiltered);
-    private org.controlsfx.control.textfield.AutoCompletionBinding<String> apptSearchBinding;
+//    private org.controlsfx.control.textfield.AutoCompletionBinding<String> apptSearchBinding;
+
+    // Lightweight autocomplete (no ControlsFX modules needed) (Dashbord)
+    private final ContextMenu apptAutoMenu = new ContextMenu();
+    private final java.util.ArrayList<String> apptSuggestions = new java.util.ArrayList<>();
 
     private final ObservableList<PatientRow> patientData = FXCollections.observableArrayList();
 
@@ -508,6 +512,11 @@ public class DoctorController {
                     TablePrescriptionItems
             );
         } catch (Throwable ignore) {}
+
+        apptData.addListener((javafx.collections.ListChangeListener<? super AppointmentRow>) c -> {
+            // إعادة بناء الاقتراحات بعد اكتمال التغيير
+            Platform.runLater(this::buildAppointmentSearchIndex);
+        });
 
 
         if (loadUserAndEnsureDoctorProfile()) {
@@ -903,41 +912,82 @@ public class DoctorController {
         loadAppointmentsForDateAsync(date);
     }
 
-    /**
-     * Build the search suggestions for the Appointments table and wire the live filter.
-     */
+
     private void buildAppointmentSearchIndex() {
         if (searchLabel == null) return;
 
-        java.util.LinkedHashSet<String> suggestions = new java.util.LinkedHashSet<>();
+        apptSuggestions.clear();
+
+        // اجمع اقتراحات فريدة من الاسم والوقت + سطر مركب
+        java.util.LinkedHashSet<String> uniq = new java.util.LinkedHashSet<>();
         for (AppointmentRow r : apptData) {
             if (r == null) continue;
-            String idStr = String.valueOf(r.getId());
-            String name = nullToEmpty(r.getPatientName());
-            String nid = nullToEmpty(r.getNationalId());
-            String status = nullToEmpty(r.getStatus());
-            String dateStr = (r.getDate() == null) ? "" : r.getDate().toString();
-            String timeStr = nullToEmpty(r.getTimeStr());
-            for (String p : java.util.Arrays.asList(idStr, name, nid, status, dateStr, timeStr)) {
-                String t = nullToEmpty(p).trim();
-                if (!t.isEmpty()) suggestions.add(t);
+            String name = s(r.getPatientName());
+            String time = s(r.getTimeStr());
+            if (!name.isBlank()) uniq.add(name);
+            if (!time.isBlank()) uniq.add(time);
+            if (!name.isBlank() && !time.isBlank()) uniq.add(name + " • " + time);
+        }
+        apptSuggestions.addAll(uniq);
+
+        // فلترة مباشرة أثناء الكتابة
+        try { searchLabel.textProperty().removeListener(searchLiveListener); } catch (Throwable ignore) {}
+        searchLabel.textProperty().addListener(searchLiveListener);
+
+        // أظهر قائمة الاقتراحات أثناء الكتابة/التركيز
+        searchLabel.setOnKeyReleased(e -> showApptSuggestions(searchLabel.getText()));
+        searchLabel.focusedProperty().addListener((o, was, isNow) -> {
+            if (!isNow) apptAutoMenu.hide();
+        });
+    }
+
+
+    private void showApptSuggestions(String query) {
+        if (searchLabel == null) return;
+        String q = (query == null) ? "" : query.trim().toLowerCase();
+        apptAutoMenu.getItems().clear();
+
+        if (q.isEmpty()) { apptAutoMenu.hide(); return; }
+
+        int shown = 0;
+        for (String s : apptSuggestions) {
+            if (s == null) continue;
+            String t = s.trim();
+            if (t.toLowerCase().contains(q)) {
+                MenuItem mi = new MenuItem(t);
+                mi.setOnAction(ev -> {
+                    searchLabel.setText(t);
+                    applyAppointmentsFilter(t);
+                    apptAutoMenu.hide();
+                });
+                apptAutoMenu.getItems().add(mi);
+                shown++;
+                if (shown >= 8) break; // حد أقصى للاقتراحات
             }
         }
 
-        try {
-            if (apptSearchBinding != null) apptSearchBinding.dispose();
-            apptSearchBinding = org.controlsfx.control.textfield.TextFields.bindAutoCompletion(searchLabel, suggestions);
-        } catch (IllegalAccessError err) {
-            apptSearchBinding = null;
-            System.out.println("[AutoComplete] Disabled due to module access error: " + err.getMessage());
-        } catch (Throwable t) {
-            // Any other runtime issue with ControlsFX; keep the app running.
-            apptSearchBinding = null;
-            System.out.println("[AutoComplete] Disabled: " + t.getClass().getSimpleName() + ": " + t.getMessage());
-        }
+        if (shown == 0) { apptAutoMenu.hide(); return; }
 
-        searchLabel.textProperty().removeListener(searchAppointmentsListener);
-        searchLabel.textProperty().addListener(searchAppointmentsListener);
+        if (!apptAutoMenu.isShowing()) {
+            apptAutoMenu.show(searchLabel, javafx.geometry.Side.BOTTOM, 0, 0);
+        }
+    }
+
+    private final javafx.beans.value.ChangeListener<String> searchLiveListener =
+            (obs, ov, nv) -> applyAppointmentsFilter(nv);
+
+    private static String s(String v) { return v == null ? "" : v; }
+
+    private void applyAppointmentsFilter(String query) {
+        final String q = (query == null ? "" : query.trim().toLowerCase());
+        if (apptFiltered == null) return;
+        apptFiltered.setPredicate(r -> {
+            if (r == null) return false;
+            if (q.isEmpty()) return true;
+            String name = s(r.getPatientName()).toLowerCase();
+            String time = s(r.getTimeStr()).toLowerCase();
+            return name.contains(q) || time.contains(q);
+        });
     }
 
     // listener لفلترة جدول المواعيد حسب النص
@@ -1230,89 +1280,114 @@ public class DoctorController {
         }
     }
 
-    private void loadAppointmentsForDateAsync(LocalDate date) {
-        var u = Session.get();
-        if (u == null || date == null) return;
-        new Thread(() -> {
-            List<Appt> list = null;
-            Exception lastErr = null;
-            try {
-                // Preferred service call with explicit date
-                list = svc.listTodayAppointments(u.getId(), date);
-            } catch (Exception ex) {
-                lastErr = ex;
-                System.out.println("[Appointments] service call failed: " + ex.getMessage());
-                ex.printStackTrace();
-            }
+private void loadAppointmentsForDateAsync(LocalDate date) {
+    var u = Session.get();
+    if (u == null || date == null) return;
 
-            // Fallback: query by doctor email + specific date
-            if (list == null || list.isEmpty()) {
-                String email = (u.getEmail() == null) ? "" : u.getEmail().trim().toLowerCase();
-                try (Connection c = Database.get()) {
-                    String sql = """
-                            SELECT a.id,
-                                   pu.full_name              AS patient_name,
-                                   pu.national_id            AS patient_nid,
-                                   a.appointment_date        AS ts,
-                                   a.status,
-                                   p.user_id                 AS patient_user_id,
-                                   p.medical_history         AS medical_history
-                            FROM appointments a
-                            JOIN doctors d  ON d.id = a.doctor_id
-                            JOIN users   du ON du.id = d.user_id        -- doctor user
-                            JOIN patients p ON p.id = a.patient_id
-                            JOIN users   pu ON pu.id = p.user_id        -- patient user
-                            WHERE lower(du.email) = ? AND a.appointment_date::date = ?
-                            ORDER BY a.appointment_date
-                            """;
-                    try (var ps = c.prepareStatement(sql)) {
-                        ps.setString(1, email);
-                        ps.setDate(2, java.sql.Date.valueOf(date));
-                        try (var rs = ps.executeQuery()) {
-                            java.util.ArrayList<Appt> fb = new java.util.ArrayList<>();
-                            while (rs.next()) {
-                                Appt a = new Appt();
-                                a.id = rs.getLong("id");
-                                a.patientName = rs.getString("patient_name");
-                                a.patientNationalId = rs.getString("patient_nid");
-                                java.sql.Timestamp ts = rs.getTimestamp("ts");
-                                if (ts != null) {
-                                    var zdt = ts.toInstant().atZone(APP_TZ);
-                                    a.date = zdt.toLocalDate();
-                                    a.time = zdt.toLocalTime();
-                                }
-                                a.status = rs.getString("status");
-                                a.patientUserId = rs.getLong("patient_user_id");
-                                a.medicalHistory = rs.getString("medical_history");
-                                fb.add(a);
+    // احضر مواعيد اليوم المحدد بالخلفية ثم حدّث الواجهة بأمان
+    Thread t = new Thread(() -> {
+        List<Appt> list = null;
+        Exception lastErr = null;
+
+        // 1) النداء المفضّل للخدمة (يمرَّر التاريخ صراحة)
+        try {
+            list = svc.listTodayAppointments(u.getId(), date);
+        } catch (Exception ex) {
+            lastErr = ex;
+            System.out.println("[Appointments] service call failed: " + ex.getMessage());
+        }
+
+        // 2) بديل آمن: استعلام بالايميل + التاريخ المحدد
+        if (list == null || list.isEmpty()) {
+            String email = (u.getEmail() == null) ? "" : u.getEmail().trim().toLowerCase();
+            try (Connection c = Database.get()) {
+                String sql = """
+                        SELECT a.id,
+                               pu.full_name       AS patient_name,
+                               pu.national_id     AS patient_nid,
+                               a.appointment_date AS ts,
+                               a.status,
+                               p.user_id          AS patient_user_id,
+                               p.medical_history  AS medical_history
+                        FROM appointments a
+                        JOIN doctors d  ON d.id = a.doctor_id
+                        JOIN users   du ON du.id = d.user_id        -- doctor user
+                        JOIN patients p ON p.id = a.patient_id
+                        JOIN users   pu ON pu.id = p.user_id        -- patient user
+                        WHERE lower(du.email) = ? AND a.appointment_date::date = ?
+                        ORDER BY a.appointment_date
+                        """;
+                try (var ps = c.prepareStatement(sql)) {
+                    ps.setString(1, email);
+                    ps.setDate(2, java.sql.Date.valueOf(date));
+                    try (var rs = ps.executeQuery()) {
+                        java.util.ArrayList<Appt> fb = new java.util.ArrayList<>();
+                        while (rs.next()) {
+                            Appt a = new Appt();
+                            a.id = rs.getLong("id");
+                            a.patientName = rs.getString("patient_name");
+                            a.patientNationalId = rs.getString("patient_nid");
+                            java.sql.Timestamp ts = rs.getTimestamp("ts");
+                            if (ts != null) {
+                                var zdt = ts.toInstant().atZone(APP_TZ);
+                                a.date = zdt.toLocalDate();
+                                a.time = zdt.toLocalTime();
                             }
-                            System.out.println("[Appointments] email fallback succeeded using appointment_date casts.");
-                            list = fb;
+                            a.status = rs.getString("status");
+                            a.patientUserId = rs.getLong("patient_user_id");
+                            a.medicalHistory = rs.getString("medical_history");
+                            fb.add(a);
                         }
+                        list = fb;
+                        System.out.println("[Appointments] email fallback succeeded using appointment_date casts.");
                     }
-                } catch (SQLException e) {
-                    lastErr = (lastErr == null) ? e : lastErr;
                 }
+            } catch (SQLException e) {
+                lastErr = (lastErr == null) ? e : lastErr;
+            }
+        }
+
+        // 3) حدّث واجهة المستخدم على خيط JavaFX
+        final List<Appt> finalList = list;
+        final Exception finalErr = lastErr;
+        Platform.runLater(() -> {
+            // امسح القائمة الحالية دائمًا ثم املأ
+            apptData.clear();
+
+            if (finalList != null && !finalList.isEmpty()) {
+                for (Appt a : finalList) {
+                    apptData.add(AppointmentRow.of(a));
+                }
+            } else if (finalErr != null) {
+                String msg = "Failed to load appointments for the selected date.";
+                if (finalErr.getMessage() != null && !finalErr.getMessage().isBlank()) {
+                    msg += " (" + finalErr.getMessage() + ")";
+                }
+                showWarn("Appointments", msg);
             }
 
-            // Update UI on FX thread
-            List<Appt> finalList = list;
-            Exception finalErr = lastErr;
-            Platform.runLater(() -> {
-                apptData.clear();
-                if (finalList != null && !finalList.isEmpty()) {
-                    for (Appt a : finalList) apptData.add(AppointmentRow.of(a));
-                } else if (finalErr != null) {
-                    String msg = "Failed to load appointments for the selected date.";
-                    if (finalErr.getMessage() != null && !finalErr.getMessage().isBlank()) {
-                        msg += " (" + finalErr.getMessage() + ")";
-                    }
-                    showWarn("Appointments", msg);
+            // أعِد بناء اقتراحات الـ AutoComplete بعد تحديث البيانات فقط (مرّة واحدة)
+            try { buildAppointmentSearchIndex(); } catch (Throwable ignore) { }
+
+            // طبّق الفلترة الحالية إن كان مربع البحث غير فارغ، وإلا أعد الضبط للوضع الافتراضي
+            try {
+                String q = (searchLabel == null) ? "" : searchLabel.getText();
+                if (q != null && !q.trim().isEmpty()) {
+                    applyAppointmentsFilter(q);
+                } else {
+                    if (apptFiltered != null) apptFiltered.setPredicate(r -> true);
                 }
-                refitAppointmentsColumnsLater();
-            });
-        }, "doc-appts-by-date").start();
-    }
+            } catch (Throwable ignore) { }
+
+            refitAppointmentsColumnsLater();
+            try { if (AppointmentsTable != null) AppointmentsTable.refresh(); } catch (Throwable ignore) { }
+        });
+    }, "doc-appts-by-date");
+
+    // خيط خفيف Daemon حتى لا يمنع إغلاق التطبيق
+    t.setDaemon(true);
+    t.start();
+}
 
     private void wireAppointmentsTable() {
         if (AppointmentsTable == null) return;
