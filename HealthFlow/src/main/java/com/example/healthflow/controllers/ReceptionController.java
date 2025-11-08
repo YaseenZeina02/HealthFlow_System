@@ -452,6 +452,10 @@ public class ReceptionController {
         }
     }
 
+    // ========== DASHBOARD TABLE RELOAD ==========
+    // This is the method referenced in the instruction (see log message)
+
+
     /* ============ slot load ============ */
 
     // إرجاع الغرف المتاحة (Room 1..Room 9) مع استبعاد المحجوزة
@@ -2393,42 +2397,88 @@ public class ReceptionController {
         }
     }
 
+//    private void reloadDashboardAppointments() {
+//        if (TableAppInDashboard == null) return;
+//
+//        java.time.LocalDate sel = (dataPickerDashboard != null && dataPickerDashboard.getValue() != null)
+//                ? dataPickerDashboard.getValue()
+//                : java.time.LocalDate.now();
+//
+//        // اجلب البيانات بالخلفية حتى ما يعلق الـ UI
+//        new Thread(() -> {
+//            try {
+//                var rows = com.example.healthflow.dao.AppointmentJdbcDAO.listByDateAll(sel);
+//
+//                // كل تفاعل مع الواجهة يتم داخل FX thread
+//                Platform.runLater(() -> {
+//                    if (rows != null && !rows.isEmpty()) {
+//                        dashBase.setAll(rows);
+//                        TableAppInDashboard.setPlaceholder(new Label(""));
+//                    } else {
+//                        System.out.println("[Dashboard] no appointments found, keeping previous rows temporarily");
+//                        TableAppInDashboard.setPlaceholder(new Label("No appointments on " + sel));
+//                    }
+//
+//                    applyDashboardFilters();
+//                    TableAppInDashboard.refresh();
+//                    System.out.println("[ReceptionController] reloadDashboardAppointments sel=" + sel + " rows=" + (rows == null ? 0 : rows.size()));
+//                });
+//
+//            } catch (Exception ex) {
+//                System.err.println("[ReceptionController] reloadDashboardAppointments error: " + ex);
+//                Platform.runLater(() -> {
+//                    if (TableAppInDashboard != null)
+//                        TableAppInDashboard.setPlaceholder(new Label("Failed to load"));
+//                });
+//            }
+//        }, "reload-dashboard").start();
+//    }
+
+
+    // ========== DASHBOARD TABLE RELOAD ==========
+    // This is the method referenced in the instruction (see log message)
     private void reloadDashboardAppointments() {
-        if (TableAppInDashboard == null) return;
+        LocalDate day = (dataPickerDashboard == null || dataPickerDashboard.getValue() == null)
+                ? java.time.LocalDate.now()
+                : dataPickerDashboard.getValue();        java.util.List<DoctorDAO.AppointmentRow> rows = null;
+        try {
+            rows = doctorDAO.listDashboardAppointments(day);
+        } catch (Exception e) {
+            e.printStackTrace();
+            showWarn("Dashboard", "Failed to load dashboard appointments: " + e.getMessage());
+            return;
+        }
+        System.out.println("[ReceptionController] reloadDashboardAppointments sel=" + day + " rows=" + (rows == null ? 0 : rows.size()));
 
-        java.time.LocalDate sel = (dataPickerDashboard != null && dataPickerDashboard.getValue() != null)
-                ? dataPickerDashboard.getValue()
-                : java.time.LocalDate.now();
-
-        // اجلب البيانات بالخلفية حتى ما يعلق الـ UI
-        new Thread(() -> {
+        // --- Apply rows to dashboard table (clear when empty) ---
+        if (rows == null || rows.isEmpty()) {
+            // Clear backing list and selection
+            try { dashBase.clear(); } catch (Throwable ignore) {}
             try {
-                var rows = com.example.healthflow.dao.AppointmentJdbcDAO.listByDateAll(sel);
-
-                // كل تفاعل مع الواجهة يتم داخل FX thread
-                Platform.runLater(() -> {
-                    if (rows != null && !rows.isEmpty()) {
-                        dashBase.setAll(rows);
-                        TableAppInDashboard.setPlaceholder(new Label(""));
-                    } else {
-                        System.out.println("[Dashboard] no appointments found, keeping previous rows temporarily");
-                        TableAppInDashboard.setPlaceholder(new Label("No appointments on " + sel));
+                if (TableAppInDashboard != null) {
+                    TableAppInDashboard.getSelectionModel().clearSelection();
+                    if (TableAppInDashboard.getItems() != sortedDash) {
+                        TableAppInDashboard.setItems(sortedDash);
                     }
-
-                    applyDashboardFilters();
+                    TableAppInDashboard.setPlaceholder(new Label(
+                            (day == null ? "No appointments" : ("No appointments for " + day))
+                    ));
                     TableAppInDashboard.refresh();
-                    System.out.println("[ReceptionController] reloadDashboardAppointments sel=" + sel + " rows=" + (rows == null ? 0 : rows.size()));
-                });
+                }
+            } catch (Throwable ignore) {}
+            System.out.println("[ReceptionController] reloadDashboardAppointments: no rows → cleared table");
+            return; // stop here; nothing more to populate
+        }
 
-            } catch (Exception ex) {
-                System.err.println("[ReceptionController] reloadDashboardAppointments error: " + ex);
-                Platform.runLater(() -> {
-                    if (TableAppInDashboard != null)
-                        TableAppInDashboard.setPlaceholder(new Label("Failed to load"));
-                });
+        // If we have rows → show them
+        dashBase.setAll(rows);
+        try {
+            if (TableAppInDashboard != null && TableAppInDashboard.getItems() != dashSorted) {
+                TableAppInDashboard.setItems(dashSorted);
             }
-        }, "reload-dashboard").start();
+        } catch (Throwable ignore) {}
     }
+
 
     // -- Dashboard DatePicker wiring: today by default + reload on change
     private void wireDashboardDatePicker() {
@@ -3388,6 +3438,9 @@ public class ReceptionController {
         if (clearSelectionDach != null) clearSelectionDach.setOnAction(e -> {
             if (TableAppInDashboard != null) TableAppInDashboard.getSelectionModel().clearSelection();
             if (searchAppointmentDach != null) searchAppointmentDach.clear();
+            // إعادة التركيز لحقل البحث بعد المسح (اختياري)
+            if (searchAppointmentDach != null)
+                searchAppointmentDach.requestFocus();
         });
         if (clearSelectionDoctor != null) {
             clearSelectionDoctor.setOnAction(e -> {
@@ -3406,17 +3459,40 @@ public class ReceptionController {
         }
         if (clearSelectionPatient != null) {
             clearSelectionPatient.setOnAction(e -> {
-                // إزالة أي تحديد داخل جدول المرضى
-                if (patientTable != null)
+                // 1) Clear selection in the patients table
+                if (patientTable != null) {
                     patientTable.getSelectionModel().clearSelection();
+                }
 
-                // مسح النص من مربع البحث
-                if (search != null)
-                    search.clear();
+                // 2) Reset any cached/selected model object
+                try { selectedPatient = null; } catch (Throwable ignore) {}
 
-                // إعادة التركيز لحقل البحث بعد المسح (اختياري)
-                if (search != null)
-                    search.requestFocus();
+                // 3) Clear form fields explicitly (defensive null checks)
+                try { if (getPatientID != null)   getPatientID.setText("");} catch (Throwable ignore) {}
+                try { if (getPatientName != null) getPatientName.setText(""); } catch (Throwable ignore) {}
+                try { if (PatientIdTextField != null) PatientIdTextField.clear(); } catch (Throwable ignore) {}
+                try { if (FullNameTextField != null) FullNameTextField.clear(); } catch (Throwable ignore) {}
+                try { if (PhoneTextField != null) PhoneTextField.clear(); } catch (Throwable ignore) {}
+                try { if (medicalHistory != null) medicalHistory.clear(); } catch (Throwable ignore) {}
+                try { if (GenderComboBox != null) GenderComboBox.getSelectionModel().clearSelection(); } catch (Throwable ignore) {}
+                try { if (DateOfBirthPicker != null) DateOfBirthPicker.setValue(null); } catch (Throwable ignore) {}
+
+                // 4) Clear the search box and return focus to it (optional UX)
+                try {
+                    if (search != null) {
+                        search.clear();
+                        search.requestFocus();
+                    }
+                } catch (Throwable ignore) {}
+
+                // 5) If a general clearForm() exists, call it to keep logic centralized
+                try { clearForm(); } catch (Throwable ignore) {}
+
+                // 6) Refresh table visuals in case any cell depends on selection-bound properties
+                try { if (patientTable != null) patientTable.refresh(); } catch (Throwable ignore) {}
+
+                // Optional: toast feedback
+                try { showToast("info", "Patient selection and form cleared."); } catch (Throwable ignore) {}
             });
         }
 

@@ -537,6 +537,50 @@ public class DoctorDAO {
         }
     }
 
+    /** Returns all appointments for a specific calendar day (dashboard). */
+    public java.util.List<AppointmentRow> listDashboardAppointments(java.time.LocalDate day)
+            throws java.sql.SQLException {
+        final String sql = """
+        SELECT
+            a.id,
+            a.doctor_id,
+            a.patient_id,
+            a.appointment_date AS start_at,
+            du.full_name AS doctor_name,
+            pu.full_name AS patient_name,
+            d.specialty,
+            a.status::text AS status,
+            a.location AS location
+        FROM appointments a
+        JOIN doctors d  ON d.id = a.doctor_id
+        JOIN users  du  ON du.id = d.user_id
+        JOIN patients p ON p.id = a.patient_id
+        JOIN users  pu  ON pu.id = p.user_id
+        WHERE a.appointment_date::date = ?
+        ORDER BY a.appointment_date ASC
+    """;
+        try (var c = Database.get(); var ps = c.prepareStatement(sql)) {
+            ps.setObject(1, day); // ::date
+            try (var rs = ps.executeQuery()) {
+                var out = new java.util.ArrayList<AppointmentRow>();
+                while (rs.next()) {
+                    AppointmentRow row = new AppointmentRow(
+                            rs.getLong("id"),
+                            rs.getLong("doctor_id"),
+                            rs.getLong("patient_id"),
+                            rs.getObject("start_at", java.time.OffsetDateTime.class),
+                            rs.getString("doctor_name"),
+                            rs.getString("patient_name"),
+                            rs.getString("specialty"),
+                            rs.getString("status")
+                    );
+                    row.location = rs.getString("location");
+                    out.add(row);
+                }
+                return out;
+            }
+        }
+    }
 
     /**
      * Search appointments by free-text over doctor/patient names or status.

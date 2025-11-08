@@ -22,7 +22,7 @@
 <?import javafx.scene.text.Font?>
 <?import org.kordamp.ikonli.javafx.FontIcon?>
 
-<StackPane fx:id="rootPane" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="600.0" prefWidth="1100.0" stylesheets="@../Design/ReceptionDesign.css" xmlns="http://javafx.com/javafx/23.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.example.healthflow.controllers.ReceptionController">
+<StackPane fx:id="rootPane" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="600.0" prefWidth="1100.0" stylesheets="@../Design/ReceptionDesign.css" xmlns="http://javafx.com/javafx/19" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.example.healthflow.controllers.ReceptionController">
 
     <children>
         <AnchorPane prefHeight="200.0" prefWidth="200.0">
@@ -148,7 +148,7 @@
                             <children>
 
                                 <!-- ===== Dashboard ===== -->
-                                <AnchorPane fx:id="DashboardAnchorPane" prefHeight="558.4" prefWidth="889.6" visible="false" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+                                <AnchorPane fx:id="DashboardAnchorPane" prefHeight="558.4" prefWidth="889.6" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
                                     <children>
 
                                         <AnchorPane layoutY="184.8" prefHeight="360.0" prefWidth="600.0" stylesheets="@../Design/ReceptionDesign.css" AnchorPane.bottomAnchor="14.0" AnchorPane.leftAnchor="11.0" AnchorPane.rightAnchor="273.0" AnchorPane.topAnchor="185.0">
@@ -174,7 +174,7 @@
                                                     </columnResizePolicy>
                                                 </TableView>
                                                 <TextField fx:id="searchAppointmentDach" layoutX="394.0" layoutY="6.0" prefHeight="0.0" prefWidth="130.0" promptText="search" styleClass="box" AnchorPane.rightAnchor="81.19999999999993" AnchorPane.topAnchor="6.0" />
-                                                <Button fx:id="clearSelectionDach" layoutX="532.0" layoutY="10.0" mnemonicParsing="false" prefHeight="30.0" prefWidth="60.0" styleClass="btn-2" text="Clear" AnchorPane.rightAnchor="13.599999999999909" AnchorPane.topAnchor="10.0">
+                                                <Button fx:id="clearSelectionDach" layoutX="532.4000000000001" layoutY="7.0" mnemonicParsing="false" prefHeight="30.0" prefWidth="60.0" styleClass="btn-2" text="Clear" AnchorPane.rightAnchor="13.599999999999909" AnchorPane.topAnchor="7.0">
                                        <stylesheets>
                                           <URL value="@../Design/ButtonsStyles.css" />
                                           <URL value="@../Design/ReceptionDesign.css" />
@@ -336,7 +336,7 @@
                                 </AnchorPane>
 
                                 <!-- ===== Doctors Table ===== -->
-                                <AnchorPane fx:id="DoctorAnchorPane" layoutX="345.0" prefHeight="563.0" prefWidth="892.0" stylesheets="@../Design/ReceptionDesign.css" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+                                <AnchorPane fx:id="DoctorAnchorPane" layoutX="345.0" prefHeight="563.0" prefWidth="892.0" stylesheets="@../Design/ReceptionDesign.css" visible="false" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
                                     <children>
                                         <Label layoutX="19.0" layoutY="27.0" prefHeight="20.0" prefWidth="120.0" styleClass="header-top" stylesheets="@../Design/ReceptionDesign.css" text="Doctors Details">
                                             <font>
@@ -396,7 +396,7 @@
                                                     </columnResizePolicy>
                                                 </TableView>
                                                 <TextField fx:id="search" layoutX="575.0" layoutY="13.0" prefHeight="30.0" prefWidth="200.0" promptText="search" styleClass="box" AnchorPane.rightAnchor="91.39999999999998" AnchorPane.topAnchor="13.0" />
-                                    <Button fx:id="clearSelectionDach11" layoutX="786.0" layoutY="15.0" mnemonicParsing="false" prefHeight="30.0" prefWidth="60.0" styleClass="btn-2" text="Clear" AnchorPane.rightAnchor="20.399999999999977">
+                                    <Button fx:id="clearSelectionPatient" layoutX="786.0" layoutY="15.0" mnemonicParsing="false" prefHeight="30.0" prefWidth="60.0" styleClass="btn-2" text="Clear" AnchorPane.rightAnchor="20.399999999999977">
                                        <stylesheets>
                                           <URL value="@../Design/ButtonsStyles.css" />
                                           <URL value="@../Design/ReceptionDesign.css" />
@@ -448,7 +448,7 @@
                                           <URL value="@../Design/ReceptionDesign.css" />
                                        </stylesheets>
                                                 </Label>
-                                                <TextArea fx:id="medicalHistory" layoutX="513.0" layoutY="193.0" prefHeight="60.0" prefWidth="180.0" style="-fx-background-color: #ffffff;" />
+                                                <TextArea fx:id="medicalHistory" layoutX="519.0" layoutY="169.0" prefHeight="69.0" prefWidth="180.0" style="-fx-background-color: #ffffff;" />
 
                                                 <Label layoutX="14.0" layoutY="63.0" prefHeight="30.0" prefWidth="80.0" styleClass="text-gradient" stylesheets="@../Design/ReceptionDesign.css" text="National ID">
                                                     <font>
