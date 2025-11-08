@@ -180,6 +180,10 @@ public class DoctorController {
     // ---- Hybrid Search (patients) ----
     private final Timeline patientSearchDebounce = new Timeline();
     private volatile String lastPatientSearchText = "";
+    // Gate for AppointmentsButton (avoid setDisable on a bound property)
+    private final javafx.beans.property.BooleanProperty appointmentsAccess =
+            new javafx.beans.property.SimpleBooleanProperty(false);
+
 
     /* ====== Medicine tab ====== */
     @FXML

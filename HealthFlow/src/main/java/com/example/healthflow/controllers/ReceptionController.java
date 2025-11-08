@@ -47,6 +47,7 @@ import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.shape.Circle;
 import javafx.scene.text.Text;
+import javafx.stage.Modality;
 import javafx.stage.Stage;
 import javafx.util.Duration;
 
@@ -82,7 +83,6 @@ import javafx.scene.input.KeyEvent;
 public class ReceptionController {
     /* ============ UI ============ */
     @FXML private Button LogOutBtn;
-    @FXML private Button BackButton;
 
 
     @FXML private AnchorPane DashboardAnchorPane;
@@ -120,6 +120,7 @@ public class ReceptionController {
     @FXML private TextField search;
     @FXML private Button clearSelectionPatient;
     @FXML private TableView<PatientRow> patientTable;
+    @FXML private TableColumn<PatientRow, Integer> colPatientsSerial;
     @FXML private TableColumn<PatientRow, String> colNationalId;
     @FXML private TableColumn<PatientRow, String> colName;
     @FXML private TableColumn<PatientRow, String> colGender;
@@ -190,6 +191,8 @@ public class ReceptionController {
 
     // ===== Doctors table =====
     @FXML private TableView<DoctorRow> DocTable_Recption;
+
+    @FXML private TableColumn<DoctorRow, Integer> colDoctorSerial;
     @FXML private TableColumn<DoctorRow, String> colDoctor_name;
     @FXML private TableColumn<DoctorRow, String> colDoctor_Gender;
     @FXML private TableColumn<DoctorRow, String> colDoctor_Phone;
@@ -291,6 +294,10 @@ public class ReceptionController {
     private boolean patientSelHooked = false;
 
     private final Deque<AnchorPane> navigationHistory = new ArrayDeque<>();
+
+    // Gate for AppointmentsButton (avoid setDisable on a bound property)
+    private javafx.beans.property.BooleanProperty appointmentsAccess =
+            new javafx.beans.property.SimpleBooleanProperty(false);
 
     // helpers:
     private static java.time.OffsetDateTime toAppOffset(java.time.LocalDate d, java.time.LocalTime t) {
@@ -511,14 +518,6 @@ public class ReceptionController {
     public ReceptionController() {
         this(new ConnectivityMonitor());
     }
-
-
-//    private void setupAppointmentSlotsListener() {
-//        // listeners already wired in initialize():
-//        // AppointmentDate.valueProperty() -> refreshSlots()
-//        // avilabelDoctorApp.valueProperty() -> refreshSlots()
-//        // cmbSlots.setOnShown(...) -> refreshSlots()
-//    }
 
     private void updateAppointmentDetailsLabel(Appointment.ApptRow row) {
         if (AppointmentDateDetailes == null) return;
@@ -830,33 +829,11 @@ public class ReceptionController {
     }
 
     /* ============ Navigation ============ */
-    @FXML
-    private void BackAction() {
-        Stage stage = (Stage) BackButton.getScene().getWindow();
-        try {
-            FXMLLoader loader = new FXMLLoader(getClass().getResource(new Navigation().Login_Fxml));
-            loader.setControllerFactory(type -> type == LoginController.class ? new LoginController(monitor) : null);
-            Parent loginRoot = loader.load();
 
-            var banner = new ConnectivityBanner(monitor);
-            javafx.scene.layout.BorderPane root = new javafx.scene.layout.BorderPane();
-            root.setTop(banner);
-            root.setCenter(loginRoot);
-
-            stage.setScene(new Scene(root));
-            stage.setTitle("HealthFlow");
-            stage.setResizable(false);
-            stage.show();
-
-            // أوقف المستمعين والـ executors عند الخروج
-            shutdown();
-        } catch (IOException e) {
-            showError("Navigation", e);
-        }
-    }
 
     /* ============ Panes ============ */
     private void showDashboardPane() {
+        disableAppointmentsAccess();
         DashboardAnchorPane.setVisible(true);
         PatientAnchorPane.setVisible(false);
         AppointmentsAnchorPane.setVisible(false);
@@ -865,6 +842,7 @@ public class ReceptionController {
     }
 
     private void showDoctorPane() {
+        disableAppointmentsAccess();
         DashboardAnchorPane.setVisible(false);
         PatientAnchorPane.setVisible(false);
         AppointmentsAnchorPane.setVisible(false);
@@ -873,10 +851,17 @@ public class ReceptionController {
     }
 
     private void showPatientsPane() {
+        disableAppointmentsAccess();
         DashboardAnchorPane.setVisible(false);
         PatientAnchorPane.setVisible(true);
         AppointmentsAnchorPane.setVisible(false);
         DoctorAnchorPane.setVisible(false);
+        markNavActive(PatientsButton);
+    }
+    @FXML
+    private void showPatientsPaneAction() {
+        disableAppointmentsAccess();
+        switchPane(PatientAnchorPane);
         markNavActive(PatientsButton);
     }
 
@@ -885,11 +870,16 @@ public class ReceptionController {
         PatientAnchorPane.setVisible(false);
         AppointmentsAnchorPane.setVisible(true);
         DoctorAnchorPane.setVisible(false);
+        enableAppointmentsAccess();
         markNavActive(AppointmentsButton);
+
     }
 
     /* ============ Patients: table & search ============ */
     private void wirePatientTable() {
+        colPatientsSerial.setCellValueFactory(cd ->
+                new ReadOnlyObjectWrapper<Integer>(patientTable.getItems().indexOf(cd.getValue()) + 1)
+        );
         colNationalId.setCellValueFactory(cd -> cd.getValue().nationalIdProperty());
         colName.setCellValueFactory(cd -> cd.getValue().fullNameProperty());
         colGender.setCellValueFactory(cd -> cd.getValue().genderProperty());
@@ -1090,6 +1080,9 @@ public class ReceptionController {
 
     /* ============ Doctors: table, search, load ============ */
     private void wireDoctorTable() {
+        colDoctorSerial.setCellValueFactory(cd ->
+                new ReadOnlyObjectWrapper<Integer>(DocTable_Recption.getItems().indexOf(cd.getValue()) + 1)
+        );
         if (colDoctor_name != null) colDoctor_name.setCellValueFactory(cd -> cd.getValue().fullNameProperty());
         if (colDoctor_Gender != null) colDoctor_Gender.setCellValueFactory(cd -> cd.getValue().genderProperty());
         if (colDoctor_Phone != null) colDoctor_Phone.setCellValueFactory(cd -> cd.getValue().phoneProperty());
@@ -1227,6 +1220,9 @@ public class ReceptionController {
 
     private void showWarn(String title, String msg) {
         Alert a = new Alert(Alert.AlertType.WARNING);
+        Stage stage = (Stage) rootPane.getScene().getWindow();
+        a.initOwner(stage);
+        a.initModality(Modality.WINDOW_MODAL);
         a.setTitle(title);
         a.setHeaderText(null);
         a.setContentText(msg);
@@ -1235,6 +1231,9 @@ public class ReceptionController {
 
     private void showInfo(String title, String msg) {
         Alert a = new Alert(Alert.AlertType.INFORMATION);
+        Stage stage = (Stage) rootPane.getScene().getWindow();
+        a.initOwner(stage);
+        a.initModality(Modality.WINDOW_MODAL);
         a.setTitle(title);
         a.setHeaderText(null);
         a.setContentText(msg);
@@ -1244,6 +1243,9 @@ public class ReceptionController {
     private String showError(String title, Exception ex) {
         if (ex != null) ex.printStackTrace();
         Alert a = new Alert(Alert.AlertType.ERROR);
+        Stage stage = (Stage) rootPane.getScene().getWindow();
+        a.initOwner(stage);
+        a.initModality(Modality.WINDOW_MODAL);
         a.setTitle(title);
         a.setHeaderText(null);
         a.setContentText(ex == null ? title : ex.getMessage());
@@ -1254,6 +1256,10 @@ public class ReceptionController {
 
     private boolean confirm(String title, String msg) {
         Alert a = new Alert(Alert.AlertType.CONFIRMATION);
+        Stage stage = (Stage) rootPane.getScene().getWindow();
+        a.initOwner(stage);
+        a.initModality(Modality.WINDOW_MODAL);
+
         a.setTitle(title);
         a.setHeaderText(null);
         a.setContentText(msg);
@@ -1269,8 +1275,16 @@ public class ReceptionController {
         String phone = trimOrNull(PhoneTextField.getText());
         String history = trimOrNull(medicalHistory.getText());
 
-        if (fullName == null || dob == null || gender == null) {
-            showWarn("Validation", "Full name, gender and date of birth are required.");
+        if (fullName == null) {
+            showWarn("Validation", "Full name is required.");
+            return;
+        }
+        if (dob == null) {
+            showWarn("Validation", "Date of birth is required.");
+            return;
+        }
+        if (gender == null) {
+            showWarn("Validation", "Gender is required.");
             return;
         }
         if (phone == null) {
@@ -1278,13 +1292,41 @@ public class ReceptionController {
             return;
         }
 
+        // Validate National ID: exactly 9 digits (client-side guard)
+        if (nid == null || !nid.matches("\\d{9}")) {
+            showWarn("National ID", "National ID must be exactly 9 digits.");
+            return;
+        }
+
         try {
-            // ننشئ المريض – ما بنعتمد على PatientView
             patientService.createPatient(fullName, nid, phone, dob, gender.name(), history);
-            // نحدّث الجدول من المصدر الرسمي (PatientRow)
             loadPatientsBG();
             clearForm();
             showInfo("Insert", "Patient inserted successfully.");
+        } catch (org.postgresql.util.PSQLException e) {
+            String msg = (e.getMessage() == null) ? "" : e.getMessage();
+            String sqlState = e.getSQLState(); // '23505' for unique-violation in PG
+            String constraint = null;
+            try {
+                var sev = e.getServerErrorMessage();
+                if (sev != null) constraint = sev.getConstraint();
+            } catch (Throwable ignore) { }
+
+            // 1) طول الهوية
+            if (msg.contains("value too long for type character(9)") ||
+                msg.toLowerCase().contains("national_id must be 9 digits")) {
+                showWarn("National ID", "National ID must be exactly 9 digits.");
+            }
+            // 2) تكرار الهوية (unique violation)
+            else if ("23505".equals(sqlState) ||
+                     (constraint != null && constraint.toLowerCase().contains("uniq_users_nid_nonnull")) ||
+                     msg.toLowerCase().contains("duplicate key value") && msg.toLowerCase().contains("national_id")) {
+                showWarn("Duplicate", "A patient with this National ID already exists. Please use Update instead.");
+            }
+            else {
+                showError("Insert Patient", e);
+            }
+            return;
         } catch (Exception ex) {
             showError("Insert Patient", ex);
             return;
@@ -1312,9 +1354,13 @@ public class ReceptionController {
         Gender gender = GenderComboBox.getValue();
         LocalDate dob = DateOfBirthPicker.getValue();
 
-
         if (fullName == null || dob == null || gender == null) {
             showWarn("Validation", "Full name, gender and date of birth are required.");
+            return;
+        }
+        // Validate National ID on update as well
+        if (nid != null && !nid.isBlank() && !nid.matches("\\d{9}")) {
+            showWarn("National ID", "National ID must be exactly 9 digits.");
             return;
         }
         try {
@@ -1328,10 +1374,20 @@ public class ReceptionController {
             row.setMedicalHistory(history);
             if (patientTable != null) patientTable.refresh();
             showInfo("Update", "Patient updated successfully.");
+        } catch (org.postgresql.util.PSQLException e) {
+            if (e.getMessage() != null && (
+                    e.getMessage().contains("value too long for type character(9)") ||
+                    e.getMessage().toLowerCase().contains("national_id must be 9 digits")
+            )) {
+                showWarn("National ID", "National ID must be exactly 9 digits.");
+            } else {
+                showError("Update Patient", e);
+            }
+            return;
         } catch (Exception ex) {
             showError("Update Patient", ex);
+            return;
         }
-
         try (Connection c = Database.get();
              PreparedStatement nps = c.prepareStatement("SELECT pg_notify('patients_changed','update')")) {
             nps.execute();
@@ -3243,8 +3299,28 @@ public class ReceptionController {
         PatientsButton.setOnAction(e -> showPatientsPaneAction());
         AppointmentsButton.setOnAction(e -> showAppointmentPane());
         DoctorsButton.setOnAction(e -> showDoctorPane());
-        BackButton.setOnAction(e -> handleBack());
 
+        if (AppointmentsButton != null) {
+            appointmentsAccess = new javafx.beans.property.SimpleBooleanProperty(false);
+            AppointmentsButton.disableProperty().bind(appointmentsAccess.not());
+
+            appointmentsAccess.addListener((obs, oldVal, enabled) -> {
+                try {
+                    AppointmentsButton.setOpacity(enabled ? 1.0 : 0.6);
+                    var css = AppointmentsButton.getStyleClass();
+                    if (enabled) {
+                        css.remove("btn-disabled");
+                        if (!css.contains("btn-enabled")) css.add("btn-enabled");
+                    } else {
+                        css.remove("btn-enabled");
+                        if (!css.contains("btn-disabled")) css.add("btn-disabled");
+                    }
+                } catch (Throwable ignore) {}
+            });
+        }
+
+
+        disableAppointmentsAccess(); //for disable btn
         startClock();
 
         GenderComboBox.setItems(FXCollections.observableArrayList(Gender.values()));
@@ -3310,7 +3386,8 @@ public class ReceptionController {
             if (p == null) {
                 // آخر فallback: لو الفورم مليان، كمّل التنقل واملأ الحقول (بدون مسودة) عشان ما توقف شغلك
                 if (!formName.isEmpty() || !formNid.isEmpty()) {
-                    if (AppointmentsButton != null) AppointmentsButton.fire(); else showAppointmentPane();
+                    enableAppointmentsAccess();
+                    showAppointmentPane();
                     if (getPatientName != null) getPatientName.setText(formName);
                     if (getPatientID   != null) getPatientID.setText(formNid);
                     selectNearestSlotOnNextRefresh = true;
@@ -3320,6 +3397,10 @@ public class ReceptionController {
                 }
 
                 Alert a = new Alert(Alert.AlertType.WARNING);
+                Stage stage = (Stage) rootPane.getScene().getWindow();
+                a.initOwner(stage);
+                a.initModality(Modality.WINDOW_MODAL);
+
                 a.setTitle("Select a patient");
                 a.setHeaderText(null);
                 a.setContentText("Please select a patient from the table first.");
@@ -3330,7 +3411,8 @@ public class ReceptionController {
 
             System.out.println("BookAppointmentFromPateint: " + p.getFullName() + "  Age :" + p.getAge());
 
-            if (AppointmentsButton != null) AppointmentsButton.fire(); else showAppointmentPane();
+            enableAppointmentsAccess();
+            showAppointmentPane();
 
             if (getPatientName != null) getPatientName.setText(p.getFullName());
             if (getPatientID   != null) getPatientID.setText(p.getNationalId());
@@ -3344,6 +3426,13 @@ public class ReceptionController {
             selectNearestSlotOnNextRefresh = true;
             Platform.runLater(this::applyAppointmentFilters);
         });
+        if (AppointmentsAnchorPane != null) {
+            AppointmentsAnchorPane.visibleProperty().addListener((o, was, isNow) -> {
+                if (Boolean.FALSE.equals(isNow)) {
+                    disableAppointmentsAccess();
+                }
+            });
+        }
 
         Platform.runLater(() -> {
             new Thread(() -> {
@@ -3714,6 +3803,10 @@ public class ReceptionController {
         }, "load-appts-filtered").start();
     }
 
+    // --- Gate Appointments navigation ---
+    private void enableAppointmentsAccess()  { appointmentsAccess.set(true);  }
+    private void disableAppointmentsAccess() { appointmentsAccess.set(false); }
+
 
     /**
      * Attach /com/example/healthflow/Design/combobox.css to the current scene
@@ -3841,6 +3934,7 @@ public class ReceptionController {
 
         // Single app-attached confirmation (no duplicate prompts)
         Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+
         alert.setTitle("Confirm Logout");
         alert.setHeaderText(null);
         alert.setContentText("Are you sure you want to log out?");
@@ -3888,7 +3982,6 @@ public class ReceptionController {
 
             // أظهر السابقة
             previous.setVisible(true);
-            BackButton.setDisable(navigationHistory.isEmpty());
         }
     }
     private AnchorPane getCurrentPane() {
@@ -3912,12 +4005,6 @@ public class ReceptionController {
 
         // أظهر الصفحة الجديدة
         paneToShow.setVisible(true);
-        BackButton.setDisable(navigationHistory.isEmpty());
-    }
-    @FXML
-    private void showPatientsPaneAction() {
-        switchPane(PatientAnchorPane);
-        markNavActive(PatientsButton);
     }
 
 }

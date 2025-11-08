@@ -60,3 +60,13 @@
 .btn-logout:hover {
     -fx-background-color: linear-gradient(to bottom, #ff7b7b, #e04a4a);
 }
+
+.button.btn-disabled {
+    -fx-opacity: 0.6;
+    /* أي ستايل إضافي يبيّن أنه غير نشط */
+}
+.button.btn-enabled {
+    -fx-opacity: 1.0;
+    /* لون/ظلّة تمييز لو حاب */
+    /* -fx-background-color: -hf-primary; */
+}

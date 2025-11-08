@@ -69,6 +69,11 @@ public final class TableUtils {
 
             // 3) ميزات النسخ و I-beam
             try { makeAllStringColumnsCopyable(tv); } catch (Throwable ignored) {}
+            try {
+                for (TableColumn<?, ?> col : tv.getColumns()) {
+                    centerAlignColumnRec(col);
+                }
+            } catch (Throwable ignored) {}
             try { forceIBeamOnCopyableCells(tv); }  catch (Throwable ignored) {}
         }
     }
@@ -1299,6 +1304,19 @@ public final class TableUtils {
             });
             return row;
         });
+    }
+    @SuppressWarnings({"rawtypes","unchecked"})
+    private static void centerAlignColumnRec(TableColumn col) {
+        if (col == null) return;
+        // طبّق على الأعمدة المتداخلة أيضًا
+        if (col.getColumns() != null && !col.getColumns().isEmpty()) {
+            for (Object child : col.getColumns()) {
+                centerAlignColumnRec((TableColumn) child);
+            }
+            return;
+        }
+        // عيّن المحاذاة الوسطية
+        col.setStyle("-fx-alignment: CENTER;");
     }
 
     /** هل هذا الصف صف تعبئة داخلي؟ (مفيد لتجاهله عند النسخ/التصدير إن رغبت) */
