@@ -78,16 +78,6 @@ public class PrescriptionDAO {
         }
     }
 
-    // Convenience overloads that manage their own connection
-    public int countTotalOnDate(LocalDate day) throws SQLException {
-        try (Connection c = Database.get()) { return countTotalOnDate(c, day); }
-    }
-    public int countPendingOnDate(LocalDate day) throws SQLException {
-        try (Connection c = Database.get()) { return countPendingOnDate(c, day); }
-    }
-    public int countCompletedOnDate(LocalDate day) throws SQLException {
-        try (Connection c = Database.get()) { return countCompletedOnDate(c, day); }
-    }
 
     /** Create a prescription (optionally without appointment) and insert items in one transaction. */
     public Prescription createAndItems(Connection c,
@@ -138,41 +128,41 @@ public class PrescriptionDAO {
         ORDER BY p.created_at DESC
     """;
 
-            try (PreparedStatement ps = c.prepareStatement(sql)) {
-                // نطاق اليوم [start .. next day) — أسرع من created_at::date
-                ps.setObject(1, day.atStartOfDay());
-                ps.setObject(2, day.plusDays(1).atStartOfDay());
+        try (PreparedStatement ps = c.prepareStatement(sql)) {
+            // نطاق اليوم [start .. next day) — أسرع من created_at::date
+            ps.setObject(1, day.atStartOfDay());
+            ps.setObject(2, day.plusDays(1).atStartOfDay());
 
-                if (st == null) {
-                    ps.setNull(3, java.sql.Types.VARCHAR); // (? IS NULL ...)
-                    ps.setNull(4, java.sql.Types.VARCHAR); // (? IS NOT NULL ...)
-                    ps.setNull(5, java.sql.Types.VARCHAR); // (... = ?::prescription_status)
-                } else {
-                    String s = st.name();
-                    ps.setString(3, s);
-                    ps.setString(4, s);
-                    ps.setString(5, s);
-                }
+            if (st == null) {
+                ps.setNull(3, java.sql.Types.VARCHAR); // (? IS NULL ...)
+                ps.setNull(4, java.sql.Types.VARCHAR); // (? IS NOT NULL ...)
+                ps.setNull(5, java.sql.Types.VARCHAR); // (... = ?::prescription_status)
+            } else {
+                String s = st.name();
+                ps.setString(3, s);
+                ps.setString(4, s);
+                ps.setString(5, s);
+            }
 
-                try (ResultSet rs = ps.executeQuery()) {
-                    List<DashboardRow> out = new ArrayList<>();
-                    while (rs.next()) {
-                        DashboardRow r = new DashboardRow();
-                        r.prescriptionId       = rs.getLong("prescription_id");
-                        r.appointmentId        = (Long) rs.getObject("appointment_id");
-                        r.createdAt            = rs.getObject("created_at", OffsetDateTime.class);
-                        r.status               = PrescriptionStatus.fromDb(rs.getString("status"));
-                        r.diagnosisNote        = rs.getString("notes");
-                        r.appointmentDateTime  = rs.getObject("appointment_date", OffsetDateTime.class);
-                        r.doctorName           = rs.getString("doctor_name");
-                        r.patientName          = rs.getString("patient_name");
-                        r.patientNid           = rs.getString("patient_nid");
-                        out.add(r);
-                    }
-                    return out;
+            try (ResultSet rs = ps.executeQuery()) {
+                List<DashboardRow> out = new ArrayList<>();
+                while (rs.next()) {
+                    DashboardRow r = new DashboardRow();
+                    r.prescriptionId       = rs.getLong("prescription_id");
+                    r.appointmentId        = (Long) rs.getObject("appointment_id");
+                    r.createdAt            = rs.getObject("created_at", OffsetDateTime.class);
+                    r.status               = PrescriptionStatus.fromDb(rs.getString("status"));
+                    r.diagnosisNote        = rs.getString("notes");
+                    r.appointmentDateTime  = rs.getObject("appointment_date", OffsetDateTime.class);
+                    r.doctorName           = rs.getString("doctor_name");
+                    r.patientName          = rs.getString("patient_name");
+                    r.patientNid           = rs.getString("patient_nid");
+                    out.add(r);
                 }
+                return out;
             }
         }
+    }
 
 
     public List<DashboardRow> listDashboardRowsByDate(LocalDate day) throws SQLException {
@@ -291,3 +281,4 @@ public class PrescriptionDAO {
         }
     }
 }
+

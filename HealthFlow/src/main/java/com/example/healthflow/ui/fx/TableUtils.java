@@ -36,12 +36,15 @@ import javafx.scene.control.CustomMenuItem;
 import javafx.scene.control.Label;
 import javafx.util.Callback;
 import org.kordamp.ikonli.javafx.FontIcon;
+// Needed for nextAvailableFile
+// (No need to import java.util.regex.Matcher/Pattern since we use fully-qualified names in the helper)
 
 /**
  * Utilities for safe table updates without losing focus/editing.
  */
 public final class TableUtils {
-    private TableUtils(){}
+    private TableUtils() {
+    }
 
 
     @SafeVarargs
@@ -52,7 +55,8 @@ public final class TableUtils {
                 var classes = root.getStyleClass();
                 if (!classes.contains("hf-theme")) classes.add("hf-theme");
             }
-        } catch (Throwable ignored) {}
+        } catch (Throwable ignored) {
+        }
 
         if (tables == null) return;
 
@@ -62,19 +66,27 @@ public final class TableUtils {
             // 2) ستايل موحّد
             try {
                 var cls = tv.getStyleClass();
-                if (!cls.contains("hf-force"))  cls.add("hf-force");
+                if (!cls.contains("hf-force")) cls.add("hf-force");
                 if (!cls.contains("hf-select")) cls.add("hf-select");
                 tv.setFocusTraversable(true);
-            } catch (Throwable ignored) {}
+            } catch (Throwable ignored) {
+            }
 
             // 3) ميزات النسخ و I-beam
-            try { makeAllStringColumnsCopyable(tv); } catch (Throwable ignored) {}
+            try {
+                makeAllStringColumnsCopyable(tv);
+            } catch (Throwable ignored) {
+            }
             try {
                 for (TableColumn<?, ?> col : tv.getColumns()) {
                     centerAlignColumnRec(col);
                 }
-            } catch (Throwable ignored) {}
-            try { forceIBeamOnCopyableCells(tv); }  catch (Throwable ignored) {}
+            } catch (Throwable ignored) {
+            }
+            try {
+                forceIBeamOnCopyableCells(tv);
+            } catch (Throwable ignored) {
+            }
         }
     }
 
@@ -87,7 +99,9 @@ public final class TableUtils {
     // Copy helpers (universal)
     // =========================
 
-    /** Register nodes that should NOT cause the table to clear selection when clicked. */
+    /**
+     * Register nodes that should NOT cause the table to clear selection when clicked.
+     */
     public static void registerClearSelectionSafeZones(TableView<?> table, Node... zones) {
         if (table == null || zones == null || zones.length == 0) return;
         // store as a simple List<Node> on table properties
@@ -101,14 +115,20 @@ public final class TableUtils {
         }
     }
 
-    /** Convenience: install click-outside-to-clear but keep selection when clicking inside any of the provided safe zones. */
+    /**
+     * Convenience: install click-outside-to-clear but keep selection when clicking inside any of the provided safe zones.
+     */
     public static void installClickOutsideToClear(TableView<?> table, Node... safeZones) {
         if (table == null) return;
         registerClearSelectionSafeZones(table, safeZones);
         // enhanceSelectionBehavior is already called from makeAllStringColumnsCopyable(...)
         // If needed explicitly:
-        try { enhanceSelectionBehavior((TableView<Object>) table); } catch (Throwable ignored) {}
+        try {
+            enhanceSelectionBehavior((TableView<Object>) table);
+        } catch (Throwable ignored) {
+        }
     }
+
     public static <R> void makeAllStringColumnsCopyable(TableView<R> table) {
         if (table == null) return;
         for (TableColumn<R, ?> c : table.getColumns()) {
@@ -137,6 +157,7 @@ public final class TableUtils {
     }
 
     private static final PseudoClass PC_COPY_ACTIVE = PseudoClass.getPseudoClass("copy-active");
+
     private static boolean isClassPresent(String fqcn) {
         try {
             Class.forName(fqcn);
@@ -145,7 +166,10 @@ public final class TableUtils {
             return false;
         }
     }
-    /** Apply a delta update by key, avoiding setItems(newList). */
+
+    /**
+     * Apply a delta update by key, avoiding setItems(newList).
+     */
     public static <T, K> void applyDelta(ObservableList<T> target, List<T> fresh, Function<T, K> keyExtractor) {
         if (target == null || fresh == null) return;
         if (!javafx.application.Platform.isFxApplicationThread()) {
@@ -155,7 +179,9 @@ public final class TableUtils {
         target.setAll(fresh);
     }
 
-    /** Remember the current focus owner to restore it later. */
+    /**
+     * Remember the current focus owner to restore it later.
+     */
     public static Node rememberFocus(Node anyNodeInScene) {
         if (anyNodeInScene == null || anyNodeInScene.getScene() == null) return null;
         return anyNodeInScene.getScene().getFocusOwner();
@@ -165,7 +191,9 @@ public final class TableUtils {
         if (node != null) node.requestFocus();
     }
 
-    /** Convenience: refresh table without losing selection. */
+    /**
+     * Convenience: refresh table without losing selection.
+     */
     public static <T> void safeRefresh(TableView<T> table) {
         if (table == null) return;
         var sel = table.getSelectionModel().getSelectedItem();
@@ -174,7 +202,7 @@ public final class TableUtils {
     }
 
 
-    @SuppressWarnings({"unchecked","rawtypes"})
+    @SuppressWarnings({"unchecked", "rawtypes"})
     private static <R> void applyCopyableToColumnRec(TableColumn<R, ?> col) {
         if (col == null) return;
         if (col.getColumns() != null && !col.getColumns().isEmpty()) {
@@ -198,9 +226,11 @@ public final class TableUtils {
         }
     }
 
-    /** Install: (1) clear selection when clicking outside any row;
-     *  (2) soft hover styling on rows (via style-class). */
-    @SuppressWarnings({"rawtypes","unchecked"})
+    /**
+     * Install: (1) clear selection when clicking outside any row;
+     * (2) soft hover styling on rows (via style-class).
+     */
+    @SuppressWarnings({"rawtypes", "unchecked"})
     private static void enhanceSelectionBehavior(TableView<Object> table) {
         if (table == null) return;
 
@@ -242,9 +272,9 @@ public final class TableUtils {
                     }
 
                     // إن كان الضغط داخل TableCell ينتمي لعمود قابل للتحرير أو كومبوبوكس، لا تستهلك الحدث
-                    TableCell<?,?> cell = findAncestor(target, TableCell.class);
+                    TableCell<?, ?> cell = findAncestor(target, TableCell.class);
                     if (cell != null) {
-                        TableColumn<?,?> col = cell.getTableColumn();
+                        TableColumn<?, ?> col = cell.getTableColumn();
                         if (col != null) {
                             // لا تتدخل في أعمدة التحرير/الكومبوبوكس
                             if (col.isEditable() || isComboLikeCellFactory((TableColumn) col)) {
@@ -292,7 +322,10 @@ public final class TableUtils {
             }
         });
     }
-    /** Returns true if node n is a descendant of ancestor (inclusive). */
+
+    /**
+     * Returns true if node n is a descendant of ancestor (inclusive).
+     */
     private static boolean isDescendantOf(Node n, Node ancestor) {
         for (Node cur = n; cur != null; cur = cur.getParent()) {
             if (cur == ancestor) return true;
@@ -300,7 +333,9 @@ public final class TableUtils {
         return false;
     }
 
-    /** Walk up the parent chain to find the first ancestor of the requested type. */
+    /**
+     * Walk up the parent chain to find the first ancestor of the requested type.
+     */
     @SuppressWarnings("unchecked")
     private static <T> T findAncestor(Node n, Class<T> type) {
         for (Node cur = n; cur != null; cur = cur.getParent()) {
@@ -308,7 +343,6 @@ public final class TableUtils {
         }
         return null;
     }
-
 
 
     /**
@@ -321,12 +355,14 @@ public final class TableUtils {
         // هذه الدالة تفيد لو حبيت تعمل مناداة شرطية لاحقًا
         return true;
     }
+
     /**
      * Decorator: Adds a lightweight "Copy" context menu to each column, without replacing its cellFactory.
      * Non-intrusive: preserves original editing/cell logic.
+     *
      * @param cols Columns to decorate
      */
-    @SuppressWarnings({"rawtypes","unchecked"})
+    @SuppressWarnings({"rawtypes", "unchecked"})
     public static void addCopyMenuNonIntrusive(TableColumn<?, ?>... cols) {
         if (cols == null) return;
         for (TableColumn col : cols) {
@@ -335,7 +371,8 @@ public final class TableUtils {
             javafx.util.Callback original = col.getCellFactory();
             // لا تغيّر المصنع لو مش مطلوب؛ لو كان null، أنشئ مصنع افتراضي بسيط ثم زيّنه
             javafx.util.Callback<TableColumn, TableCell> fallback = tc -> new TableCell<>() {
-                @Override protected void updateItem(Object item, boolean empty) {
+                @Override
+                protected void updateItem(Object item, boolean empty) {
                     super.updateItem(item, empty);
                     setText(empty ? null : (item == null ? "" : String.valueOf(item)));
                 }
@@ -374,7 +411,9 @@ public final class TableUtils {
     }
 
 
-    /** Render cells as non-editable, selectable TextField with copy menu */
+    /**
+     * Render cells as non-editable, selectable TextField with copy menu
+     */
     public static <R> void makeCopyable(TableColumn<R, String> column) {
         // ===== لا تستبدل مصنع خلايا الأعمدة القابلة للتحرير/الكومبوبوكس =====
         if (Boolean.TRUE.equals(column.getProperties().get("hf.noCopy"))) {
@@ -389,6 +428,7 @@ public final class TableUtils {
 
         column.setCellFactory(col -> new TableCell<R, String>() {
             private final TextField tf = new TextField();
+
             // helper: toggle both pseudo and style class
             private void setActive(boolean active) {
                 pseudoClassStateChanged(PC_COPY_ACTIVE, active);
@@ -581,7 +621,7 @@ public final class TableUtils {
     }
 
     // لفّ الـ valueFactory الحالي (مهما كان نوعه) بحيث لو الصف null يرجّع ObservableValue null
-    @SuppressWarnings({"unchecked","rawtypes"})
+    @SuppressWarnings({"unchecked", "rawtypes"})
     private static <R, T> void wrapColumnNullSafe(TableColumn<R, T> col) {
         var original = (Callback<TableColumn.CellDataFeatures<R, T>, ObservableValue<T>>) col.getCellValueFactory();
 
@@ -600,14 +640,15 @@ public final class TableUtils {
         }
     }
 
-    @SuppressWarnings({"rawtypes","unchecked"})
+    @SuppressWarnings({"rawtypes", "unchecked"})
     private static boolean isComboLikeCellFactory(TableColumn col) {
         try {
             // One-time watch to invalidate cache when cellFactory changes
             if (!Boolean.TRUE.equals(col.getProperties().get("hf.comboWatch"))) {
                 try {
                     col.cellFactoryProperty().addListener((obs, oldF, newF) -> col.getProperties().remove("hf.comboLike"));
-                } catch (Throwable ignore) {}
+                } catch (Throwable ignore) {
+                }
                 col.getProperties().put("hf.comboWatch", Boolean.TRUE);
             }
 
@@ -641,6 +682,7 @@ public final class TableUtils {
         // اجعل المؤشر I-beam فقط على الخلايا التي أنشأناها نحن (copyable-cell)
         // لا تفعل شيئًا الآن؛ يتم ضبط المؤشر داخل makeCopyable على مستوى الخلية نفسها.
     }
+
     public static void optOutCopy(TableColumn<?, ?>... cols) {
         if (cols == null) return;
         for (TableColumn<?, ?> c : cols) {
@@ -649,7 +691,9 @@ public final class TableUtils {
         }
     }
 
-    /** Cmd/Ctrl+C to copy focused cell text */
+    /**
+     * Cmd/Ctrl+C to copy focused cell text
+     */
     public static void enableTableCopyShortcut(TableView<?> table) {
         if (table == null) return;
         // If a TextField/TextArea is currently focused, let it handle Cmd/Ctrl+C natively
@@ -720,13 +764,13 @@ public final class TableUtils {
         MenuItem miCell = prettyItem("fas-copy", "Copy cell", "");
         miCell.setOnAction(e -> copyFocusedCell(table));
 
-        MenuItem miRow  = prettyItem("fas-align-justify", "Copy row", "");
+        MenuItem miRow = prettyItem("fas-align-justify", "Copy row", "");
         miRow.setOnAction(e -> copyFocusedRow(table));
 
-        MenuItem miCol  = prettyItem("fas-columns", "Copy column", "");
+        MenuItem miCol = prettyItem("fas-columns", "Copy column", "");
         miCol.setOnAction(e -> copyFocusedColumn(table));
 
-        MenuItem miAll  = prettyItem("fas-table", "Copy table (TSV)", "");
+        MenuItem miAll = prettyItem("fas-table", "Copy table (TSV)", "");
         miAll.setOnAction(e -> copyWholeTable(table));
 
         cm.getItems().addAll(miCell, miRow, miCol, new SeparatorMenuItem(), miAll);
@@ -747,7 +791,7 @@ public final class TableUtils {
                 true
         ));
 
-        MenuItem miExportCsv  = prettyItem("fas-file-export",
+        MenuItem miExportCsv = prettyItem("fas-file-export",
                 poiAvailable ? "Export to CSV (.csv)" : "Export (Excel-compatible .csv)", "");
         miExportCsv.setOnAction(e -> exportTableToExcel(
                 table,
@@ -929,7 +973,9 @@ public final class TableUtils {
         }
     }
 
-    /** Export the given TableView to either XLSX (via Apache POI if present) or CSV. */
+    /**
+     * Export the given TableView to either XLSX (via Apache POI if present) or CSV.
+     */
     private static void exportTableToExcel(TableView<?> table, Window owner, boolean preferXlsx) {
         if (table == null || table.getItems() == null) return;
 
@@ -952,19 +998,49 @@ public final class TableUtils {
         File out = fc.showSaveDialog(owner);
         if (out == null) return;
 
+        // Determine the base name (without any trailing " (n)") and check for conflicts
+        File target = out;
+        String targetName = target.getName();
+        int dotIdx = targetName.lastIndexOf('.');
+        String targetBase = (dotIdx > 0) ? targetName.substring(0, dotIdx) : targetName;
+        // strip trailing (n)
+        targetBase = targetBase.replaceFirst(" \\((?:\\d+)\\)$", "");
+
+        boolean conflict = target.exists() || hasSiblingNameConflict(target.getParentFile(), targetBase);
+        if (conflict) {
+            Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+            alert.setTitle("File exists");
+            alert.setHeaderText("A file with this name already exists in the folder.");
+            alert.setContentText("Do you want to overwrite it or keep both?");
+
+            ButtonType btnOverwrite = new ButtonType("Overwrite");
+            ButtonType btnKeepBoth = new ButtonType("Keep both");
+            ButtonType btnCancel = ButtonType.CANCEL;
+            alert.getButtonTypes().setAll(btnOverwrite, btnKeepBoth, btnCancel);
+
+            var res = alert.showAndWait();
+            if (res.isEmpty() || res.get() == btnCancel) {
+                return; // user cancelled
+            } else if (res.get() == btnKeepBoth) {
+                target = nextAvailableFile(target);
+            } else {
+                // Overwrite → keep target as-is
+            }
+        }
+
         try {
-            if (doXlsx && out.getName().toLowerCase().endsWith(".xlsx")) {
-                writeXlsxViaPoiReflection(table, out);
+            if (doXlsx && target.getName().toLowerCase().endsWith(".xlsx")) {
+                writeXlsxViaPoiReflection(table, target);
             } else {
                 // force CSV if extension is .csv or POI not available
-                writeCsv(table, out);
+                writeCsv(table, target);
             }
         } catch (Exception ex) {
             // كـ fallback: لو فشل إنشاء XLSX لأي سبب، جرب CSV بنفس الاسم لكن امتداد .csv
             try {
-                File alt = out.getName().toLowerCase().endsWith(".csv")
-                        ? out
-                        : new File(out.getParentFile(), out.getName().replaceAll("\\.xlsx?$", "") + ".csv");
+                File alt = target.getName().toLowerCase().endsWith(".csv")
+                        ? target
+                        : new File(target.getParentFile(), target.getName().replaceAll("\\.xlsx?$", "") + ".csv");
                 writeCsv(table, alt);
             } catch (Exception ignored) {
                 // بصمت: ما بنظهر Dialog هنا لأن util عام؛ اترك مسؤولية التوست/التنبيه للطبقة المستدعية لو رغبت مستقبلاً
@@ -972,7 +1048,39 @@ public final class TableUtils {
         }
     }
 
-    /** Sanitize text for safe export to spreadsheet apps: strip control chars and neutralize CSV/Excel formulas. */
+    /**
+     * Return a non-conflicting file name by appending " (2)", "(3)", ... before the extension.
+     */
+    private static File nextAvailableFile(File f) {
+        if (f == null) return null;
+        File dir = f.getParentFile();
+        String name = f.getName();
+        int dot = name.lastIndexOf('.');
+        String base = (dot > 0) ? name.substring(0, dot) : name;
+        String ext = (dot > 0) ? name.substring(dot) : ""; // includes the dot
+
+        // Try to detect existing (n) suffix
+        int n = 2;
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("^(.*) \\((\\d+)\\)$").matcher(base);
+        if (m.matches()) {
+            base = m.group(1);
+            try {
+                n = Math.max(2, Integer.parseInt(m.group(2)) + 1);
+            } catch (Exception ignore) {
+            }
+        }
+
+        File candidate;
+        do {
+            candidate = new File(dir, base + " (" + n + ")" + ext);
+            n++;
+        } while (candidate.exists());
+        return candidate;
+    }
+
+    /**
+     * Sanitize text for safe export to spreadsheet apps: strip control chars and neutralize CSV/Excel formulas.
+     */
     private static String sanitizeForExport(String s) {
         if (s == null) return "";
         // Strip control characters except tab/newline
@@ -987,7 +1095,9 @@ public final class TableUtils {
         return s;
     }
 
-    /** Write CSV with headers, Excel-compatible UTF-8 BOM. Each row on one line. */
+    /**
+     * Write CSV with headers, Excel-compatible UTF-8 BOM. Each row on one line.
+     */
     private static void writeCsv(TableView<?> table, File out) throws IOException {
         StringBuilder sb = new StringBuilder();
 
@@ -1021,7 +1131,9 @@ public final class TableUtils {
         }
     }
 
-    /** CSV escaping per RFC4180 */
+    /**
+     * CSV escaping per RFC4180
+     */
     private static String escapeCsv(Object v) {
         if (v == null) return "";
         String s = String.valueOf(v);
@@ -1035,6 +1147,7 @@ public final class TableUtils {
 
     // Optional properties supported:
     // export.receptionist, export.doctor, export.pharmacist  -> explicit names for each role if different from current user
+
     /**
      * Create an .xlsx via reflection against Apache POI (if present) to avoid hard dependency.
      * Minimal sheet with headers + rows.
@@ -1058,7 +1171,10 @@ public final class TableUtils {
         Object wb = wbClz.getConstructor().newInstance();
         Object sheet = wbIfcClz.getMethod("createSheet", String.class).invoke(wb, "Data");
         // default width for readability
-        try { sheetClz.getMethod("setDefaultColumnWidth", int.class).invoke(sheet, 20); } catch (Throwable ignore) {}
+        try {
+            sheetClz.getMethod("setDefaultColumnWidth", int.class).invoke(sheet, 20);
+        } catch (Throwable ignore) {
+        }
 
         int cols = Math.max(1, table.getVisibleLeafColumns().size());
 
@@ -1070,9 +1186,12 @@ public final class TableUtils {
         cellClz.getMethod("setCellValue", String.class).invoke(titleCell, sanitizeForExport(title));
 
         Object titleStyle = wbIfcClz.getMethod("createCellStyle").invoke(wb);
-        Object titleFont  = wbIfcClz.getMethod("createFont").invoke(wb);
+        Object titleFont = wbIfcClz.getMethod("createFont").invoke(wb);
         fontClz.getMethod("setBold", boolean.class).invoke(titleFont, true);
-        try { fontClz.getMethod("setFontHeightInPoints", short.class).invoke(titleFont, (short)16); } catch (Throwable ignore) {}
+        try {
+            fontClz.getMethod("setFontHeightInPoints", short.class).invoke(titleFont, (short) 16);
+        } catch (Throwable ignore) {
+        }
         // white text on teal fill (more pleasant)
         try {
             Object white = Enum.valueOf((Class<Enum>) indexedColorsClz, "WHITE");
@@ -1083,27 +1202,34 @@ public final class TableUtils {
             cellStyleClz.getMethod("setFillForegroundColor", short.class).invoke(titleStyle, tealIdx);
             Object solid = Enum.valueOf((Class<Enum>) fillPatternClz, "SOLID_FOREGROUND");
             cellStyleClz.getMethod("setFillPattern", fillPatternClz).invoke(titleStyle, solid);
-        } catch (Throwable ignore) {}
+        } catch (Throwable ignore) {
+        }
         cellStyleClz.getMethod("setFont", fontClz).invoke(titleStyle, titleFont);
         try {
             Object center = Enum.valueOf((Class<Enum>) horizontalAlignClz, "CENTER");
             cellStyleClz.getMethod("setAlignment", horizontalAlignClz).invoke(titleStyle, center);
-        } catch (Throwable ignore) {}
+        } catch (Throwable ignore) {
+        }
         try {
             Object thin = Enum.valueOf((Class<Enum>) borderStyleClz, "THIN");
             cellStyleClz.getMethod("setBorderBottom", borderStyleClz).invoke(titleStyle, thin);
-        } catch (Throwable ignore) {}
+        } catch (Throwable ignore) {
+        }
         try {
             Object mergedTitle = regionClz.getConstructor(int.class, int.class, int.class, int.class)
                     .newInstance(0, 0, 0, cols - 1);
             sheetClz.getMethod("addMergedRegion", regionClz).invoke(sheet, mergedTitle);
-        } catch (Throwable ignore) {}
-        try { cellClz.getMethod("setCellStyle", cellStyleClz).invoke(titleCell, titleStyle); } catch (Throwable ignore) {}
+        } catch (Throwable ignore) {
+        }
+        try {
+            cellClz.getMethod("setCellStyle", cellStyleClz).invoke(titleCell, titleStyle);
+        } catch (Throwable ignore) {
+        }
 
         // ===== Header row (styled) at row 1 =====
         Object headerRow = sheetClz.getMethod("createRow", int.class).invoke(sheet, 1);
         Object headerStyle = wbIfcClz.getMethod("createCellStyle").invoke(wb);
-        Object headerFont  = wbIfcClz.getMethod("createFont").invoke(wb);
+        Object headerFont = wbIfcClz.getMethod("createFont").invoke(wb);
         fontClz.getMethod("setBold", boolean.class).invoke(headerFont, true);
         cellStyleClz.getMethod("setFont", fontClz).invoke(headerStyle, headerFont);
         try {
@@ -1114,12 +1240,13 @@ public final class TableUtils {
             cellStyleClz.getMethod("setFillPattern", fillPatternClz).invoke(headerStyle, solid);
             Object thin = Enum.valueOf((Class<Enum>) borderStyleClz, "THIN");
             cellStyleClz.getMethod("setBorderBottom", borderStyleClz).invoke(headerStyle, thin);
-            cellStyleClz.getMethod("setBorderTop",    borderStyleClz).invoke(headerStyle, thin);
-            cellStyleClz.getMethod("setBorderLeft",   borderStyleClz).invoke(headerStyle, thin);
-            cellStyleClz.getMethod("setBorderRight",  borderStyleClz).invoke(headerStyle, thin);
+            cellStyleClz.getMethod("setBorderTop", borderStyleClz).invoke(headerStyle, thin);
+            cellStyleClz.getMethod("setBorderLeft", borderStyleClz).invoke(headerStyle, thin);
+            cellStyleClz.getMethod("setBorderRight", borderStyleClz).invoke(headerStyle, thin);
             Object center = Enum.valueOf((Class<Enum>) horizontalAlignClz, "CENTER");
             cellStyleClz.getMethod("setAlignment", horizontalAlignClz).invoke(headerStyle, center);
-        } catch (Throwable ignore) {}
+        } catch (Throwable ignore) {
+        }
 
         // Data zebra style (very light blue) for alternate rows
         Object dataAltStyle = wbIfcClz.getMethod("createCellStyle").invoke(wb);
@@ -1129,14 +1256,18 @@ public final class TableUtils {
             cellStyleClz.getMethod("setFillForegroundColor", short.class).invoke(dataAltStyle, paleIdx);
             Object solid = Enum.valueOf((Class<Enum>) fillPatternClz, "SOLID_FOREGROUND");
             cellStyleClz.getMethod("setFillPattern", fillPatternClz).invoke(dataAltStyle, solid);
-        } catch (Throwable ignore) {}
+        } catch (Throwable ignore) {
+        }
 
         int cidx = 0;
         for (TableColumn<?, ?> c : table.getVisibleLeafColumns()) {
             Object cell = rowClz.getMethod("createCell", int.class).invoke(headerRow, cidx++);
             String head = c.getText() == null ? "" : c.getText();
             cellClz.getMethod("setCellValue", String.class).invoke(cell, sanitizeForExport(head));
-            try { cellClz.getMethod("setCellStyle", cellStyleClz).invoke(cell, headerStyle); } catch (Throwable ignore) {}
+            try {
+                cellClz.getMethod("setCellStyle", cellStyleClz).invoke(cell, headerStyle);
+            } catch (Throwable ignore) {
+            }
         }
 
         // ===== Data rows start at row 2 =====
@@ -1166,7 +1297,10 @@ public final class TableUtils {
                 }
                 // apply alternate row shading
                 if ((r % 2) == 1) {
-                    try { cellClz.getMethod("setCellStyle", cellStyleClz).invoke(cell, dataAltStyle); } catch (Throwable ignore) {}
+                    try {
+                        cellClz.getMethod("setCellStyle", cellStyleClz).invoke(cell, dataAltStyle);
+                    } catch (Throwable ignore) {
+                    }
                 }
             }
         }
@@ -1174,20 +1308,25 @@ public final class TableUtils {
         int lastDataRow = table.getItems().size() + 1; // header at row 1
 
         // Freeze pane under header
-        try { sheetClz.getMethod("createFreezePane", int.class, int.class).invoke(sheet, 0, 2); } catch (Throwable ignore) {}
+        try {
+            sheetClz.getMethod("createFreezePane", int.class, int.class).invoke(sheet, 0, 2);
+        } catch (Throwable ignore) {
+        }
         // Auto filter on header row
         try {
             Object filterRegion = regionClz.getConstructor(int.class, int.class, int.class, int.class)
                     .newInstance(1, 1, 0, cols - 1);
             sheetClz.getMethod("setAutoFilter", regionClz).invoke(sheet, filterRegion);
-        } catch (Throwable ignore) {}
+        } catch (Throwable ignore) {
+        }
 
         // Auto-size columns
         try {
             for (int i = 0; i < cols; i++) {
                 sheetClz.getMethod("autoSizeColumn", int.class).invoke(sheet, i);
             }
-        } catch (Throwable ignore) {}
+        } catch (Throwable ignore) {
+        }
 
         // ===== Footer: only Date/Time, merged across all columns =====
         java.time.LocalDateTime now = java.time.LocalDateTime.now();
@@ -1199,8 +1338,11 @@ public final class TableUtils {
         cellClz.getMethod("setCellValue", String.class).invoke(footerCell, "Generated: " + fmt.format(now) + " (" + day + ")");
 
         Object footerStyle = wbIfcClz.getMethod("createCellStyle").invoke(wb);
-        Object footerFont  = wbIfcClz.getMethod("createFont").invoke(wb);
-        try { fontClz.getMethod("setItalic", boolean.class).invoke(footerFont, true); } catch (Throwable ignore) {}
+        Object footerFont = wbIfcClz.getMethod("createFont").invoke(wb);
+        try {
+            fontClz.getMethod("setItalic", boolean.class).invoke(footerFont, true);
+        } catch (Throwable ignore) {
+        }
         cellStyleClz.getMethod("setFont", fontClz).invoke(footerStyle, footerFont);
         try {
             Object center = Enum.valueOf((Class<Enum>) horizontalAlignClz, "CENTER");
@@ -1212,21 +1354,29 @@ public final class TableUtils {
             cellStyleClz.getMethod("setFillPattern", fillPatternClz).invoke(footerStyle, solid);
             Object thin = Enum.valueOf((Class<Enum>) borderStyleClz, "THIN");
             cellStyleClz.getMethod("setBorderTop", borderStyleClz).invoke(footerStyle, thin);
-        } catch (Throwable ignore) {}
-        try { cellClz.getMethod("setCellStyle", cellStyleClz).invoke(footerCell, footerStyle); } catch (Throwable ignore) {}
+        } catch (Throwable ignore) {
+        }
+        try {
+            cellClz.getMethod("setCellStyle", cellStyleClz).invoke(footerCell, footerStyle);
+        } catch (Throwable ignore) {
+        }
 
         try {
             Object footerRegion = regionClz.getConstructor(int.class, int.class, int.class, int.class)
                     .newInstance(footerRowIdx, footerRowIdx, 0, cols - 1);
             sheetClz.getMethod("addMergedRegion", regionClz).invoke(sheet, footerRegion);
-        } catch (Throwable ignore) {}
+        } catch (Throwable ignore) {
+        }
 
         // write file
         try (java.io.OutputStream os = new java.io.FileOutputStream(out)) {
             wbIfcClz.getMethod("write", java.io.OutputStream.class).invoke(wb, os);
         }
         // close workbook
-        try { wbIfcClz.getMethod("close").invoke(wb); } catch (Throwable ignore) {}
+        try {
+            wbIfcClz.getMethod("close").invoke(wb);
+        } catch (Throwable ignore) {
+        }
     }
 //    public static void forceIBeamOnCopyableCells(TableView<?> table) {
 //        if (table == null) return;
@@ -1247,11 +1397,16 @@ public final class TableUtils {
     // ——— markers & css ———
     private static final class _EmptyRowMarker {
         static final _EmptyRowMarker INSTANCE = new _EmptyRowMarker();
-        private _EmptyRowMarker() {}
+
+        private _EmptyRowMarker() {
+        }
     }
+
     private static final String CSS_EMPTY_ROW = "hf-empty-row";
 
-    /** أضِف/أزل صفوف تعبئة إذا كانت القائمة فارغة. استدعِها بعد كل تحميل بيانات. */
+    /**
+     * أضِف/أزل صفوف تعبئة إذا كانت القائمة فارغة. استدعِها بعد كل تحميل بيانات.
+     */
     @SuppressWarnings("unchecked")
     public static <T> void ensureBlankRows(TableView<T> table, int minRowsWhenEmpty) {
         if (table == null) return;
@@ -1275,7 +1430,8 @@ public final class TableUtils {
             if (target instanceof javafx.collections.transformation.FilteredList<?> f) {
                 target = f.getSource();
             }
-        } catch (Throwable ignore) { }
+        } catch (Throwable ignore) {
+        }
 
         if (!(target instanceof ObservableList<?> raw)) return;
         @SuppressWarnings("unchecked")
@@ -1305,7 +1461,8 @@ public final class TableUtils {
             return row;
         });
     }
-    @SuppressWarnings({"rawtypes","unchecked"})
+
+    @SuppressWarnings({"rawtypes", "unchecked"})
     private static void centerAlignColumnRec(TableColumn col) {
         if (col == null) return;
         // طبّق على الأعمدة المتداخلة أيضًا
@@ -1319,8 +1476,27 @@ public final class TableUtils {
         col.setStyle("-fx-alignment: CENTER;");
     }
 
-    /** هل هذا الصف صف تعبئة داخلي؟ (مفيد لتجاهله عند النسخ/التصدير إن رغبت) */
+    /**
+     * هل هذا الصف صف تعبئة داخلي؟ (مفيد لتجاهله عند النسخ/التصدير إن رغبت)
+     */
     private static boolean isScaffoldRow(Object item) {
         return item == _EmptyRowMarker.INSTANCE;
+    }
+
+    /**
+     * Returns true if the directory already has a sibling file with the same base name (any .xlsx/.csv), ignoring suffixes like " (2)".
+     */
+    private static boolean hasSiblingNameConflict(File dir, String base) {
+        if (dir == null || base == null || base.isBlank()) return false;
+        File[] list = dir.listFiles((d, name) -> {
+            int dot = name.lastIndexOf('.');
+            String nBase = (dot > 0) ? name.substring(0, dot) : name;
+            // strip trailing (n)
+            nBase = nBase.replaceFirst(" \\((?:\\d+)\\)$", "");
+            String ext = (dot > 0) ? name.substring(dot).toLowerCase() : "";
+            boolean extOk = ext.equals(".xlsx") || ext.equals(".csv");
+            return extOk && nBase.equalsIgnoreCase(base);
+        });
+        return list != null && list.length > 0;
     }
 }

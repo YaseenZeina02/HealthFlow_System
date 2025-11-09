@@ -215,6 +215,9 @@ public class ReceptionController {
     @FXML private Label AppointmentDateDetailes;
 
     @FXML private ComboBox<String> statusFilter; // لو معرف في FXML تجاهل هذا السطر
+    @FXML private ComboBox<String> statusFilterDashboard; // لو معرف في FXML تجاهل هذا السطر
+
+
 
     private static final ObservableList<String> STATUS_CHOICES =
             FXCollections.observableArrayList("ALL","SCHEDULED","COMPLETED","CANCELLED");
@@ -413,6 +416,9 @@ public class ReceptionController {
         } catch (Throwable t) {
             System.err.println("[ReceptionController] startDbNotificationsSafe error: " + t);
         }
+
+        // Ensure we only refresh on NOTIFY (no timers)
+        disableAutoRefreshPeriodic();
     }
 
     private void onAppointmentsDbEvent(String payload) {
@@ -2330,6 +2336,7 @@ public class ReceptionController {
                     n.execute();
                 }
             }
+            showDashboardPane();
 
             showInfo("Insert", "Appointment created.");
         } catch (Exception e) {
@@ -2494,69 +2501,79 @@ public class ReceptionController {
     // ========== DASHBOARD TABLE RELOAD ==========
     // This is the method referenced in the instruction (see log message)
     private void reloadDashboardAppointments() {
-        LocalDate day = (dataPickerDashboard == null || dataPickerDashboard.getValue() == null)
+        final LocalDate day = (dataPickerDashboard == null || dataPickerDashboard.getValue() == null)
                 ? java.time.LocalDate.now()
-                : dataPickerDashboard.getValue();        java.util.List<DoctorDAO.AppointmentRow> rows = null;
-        try {
-            rows = doctorDAO.listDashboardAppointments(day);
-        } catch (Exception e) {
-            e.printStackTrace();
-            showWarn("Dashboard", "Failed to load dashboard appointments: " + e.getMessage());
-            return;
-        }
-        System.out.println("[ReceptionController] reloadDashboardAppointments sel=" + day + " rows=" + (rows == null ? 0 : rows.size()));
+                : dataPickerDashboard.getValue();
 
-        // --- Apply rows to dashboard table (clear when empty) ---
-        if (rows == null || rows.isEmpty()) {
-            // Clear backing list and selection
-            try { dashBase.clear(); } catch (Throwable ignore) {}
+        new Thread(() -> {
+            java.util.List<DoctorDAO.AppointmentRow> rows;
             try {
-                if (TableAppInDashboard != null) {
-                    TableAppInDashboard.getSelectionModel().clearSelection();
-                    if (TableAppInDashboard.getItems() != sortedDash) {
-                        TableAppInDashboard.setItems(sortedDash);
-                    }
-                    TableAppInDashboard.setPlaceholder(new Label(
-                            (day == null ? "No appointments" : ("No appointments for " + day))
-                    ));
-                    TableAppInDashboard.refresh();
-                }
-            } catch (Throwable ignore) {}
-            System.out.println("[ReceptionController] reloadDashboardAppointments: no rows → cleared table");
-            return; // stop here; nothing more to populate
-        }
-
-        // If we have rows → show them
-        dashBase.setAll(rows);
-        try {
-            if (TableAppInDashboard != null && TableAppInDashboard.getItems() != dashSorted) {
-                TableAppInDashboard.setItems(dashSorted);
+                rows = doctorDAO.listDashboardAppointments(day);
+            } catch (Exception e) {
+                e.printStackTrace();
+                final String msg = e.getMessage();
+                Platform.runLater(() -> showWarn("Dashboard", "Failed to load dashboard appointments: " + msg));
+                return;
             }
-        } catch (Throwable ignore) {}
+
+            final java.util.List<DoctorDAO.AppointmentRow> finalRows = rows;
+            Platform.runLater(() -> {
+                System.out.println("[ReceptionController] reloadDashboardAppointments sel=" + day + " rows=" + (finalRows == null ? 0 : finalRows.size()));
+
+                // --- Apply rows to dashboard table (clear when empty) ---
+                if (finalRows == null || finalRows.isEmpty()) {
+                    try { dashBase.clear(); } catch (Throwable ignore) {}
+                    try {
+                        if (TableAppInDashboard != null) {
+                            TableAppInDashboard.getSelectionModel().clearSelection();
+                            if (TableAppInDashboard.getItems() != dashSorted) {
+                                TableAppInDashboard.setItems(dashSorted); // fix: use dashSorted consistently
+                            }
+                            TableAppInDashboard.setPlaceholder(new Label(
+                                    (day == null ? "No appointments" : ("No appointments for " + day))
+                            ));
+                            TableAppInDashboard.refresh();
+                        }
+                    } catch (Throwable ignore) {}
+                    System.out.println("[ReceptionController] reloadDashboardAppointments: no rows → cleared table");
+                    return; // stop here; nothing more to populate
+                }
+
+                // If we have rows → show them
+                dashBase.setAll(finalRows);
+                try {
+                    if (TableAppInDashboard != null && TableAppInDashboard.getItems() != dashSorted) {
+                        TableAppInDashboard.setItems(dashSorted);
+                    }
+                } catch (Throwable ignore) {}
+            });
+        }, "reload-dashboard").start();
     }
 
 
     // -- Dashboard DatePicker wiring: today by default + reload on change
     private void wireDashboardDatePicker() {
-        if (dataPickerDashboard != null && dataPickerDashboard.getValue() == null) {
+        if (dataPickerDashboard == null) return;
+
+        // Set default without relying on action handlers
+        if (dataPickerDashboard.getValue() == null) {
             dataPickerDashboard.setValue(java.time.LocalDate.now());
         }
-        if (dataPickerDashboard != null) {
-            dataPickerDashboard.valueProperty().addListener((obs, oldD, newD) -> {
-                reloadDashboardAppointments();
-                updateAppointmentCounters();
-                updatePatientDetailsChart();
-                applyDashboardFilters();
-            });
-        }
-        if (dataPickerDashboard != null) {
-            dataPickerDashboard.setOnAction(e -> {
-                reloadDashboardAppointments();
-                updateAppointmentCounters();
-                updatePatientDetailsChart();
-                applyDashboardFilters();
-            });
-        }
+
+        // Single source of truth: value listener only (avoid duplicate firing with setOnAction)
+        dataPickerDashboard.valueProperty().addListener((obs, oldD, newD) -> {
+            refreshDashboardAll();
+        });
+
+        // Initial populate once
+        refreshDashboardAll();
+    }
+
+    private void refreshDashboardAll() {
+        reloadDashboardAppointments();
+        updateAppointmentCounters();
+        updatePatientDetailsChart();
+        applyDashboardFilters();
     }
 
 
@@ -3183,43 +3200,43 @@ public class ReceptionController {
     }
 
     // Start a very light polling that only checks MAX(updated_at) stamps; triggers a coalesced UI refresh on change
-    private void startLightweightPolling() {
-        java.util.concurrent.ScheduledExecutorService exec = this.autoRefreshExec;
-        if (exec == null) return; // safety
-
-        exec.scheduleAtFixedRate(() -> {
-            try {
-                // 1) appointments for selected day (cheap because of date filter)
-                java.time.LocalDate sel = (dataPickerDashboard != null && dataPickerDashboard.getValue() != null)
-                        ? dataPickerDashboard.getValue() : java.time.LocalDate.now();
-
-                java.sql.Timestamp apptTs = fetchMaxApptUpdatedAt(sel);
-                if ((lastApptTs == null && apptTs != null) || (apptTs != null && apptTs.after(lastApptTs))) {
-                    lastApptTs = apptTs;
-                    uiRefresh.request(() -> {
-                        ensureTableBindings();
-                        reloadDashboardAppointments();
-                        applyDashboardFilters();
-                        updateAppointmentCounters();
-                        if (appointmentStatusChart != null) refreshAppointmentStatusChart(sel);
-                    });
-                }
-
-                // 2) patients: watch both users/patients via greatest(updated_at)
-                java.sql.Timestamp patTs = fetchMaxPatientUpdatedAt();
-                if ((lastPatientTs == null && patTs != null) || (patTs != null && patTs.after(lastPatientTs))) {
-                    lastPatientTs = patTs;
-                    Platform.runLater(this::loadPatientsBG); // light, async
-                    uiRefresh.request(() -> {
-                        ensureTableBindings();
-                        scheduleCoalescedRefresh();
-                    });
-                }
-            } catch (Throwable t) {
-                System.err.println("[ReceptionController] poll error: " + t);
-            }
-        }, 1500, 3000, java.util.concurrent.TimeUnit.MILLISECONDS); // first run after 1.5s, then every 3s
-    }
+//    private void startLightweightPolling() {
+//        java.util.concurrent.ScheduledExecutorService exec = this.autoRefreshExec;
+//        if (exec == null) return; // safety
+//
+//        exec.scheduleAtFixedRate(() -> {
+//            try {
+//                // 1) appointments for selected day (cheap because of date filter)
+//                java.time.LocalDate sel = (dataPickerDashboard != null && dataPickerDashboard.getValue() != null)
+//                        ? dataPickerDashboard.getValue() : java.time.LocalDate.now();
+//
+//                java.sql.Timestamp apptTs = fetchMaxApptUpdatedAt(sel);
+//                if ((lastApptTs == null && apptTs != null) || (apptTs != null && apptTs.after(lastApptTs))) {
+//                    lastApptTs = apptTs;
+//                    uiRefresh.request(() -> {
+//                        ensureTableBindings();
+//                        reloadDashboardAppointments();
+//                        applyDashboardFilters();
+//                        updateAppointmentCounters();
+//                        if (appointmentStatusChart != null) refreshAppointmentStatusChart(sel);
+//                    });
+//                }
+//
+//                // 2) patients: watch both users/patients via greatest(updated_at)
+//                java.sql.Timestamp patTs = fetchMaxPatientUpdatedAt();
+//                if ((lastPatientTs == null && patTs != null) || (patTs != null && patTs.after(lastPatientTs))) {
+//                    lastPatientTs = patTs;
+//                    Platform.runLater(this::loadPatientsBG); // light, async
+//                    uiRefresh.request(() -> {
+//                        ensureTableBindings();
+//                        scheduleCoalescedRefresh();
+//                    });
+//                }
+//            } catch (Throwable t) {
+//                System.err.println("[ReceptionController] poll error: " + t);
+//            }
+//        }, 1500, 3000, java.util.concurrent.TimeUnit.MILLISECONDS); // first run after 1.5s, then every 3s
+//    }
 
     private java.sql.Timestamp fetchMaxApptUpdatedAt(java.time.LocalDate day) {
         final String sql = "SELECT MAX(updated_at) FROM appointments WHERE appointment_date::date = ?";
@@ -3498,7 +3515,6 @@ public class ReceptionController {
         if (dataPickerDashboard != null && dataPickerDashboard.getValue() == null) {
             dataPickerDashboard.setValue(LocalDate.now());
         }
-        reloadDashboardAppointments();
 
 //        if (appointmentStatusChart != null) refreshAppointmentStatusChart(dataPickerDashboard.getValue());
         if (dataPickerDashboard != null) {
@@ -3516,13 +3532,8 @@ public class ReceptionController {
                 }
             });
         }
-        // Ensure dashboard initially shows today's appointments
-        reloadDashboardAppointments();
-        applyDashboardFilters();
-        if (appointmentStatusChart != null && dataPickerDashboard != null) {
-            refreshAppointmentStatusChart(dataPickerDashboard.getValue());
-        }
-        updateAppointmentCounters();
+        // Initial dashboard load (single consolidated call)
+        refreshDashboardAll();
 
         if (clearSelectionDach != null) clearSelectionDach.setOnAction(e -> {
             if (TableAppInDashboard != null) TableAppInDashboard.getSelectionModel().clearSelection();
@@ -3636,7 +3647,7 @@ public class ReceptionController {
 
         startDbNotifications();
         scheduleCoalescedRefresh();  // تعبئة أولية
-        startLightweightPolling();
+//        startLightweightPolling();
 
         Platform.runLater(() -> {
             var url = getClass().getResource(cssPath);
@@ -4005,6 +4016,15 @@ public class ReceptionController {
 
         // أظهر الصفحة الجديدة
         paneToShow.setVisible(true);
+    }
+
+    // Disable any periodic UI refresh; rely only on DB NOTIFY
+    private void disableAutoRefreshPeriodic() {
+        try {
+            if (autoRefreshExec != null && !autoRefreshExec.isShutdown()) {
+                autoRefreshExec.shutdownNow();
+            }
+        } catch (Throwable ignore) {}
     }
 
 }

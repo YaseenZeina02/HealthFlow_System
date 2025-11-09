@@ -11,10 +11,6 @@ import java.util.List;
 import java.util.Map;
 
 public class AppointmentJdbcDAO {
-
-
-
-
     public List<DoctorApptRow> listTodayByDoctor(long doctorId) throws SQLException {
         final String sql = """
             SELECT a.id as appointment_id,
@@ -375,6 +371,4 @@ public class AppointmentJdbcDAO {
             try (ResultSet rs = ps.executeQuery()) { rs.next(); return rs.getInt(1); }
         }
     }
-
-
 }

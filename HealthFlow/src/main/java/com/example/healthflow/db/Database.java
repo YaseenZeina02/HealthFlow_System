@@ -86,8 +86,8 @@ public final class Database {
             cfg.setPassword(pass);
 
             // حجم الـpool
-            cfg.setMaximumPoolSize(Integer.parseInt(p.getProperty("db.pool.max", "5")));
-            cfg.setMinimumIdle(Integer.parseInt(p.getProperty("db.pool.min", "1"))); // ← اتصال واحد جاهز دائمًا
+            cfg.setMaximumPoolSize(Integer.parseInt(p.getProperty("db.pool.max", "10")));
+            cfg.setMinimumIdle(Integer.parseInt(p.getProperty("db.pool.min", "2"))); // ← اتصاليـن جاهزين دائمًا
 
             // مهَل أعلى قليلًا
             cfg.setConnectionTimeout(Long.parseLong(p.getProperty("db.conn.timeout.ms", "15000"))); // ← 15s
@@ -110,7 +110,7 @@ public final class Database {
                 // Keep TCP alive at OS level (helps during sleep/idle networks)
                 cfg.addDataSourceProperty("tcpKeepAlive", "true");
                 // Fail faster on broken sockets (seconds)
-                cfg.addDataSourceProperty("socketTimeout", "30");
+                cfg.addDataSourceProperty("socketTimeout", "15");
                 // Login/connect timeout (seconds)
                 cfg.addDataSourceProperty("loginTimeout", "10");
                 // Prefer query rewrite for batched inserts (no behavior change if unused)

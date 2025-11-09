@@ -9,7 +9,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class DoctorPatientJdbcDAO {
-
     // كل المرضى الذين لديهم أي موعد مع هذا الدكتور (ممكن تقصرها على اليوم لو بدك)
     public List<DoctorPatientRow> listPatientsOfDoctor(long doctorId) throws SQLException {
         final String sql = """
