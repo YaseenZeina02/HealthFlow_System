@@ -63,15 +63,12 @@ public class DoctorController {
     @FXML
     private Label TotalAppointmentsNum;
 
-    //    @FXML private AnchorPane Appointments21;
     @FXML
     private Label PatientsNumberWithSpecificDoctor;
 
-    //    @FXML private AnchorPane Appointments2;
     @FXML
     private Label AppointmentCompletedWithSpecificDoctor;
 
-    //    @FXML private AnchorPane Appointments22;
     @FXML
     private Label AppointmentRemainingWithSpecificDoctor;
 
@@ -156,6 +153,9 @@ public class DoctorController {
     /* ====== Patients tab ====== */
     @FXML
     private TableView<PatientRow> patientTable;
+
+    @FXML
+    private TableColumn<PatientRow, String> colSerialPatient;
     @FXML
     private TableColumn<PatientRow, String> colNationalId;
     @FXML
@@ -169,9 +169,9 @@ public class DoctorController {
     @FXML
     private TableColumn<PatientRow, PatientRow> colAction2;
     @FXML
-    private TextField search;      // patients search (future)
+    private TextField search;      // Appointments search (dashboard TF)
     @FXML
-    private TextField searchLabel; // appointments search (future)
+    private TextField searchLabel; // Patients search (hybrid search TF)
     @FXML
     private DatePicker datePickerPatientsWithDoctor;
     private FilteredList<PatientRow> filtered;
@@ -300,8 +300,15 @@ public class DoctorController {
 //    private org.controlsfx.control.textfield.AutoCompletionBinding<String> apptSearchBinding;
 
     // Lightweight autocomplete (no ControlsFX modules needed) (Dashbord)
-    private final ContextMenu apptAutoMenu = new ContextMenu();
-    private final java.util.ArrayList<String> apptSuggestions = new java.util.ArrayList<>();
+//    private final ContextMenu apptAutoMenu = new ContextMenu();
+//    private final java.util.ArrayList<String> apptSuggestions = new java.util.ArrayList<>();
+
+    /** Returns the TextField used to search/filter the Appointments table.
+     *  Prefer 'searchLabel' (the dashboard search near AppointmentsTable),
+     *  otherwise fall back to 'search' if that's the one present. */
+    private TextField apptSearchField() {
+        return (searchLabel != null) ? searchLabel : search;
+    }
 
     private final ObservableList<PatientRow> patientData = FXCollections.observableArrayList();
 
@@ -388,8 +395,22 @@ public class DoctorController {
 
         wireSearch();
 
-        buildAppointmentSearchIndex(); // تجهيز ال-AutoComplete من أول تحميل
-
+        // === Appointments search (autoComplete) uses 'search' if present ===
+        // === Appointments live search (no popup) ===
+        TextField apptSearch = apptSearchField();
+        if (apptSearch != null) {
+            apptSearch.setPromptText("Search appointments");
+            // فلترة مباشرة من أول حرف
+            apptSearch.textProperty().addListener((obs, ov, nv) -> applyAppointmentsFilter(nv));
+            // Defensive: if both TFs are loaded, listen to both so typing in either filters appointments
+            if (searchLabel != null && searchLabel != apptSearch) {
+                searchLabel.textProperty().addListener((o, ov, nv) -> applyAppointmentsFilter(nv));
+            }
+            if (search != null && search != apptSearch) {
+                search.textProperty().addListener((o, ov, nv) -> applyAppointmentsFilter(nv));
+            }
+            if (searchLabel != null) searchLabel.setPromptText("Search appointments");
+        }
         wirePrescriptionItemsTable();
 
         ComboAnimations.applySmoothSelect(medicineName_combo, s -> s);
@@ -509,14 +530,16 @@ public class DoctorController {
             TableUtils.applyUnifiedTableStyle(
                     rootPane,
                     AppointmentsTable,
-                    TablePrescriptionItems,
+                    patientTable,
                     TablePrescriptionItems
             );
         } catch (Throwable ignore) {}
 
         apptData.addListener((javafx.collections.ListChangeListener<? super AppointmentRow>) c -> {
-            // إعادة بناء الاقتراحات بعد اكتمال التغيير
-            Platform.runLater(this::buildAppointmentSearchIndex);
+            Platform.runLater(() -> {
+                TextField fld = apptSearchField();
+                applyAppointmentsFilter(fld == null ? "" : fld.getText());
+            });
         });
 
 
@@ -593,7 +616,6 @@ public class DoctorController {
         }, "doc-all-patients").start();
     }
 
-
     /* ================= Header time & date (12h) ================= */
     private static final java.time.ZoneId APP_TZ = java.time.ZoneId.of("Asia/Gaza");
 
@@ -651,12 +673,9 @@ public class DoctorController {
 //        markNavActive(InsertButton2);     //
     }
 
+
     /**
-     * Clear the draft prescription items table and return to Dashboard.
-     * Triggered by the doctor pressing the "sendToPharmacy" button.
-     */
-    /**
-     * عند الإرسال للصيدلية: ننشئ الوصفة فعليًا (status=PENDING) ونحفظ عناصرها.
+      عند الإرسال للصيدلية: ننشئ الوصفة فعليًا (status=PENDING) ونحفظ عناصرها.
      */
     private void handleSendToPharmacy() {
         // لازم نعرف لأي وصفة نشتغل
@@ -879,81 +898,32 @@ public class DoctorController {
         loadAppointmentsForDateAsync(date);
     }
 
-
-    private void buildAppointmentSearchIndex() {
-        if (searchLabel == null) return;
-
-        apptSuggestions.clear();
-
-        // اجمع اقتراحات فريدة من الاسم والوقت + سطر مركب
-        java.util.LinkedHashSet<String> uniq = new java.util.LinkedHashSet<>();
-        for (AppointmentRow r : apptData) {
-            if (r == null) continue;
-            String name = s(r.getPatientName());
-            String time = s(r.getTimeStr());
-            if (!name.isBlank()) uniq.add(name);
-            if (!time.isBlank()) uniq.add(time);
-            if (!name.isBlank() && !time.isBlank()) uniq.add(name + " • " + time);
-        }
-        apptSuggestions.addAll(uniq);
-
-        // فلترة مباشرة أثناء الكتابة
-        try { searchLabel.textProperty().removeListener(searchLiveListener); } catch (Throwable ignore) {}
-        searchLabel.textProperty().addListener(searchLiveListener);
-
-        // أظهر قائمة الاقتراحات أثناء الكتابة/التركيز
-        searchLabel.setOnKeyReleased(e -> showApptSuggestions(searchLabel.getText()));
-        searchLabel.focusedProperty().addListener((o, was, isNow) -> {
-            if (!isNow) apptAutoMenu.hide();
-        });
-    }
-
-
-    private void showApptSuggestions(String query) {
-        if (searchLabel == null) return;
-        String q = (query == null) ? "" : query.trim().toLowerCase();
-        apptAutoMenu.getItems().clear();
-
-        if (q.isEmpty()) { apptAutoMenu.hide(); return; }
-
-        int shown = 0;
-        for (String s : apptSuggestions) {
-            if (s == null) continue;
-            String t = s.trim();
-            if (t.toLowerCase().contains(q)) {
-                MenuItem mi = new MenuItem(t);
-                mi.setOnAction(ev -> {
-                    searchLabel.setText(t);
-                    applyAppointmentsFilter(t);
-                    apptAutoMenu.hide();
-                });
-                apptAutoMenu.getItems().add(mi);
-                shown++;
-                if (shown >= 8) break; // حد أقصى للاقتراحات
-            }
-        }
-
-        if (shown == 0) { apptAutoMenu.hide(); return; }
-
-        if (!apptAutoMenu.isShowing()) {
-            apptAutoMenu.show(searchLabel, javafx.geometry.Side.BOTTOM, 0, 0);
-        }
-    }
-
-    private final javafx.beans.value.ChangeListener<String> searchLiveListener =
-            (obs, ov, nv) -> applyAppointmentsFilter(nv);
-
     private static String s(String v) { return v == null ? "" : v; }
 
+    //    private void applyAppointmentsFilter(String query) {
+    //        final String q = (query == null ? "" : query.trim().toLowerCase());
+    //        if (apptFiltered == null) return;
+    //        apptFiltered.setPredicate(r -> {
+    //            if (r == null) return false;
+    //            if (q.isEmpty()) return true;
+    //            String name = s(r.getPatientName()).toLowerCase();
+    //            String time = s(r.getTimeStr()).toLowerCase();
+    //            return name.contains(q) || time.contains(q);
+    //        });
+    //    }
     private void applyAppointmentsFilter(String query) {
         final String q = (query == null ? "" : query.trim().toLowerCase());
         if (apptFiltered == null) return;
+
         apptFiltered.setPredicate(r -> {
             if (r == null) return false;
             if (q.isEmpty()) return true;
-            String name = s(r.getPatientName()).toLowerCase();
-            String time = s(r.getTimeStr()).toLowerCase();
-            return name.contains(q) || time.contains(q);
+
+            String name   = s(r.getPatientName()).toLowerCase();
+            String time   = s(r.getTimeStr()).toLowerCase();
+            String status = s(r.getStatus()).toLowerCase();
+
+            return name.contains(q) || time.contains(q) || status.contains(q);
         });
     }
 
@@ -1035,6 +1005,7 @@ public class DoctorController {
                             String mh = rs.getString("medical_history");
                             int age = (dob == null) ? 0 : ageFromDob(dob.toLocalDate());
                             PatientRow pr = new PatientRow(nid, name, gender, age, mh);
+                            if (dob != null) pr.setDateOfBirth(dob.toLocalDate());
                             long uid = rs.getLong("patient_user_id");
                             if (uid > 0) pr.setUserId(uid);
                             rows.add(pr);
@@ -1075,6 +1046,7 @@ public class DoctorController {
                                 String mh = rs.getString("medical_history");
                                 int age = (dob == null) ? 0 : ageFromDob(dob.toLocalDate());
                                 PatientRow pr = new PatientRow(nid, name, gender, age, mh);
+                                if (dob != null) pr.setDateOfBirth(dob.toLocalDate());
                                 long uid = rs.getLong("patient_user_id");
                                 if (uid > 0) pr.setUserId(uid);
                                 rows2.add(pr);
@@ -1308,12 +1280,9 @@ private void loadAppointmentsForDateAsync(LocalDate date) {
                 showWarn("Appointments", msg);
             }
 
-            // أعِد بناء اقتراحات الـ AutoComplete بعد تحديث البيانات فقط (مرّة واحدة)
-            try { buildAppointmentSearchIndex(); } catch (Throwable ignore) { }
-
-            // طبّق الفلترة الحالية إن كان مربع البحث غير فارغ، وإلا أعد الضبط للوضع الافتراضي
             try {
-                String q = (searchLabel == null) ? "" : searchLabel.getText();
+                TextField fld = apptSearchField();
+                String q = (fld == null) ? "" : fld.getText();
                 if (q != null && !q.trim().isEmpty()) {
                     applyAppointmentsFilter(q);
                 } else {
@@ -1515,7 +1484,8 @@ private void loadAppointmentsForDateAsync(LocalDate date) {
         AppointmentsTable.setFixedCellSize(-1);
 
         // أخيراً البيانات
-        AppointmentsTable.setItems(apptData);
+        apptSorted.comparatorProperty().bind(AppointmentsTable.comparatorProperty());
+        AppointmentsTable.setItems(apptSorted);
         // سياسة القياس: سياسة غير مقيدة لتمكين سكرول أفقي عند تجاوز العرض
         AppointmentsTable.setColumnResizePolicy(TableView.UNCONSTRAINED_RESIZE_POLICY);
         startDbNotificationsForDoctor();
@@ -1570,29 +1540,32 @@ private void loadAppointmentsForDateAsync(LocalDate date) {
     private void hybridPatientSearchNow() {
         final String q = (searchLabel == null) ? "" : searchLabel.getText().trim();
         if (q.isEmpty()) {
-            // لا تغيّر binding — فقط أعد الفلتر للوضع الافتراضي
-            if (filtered != null) {
-                filtered.setPredicate(r -> true);
-            }
+            if (filtered != null) filtered.setPredicate(r -> true);
+            // ارجع قائمة اليوم الافتراضية (لو أردت)
+            loadPatientsAsync();
             return;
         }
 
-        // 1) فلترة محلية أولًا
-        List<PatientRow> local = filterLocalPatients(q);
-        if (!local.isEmpty()) {
-            if (patientTable != null) patientData.setAll(local);
+        // 1) فلترة محلية فورية من أول حرف
+        List<PatientRow> localNow = filterLocalPatients(q);
+        if (!localNow.isEmpty()) {
+            if (patientTable != null) patientData.setAll(localNow);
+            if (filtered != null) filtered.setPredicate(r -> true);
             return;
         }
 
-        // 2) لو ما في نتائج محلية أو الاستعلام طويل → DB
-        if (q.length() < 3) {
-            // نتجنّب ضرب الداتابيز باستعلامات قصيرة جدًا إلا إذا ما في محلي
-            return;
+        // 2) لا توجد نتائج محلية → نضرب الداتابيز فقط عندما يصبح الاستعلام معبّرًا
+        if (q.length() >= 3) {
+            runDbPatientSearchAsync(q, 50);
+        } else {
+            // استعلام قصير بلا نتائج محلية: أظهر لا شيء (أو اترك البيانات كما هي)
+            patientData.clear();
         }
-        runDbPatientSearchAsync(q, 50);
     }
 
-    /** Filter current in-memory patients (patientData) by query. */
+    /** Filter current in-memory patients (patientData) by query.
+     *  Matches: name, national id, phone, gender, and age text.
+     */
     private List<PatientRow> filterLocalPatients(String q) {
         String needle = (q == null) ? "" : q.trim().toLowerCase();
         if (needle.isEmpty()) return List.of();
@@ -1600,10 +1573,18 @@ private void loadAppointmentsForDateAsync(LocalDate date) {
         List<PatientRow> out = new java.util.ArrayList<>();
         for (PatientRow r : patientData) {
             if (r == null) continue;
-            String name = nullToEmpty(r.getFullName()).toLowerCase();
-            String nid  = nullToEmpty(r.getNationalId()).toLowerCase();
-            String phone = nullToEmpty(r.getPhone()).toLowerCase();
-            if (name.contains(needle) || nid.contains(needle) || phone.contains(needle)) {
+            String name    = nullToEmpty(r.getFullName()).toLowerCase();
+            String nid     = nullToEmpty(r.getNationalId()).toLowerCase();
+            String phone   = nullToEmpty(r.getPhone()).toLowerCase();
+            String gender  = nullToEmpty(r.getGender()).toLowerCase();
+            // Age column is rendered from an integer age; match on its string form as well
+            String ageText = String.valueOf(Math.max(0, r.getAge())); // "0" means unknown/— in UI
+
+            if (name.contains(needle)
+                    || nid.contains(needle)
+                    || phone.contains(needle)
+                    || gender.contains(needle)
+                    || ageText.contains(needle)) {
                 out.add(r);
             }
         }
@@ -1961,12 +1942,34 @@ private void loadAppointmentsForDateAsync(LocalDate date) {
 
     private void wirePatientsTable() {
         if (patientTable == null) return;
+        if (colSerialPatient != null) {
+            colSerialPatient.setResizable(true);
+            colSerialPatient.setSortable(false);
+
+            colSerialPatient.setCellFactory(col -> new TableCell<PatientRow, String>() {
+                @Override
+                protected void updateItem(String item, boolean empty) {
+                    super.updateItem(item, empty);
+                    if (empty || getTableRow() == null || getTableRow().getItem() == null) {
+                        setText(null);
+                        return;
+                    }
+                    // Prefer index based on the current items list (respects sorting/filtering)
+                    try {
+                        PatientRow rowObj = (PatientRow) getTableRow().getItem();
+                        int pos = (patientTable != null) ? patientTable.getItems().indexOf(rowObj) : getIndex();
+                        setText(String.valueOf((pos < 0 ? getIndex() : pos) + 1));
+                    } catch (Throwable ignore) {
+                        setText(String.valueOf(getIndex() + 1));
+                    }
+                }
+            });
+        }
 
         if (colNationalId != null) colNationalId.setCellValueFactory(new PropertyValueFactory<>("nationalId"));
         if (colName != null) colName.setCellValueFactory(new PropertyValueFactory<>("fullName"));
         if (colGender != null) colGender.setCellValueFactory(new PropertyValueFactory<>("gender"));
         if (colDob != null) {
-//            colDob.setCellValueFactory(new PropertyValueFactory<>("age"));
             colDob.setCellValueFactory(cd -> {
                 var r = cd.getValue(); // النوع حسب صفك (مثلاً PatientRow أو PrescPatientRow)
                 java.time.LocalDate dob = r.getDateOfBirth();
@@ -1978,140 +1981,13 @@ private void loadAppointmentsForDateAsync(LocalDate date) {
         if (colAction2 != null) {
             colAction2.setCellValueFactory(param -> new ReadOnlyObjectWrapper<>(param.getValue()));
             colAction2.setCellFactory(col -> new TableCell<PatientRow, PatientRow>() {
-                private final Button btnDone = new Button();
                 private final Button btnPresc = new Button("Prescription");
-                private final HBox box = new HBox(8, btnDone, btnPresc);
-
-                {
-                    // Icon + tooltip for "Complete"
-                    btnDone.setGraphic(new org.kordamp.ikonli.javafx.FontIcon("fas-check-circle"));
-                    btnDone.setTooltip(new Tooltip("Complete Appointment"));
-                    btnDone.getStyleClass().addAll("btn", "btn-complete");
+                private final HBox box = new HBox(8,btnPresc);{
                     btnPresc.getStyleClass().addAll("btn", "btn-complete");
                     box.getStyleClass().add("table-actions");
-
-                    // Compact sizes
-                    btnDone.setMinWidth(36);
-                    btnDone.setMaxWidth(Region.USE_PREF_SIZE);
                     btnPresc.setMinWidth(78);
                     btnPresc.setMaxWidth(Region.USE_PREF_SIZE);
-
-                    // Disable when offline
-                    btnDone.disableProperty().bind(monitor.onlineProperty().not());
                     btnPresc.disableProperty().bind(monitor.onlineProperty().not());
-
-                    // Complete the selected appointment if it belongs to this patient;
-                    // otherwise, complete the first active appointment for this patient.
-                    btnDone.setOnAction(e -> {
-                        PatientRow prow = getItem();
-                        if (prow == null) return;
-
-                        AppointmentRow target = null;
-
-                        // 1) Prefer the currently selected appointment in the AppointmentsTable
-                        if (AppointmentsTable != null) {
-                            AppointmentRow sel = AppointmentsTable.getSelectionModel().getSelectedItem();
-                            if (sel != null) {
-                                boolean matchByUser = (prow.getUserId() > 0) && (sel.getPatientUserId() == prow.getUserId());
-                                boolean matchByNid = (prow.getNationalId() != null) && prow.getNationalId().equals(sel.getNationalId());
-                                boolean notCompleted = sel.getStatus() == null || !sel.getStatus().equalsIgnoreCase("COMPLETED");
-                                if ((matchByUser || matchByNid) && notCompleted) {
-                                    target = sel;
-                                }
-                            }
-                        }
-
-                        // 2) If no suitable selection, fallback to first active appt for this patient
-                        if (target == null) {
-                            for (AppointmentRow ar : apptData) {
-                                boolean matchByUser = (prow.getUserId() > 0) && (ar.getPatientUserId() == prow.getUserId());
-                                boolean matchByNid = (prow.getNationalId() != null) && prow.getNationalId().equals(ar.getNationalId());
-                                boolean notCompleted = ar.getStatus() == null || !ar.getStatus().equalsIgnoreCase("COMPLETED");
-                                if ((matchByUser || matchByNid) && notCompleted) {
-                                    target = ar;
-                                    break;
-                                }
-                            }
-                        }
-
-                        if (target != null) {
-                            completeAppointmentDb(target);
-                        } else {
-                            // 3) DB fallback: try to locate today's active appointment for this patient & current doctor
-                            var u = Session.get();
-                            if (u == null) {
-                                toast("No logged-in user.", "warn");
-                                return;
-                            }
-                            Long doctorId = null;
-                            try (Connection c = Database.get()) {
-                                // resolve doctor_id from current user once
-                                doctorId = doctorDAO.findDoctorIdByUserId(c, u.getId());
-                                if (doctorId == null) {
-                                    doctorDAO.ensureProfileForUser(c, u.getId());
-                                    doctorId = doctorDAO.findDoctorIdByUserId(c, u.getId());
-                                }
-                                if (doctorId == null) {
-                                    toast("Doctor profile missing.", "warn");
-                                    return;
-                                }
-
-                                Long apptId = null;
-                                // Prefer matching by patient user id if available
-                                if (prow.getUserId() > 0) {
-                                    try (var ps = c.prepareStatement(
-                                            "SELECT a.id FROM appointments a " +
-                                                    "JOIN patients p ON p.id = a.patient_id " +
-                                                    "WHERE a.doctor_id = ? AND p.user_id = ? " +
-                                                    "AND a.appointment_date::date = CURRENT_DATE " +
-                                                    "AND a.status NOT IN ('COMPLETED','CANCELLED') " +
-                                                    "ORDER BY a.appointment_date LIMIT 1")) {
-                                        ps.setLong(1, doctorId);
-                                        ps.setLong(2, prow.getUserId());
-                                        try (var rs = ps.executeQuery()) {
-                                            if (rs.next()) apptId = rs.getLong(1);
-                                        }
-                                    }
-                                }
-                                // If still not found and we have a National ID, try via NID
-                                if (apptId == null && prow.getNationalId() != null && !prow.getNationalId().isBlank()) {
-                                    try (var ps = c.prepareStatement(
-                                            "SELECT a.id FROM appointments a " +
-                                                    "JOIN patients p ON p.id = a.patient_id " +
-                                                    "JOIN users pu ON pu.id = p.user_id " +
-                                                    "WHERE a.doctor_id = ? AND pu.national_id = ? " +
-                                                    "AND a.appointment_date::date = CURRENT_DATE " +
-                                                    "AND a.status NOT IN ('COMPLETED','CANCELLED') " +
-                                                    "ORDER BY a.appointment_date LIMIT 1")) {
-                                        ps.setLong(1, doctorId);
-                                        ps.setString(2, prow.getNationalId());
-                                        try (var rs = ps.executeQuery()) {
-                                            if (rs.next()) apptId = rs.getLong(1);
-                                        }
-                                    }
-                                }
-
-                                if (apptId != null) {
-                                    // Update status in DB and refresh UI
-                                    boolean ok = doctorDAO.markAppointmentCompleted(apptId);
-                                    if (ok) {
-                                        toast("Appointment marked COMPLETED.", "ok");
-                                        loadTodayAppointmentsAsync();
-                                        var _dashDate = (datePickerPatientsWithDoctorDash != null && datePickerPatientsWithDoctorDash.getValue() != null)
-                                                ? datePickerPatientsWithDoctorDash.getValue()
-                                                : java.time.ZonedDateTime.now(APP_TZ).toLocalDate();
-                                        loadStatsForDateAsync(_dashDate);
-                                    } else {
-                                        toast("Could not mark appointment as COMPLETED.", "warn");
-                                    }
-                                } else {
-                                    toast("No active appointment found for this patient today.", "warn");
-                                }
-                            } catch (Exception ex) {
-                                showWarn("Complete", "Failed to update DB: " + ex.getMessage());
-                            }
-                        }
-                    });
                     btnPresc.setOnAction(e -> {
                         PatientRow row = getItem();
                         if (row == null) return;

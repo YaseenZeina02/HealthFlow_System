@@ -18,7 +18,7 @@
 <?import javafx.scene.text.Font?>
 <?import org.kordamp.ikonli.javafx.FontIcon?>
 
-<AnchorPane fx:id="rootPane" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="600.0" prefWidth="1100.0" stylesheets="@../Design/Doctrol.css" xmlns="http://javafx.com/javafx/23.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.example.healthflow.controllers.DoctorController">
+<AnchorPane fx:id="rootPane" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="600.0" prefWidth="1100.0" stylesheets="@../Design/Doctrol.css" xmlns="http://javafx.com/javafx/19" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.example.healthflow.controllers.DoctorController">
 
    <children>
       <BorderPane prefHeight="600.0" prefWidth="1100.0" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
@@ -228,7 +228,7 @@
                   </AnchorPane>
 
                   <!-- ===== Patients pane (unchanged functionally) ===== -->
-                  <AnchorPane fx:id="PatientAnchorPane" visible="false" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+                  <AnchorPane fx:id="PatientAnchorPane" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
                      <children>
                         <AnchorPane prefHeight="533.0" prefWidth="866.0" stylesheets="@../Design/ReceptionDesign.css" AnchorPane.bottomAnchor="11.0" AnchorPane.leftAnchor="11.0" AnchorPane.rightAnchor="12.0" AnchorPane.topAnchor="14.0">
                            <children>
@@ -238,6 +238,7 @@
 
                               <TableView fx:id="patientTable" layoutX="11.0" layoutY="51.0" prefHeight="467.0" prefWidth="844.0" stylesheets="@../Design/ReceptionDesign.css" AnchorPane.bottomAnchor="14.599999999999909" AnchorPane.leftAnchor="11.0" AnchorPane.rightAnchor="11.400000000000091" AnchorPane.topAnchor="51.0">
                                  <columns>
+                                    <TableColumn fx:id="colSerialPatient" maxWidth="50.0" prefWidth="30.0" resizable="false" text="#" />
                                     <TableColumn fx:id="colNationalId" maxWidth="3000.0" prefWidth="75.0" text="National ID" />
                                     <TableColumn fx:id="colName" prefWidth="75.0" text="Name" />
                                     <TableColumn fx:id="colGender" maxWidth="2000.0" prefWidth="75.0" text="Gender" />
@@ -261,7 +262,7 @@
                         </AnchorPane>
                      </children>
                   </AnchorPane>
-                  <AnchorPane fx:id="PrescriptionAnchorPane" stylesheets="@../Design/ReceptionDesign.css" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+                  <AnchorPane fx:id="PrescriptionAnchorPane" stylesheets="@../Design/ReceptionDesign.css" visible="false" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
                      <children>
                         <AnchorPane layoutX="10.0" layoutY="14.0" prefHeight="180.0" prefWidth="1080.0" AnchorPane.leftAnchor="9.599999999999909" AnchorPane.rightAnchor="10.0" AnchorPane.topAnchor="14.0">
                            <children>
