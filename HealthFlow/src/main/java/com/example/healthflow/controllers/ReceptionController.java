@@ -3965,6 +3965,7 @@ public class ReceptionController {
 
         // أظهر الصفحة الجديدة
         paneToShow.setVisible(true);
+
     }
 
     // Disable any periodic UI refresh; rely only on DB NOTIFY
