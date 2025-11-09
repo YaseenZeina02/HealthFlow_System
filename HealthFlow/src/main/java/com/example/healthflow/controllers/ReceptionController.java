@@ -3968,6 +3968,7 @@ public class ReceptionController {
 
     }
 
+
     // Disable any periodic UI refresh; rely only on DB NOTIFY
     private void disableAutoRefreshPeriodic() {
         try {

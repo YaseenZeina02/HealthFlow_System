@@ -774,6 +774,7 @@ public class PharmacyController {
         startPharmacyDbNotifications();
         loadDashboardAsync(false);
     }
+
     private void loadDashboardTable() {
         loadDashboardAsync(true);
     }

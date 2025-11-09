@@ -1561,6 +1561,7 @@ private void loadAppointmentsForDateAsync(LocalDate date) {
             patientSearchDebounce.playFromStart();
         });
 
+
         // ENTER triggers immediate search
         searchLabel.setOnAction(e -> hybridPatientSearchNow());
     }
