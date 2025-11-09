@@ -1,0 +1,72 @@
+
+/* في CSS العام */
+.hf-btn:pressed { -fx-opacity: 0.9; }
+
+
+/* نفس أساس زر Login */
+.hf-btn {
+    -fx-background-radius: 12;
+    -fx-text-fill: white;
+    -fx-font-weight: 600;
+    -fx-padding: 10 24;
+    -fx-background-color: linear-gradient(to right, #1c99a7, #274b8a);
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.18), 10, 0.2, 0, 4);
+}
+
+/* Hover & Pressed */
+.hf-btn:hover   { -fx-opacity: 0.95; }
+.hf-btn:pressed { -fx-translate-y: 1; }
+
+/* نسخة ثانوية للزر (لون أفتح للنص ولون خلفية أهدى لو بدك) */
+.hf-btn-secondary {
+    -fx-background-color: linear-gradient(to right, #2da8b6, #3b66a8);
+}
+
+/* لو بدك نسخة “Ghost” بدون خلفية وتكون مثل رابط لكنه Button (اختياري) */
+.hf-btn-ghost {
+    -fx-background-color: transparent;
+    -fx-text-fill: #2b6cb0;
+    -fx-underline: true;
+    -fx-padding: 6 8;
+    -fx-effect: null;
+}
+.hf-btn-ghost:hover { -fx-text-fill: #1f4f88; }
+
+.hf-alert {
+    -fx-text-fill: #c0392b;
+    -fx-font-weight: 600;
+    -fx-font-style: normal;
+    -fx-underline: false;
+    -fx-padding: 6 4 0 4;
+}
+
+
+/* Fot LogOut Btn*/
+.btn-logout {
+    -fx-background-color: linear-gradient(to bottom, #ff5b5b, #cc3b3b);
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+    -fx-background-radius: 8;
+    -fx-cursor: hand;
+}
+.btn-logout {
+    -fx-background-color: linear-gradient(to bottom, #f24b4b, #c9302c);
+    -fx-text-fill: white;
+    -fx-background-radius: 8;
+    -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.35), 6, 0, 0, 2);
+    -fx-cursor: hand;
+
+}
+.btn-logout:hover {
+    -fx-background-color: linear-gradient(to bottom, #ff7b7b, #e04a4a);
+}
+
+.button.btn-disabled {
+    -fx-opacity: 0.6;
+    /* أي ستايل إضافي يبيّن أنه غير نشط */
+}
+.button.btn-enabled {
+    -fx-opacity: 1.0;
+    /* لون/ظلّة تمييز لو حاب */
+    /* -fx-background-color: -hf-primary; */
+}

@@ -10,6 +10,7 @@ import com.example.healthflow.net.ConnectivityMonitor;
 import com.example.healthflow.service.AuthService.Session;
 import com.example.healthflow.model.Appointment.ApptRow;
 import com.example.healthflow.service.PatientService;
+import com.example.healthflow.ui.ConfirmDialog;
 import com.example.healthflow.ui.ConnectivityBanner;
 import com.example.healthflow.ui.OnlineBindings;
 
@@ -23,12 +24,14 @@ import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
 import javafx.application.Platform;
 import javafx.beans.property.*;
+import javafx.beans.value.ChangeListener;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.collections.transformation.FilteredList;
 import javafx.collections.transformation.SortedList;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
+import javafx.geometry.Insets;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.chart.BarChart;
@@ -38,9 +41,13 @@ import javafx.scene.chart.XYChart;
 import javafx.scene.control.*;
 import javafx.scene.control.cell.ComboBoxTableCell;
 import javafx.scene.control.cell.TextFieldTableCell;
+import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.AnchorPane;
+import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.shape.Circle;
+import javafx.scene.text.Text;
+import javafx.stage.Modality;
 import javafx.stage.Stage;
 import javafx.util.Duration;
 
@@ -59,10 +66,25 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.TimeUnit;
 import com.example.healthflow.ui.ComboAnimations;
 
+import javafx.scene.control.TextField;
+
+
+import javafx.scene.control.ContextMenu;
+import javafx.scene.control.MenuItem;
+import javafx.scene.control.SeparatorMenuItem;
+import javafx.scene.control.TablePosition;
+import javafx.scene.input.Clipboard;
+import javafx.scene.input.ClipboardContent;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyEvent;
+
 
 
 public class ReceptionController {
     /* ============ UI ============ */
+    @FXML private Button LogOutBtn;
+
+
     @FXML private AnchorPane DashboardAnchorPane;
     @FXML private AnchorPane PatientAnchorPane;
     @FXML private AnchorPane AppointmentsAnchorPane;
@@ -71,7 +93,6 @@ public class ReceptionController {
     @FXML private Button DachboardButton;
     @FXML private Button PatientsButton;
     @FXML private Button AppointmentsButton;
-    @FXML private Button BackButton;
     @FXML private Button DoctorsButton;
 
     @FXML private Label DateOfDay;
@@ -95,9 +116,11 @@ public class ReceptionController {
     @FXML private Button deleteButton;
     @FXML private Button clearBtn;
 
-    @FXML private TextField search;
 
+    @FXML private TextField search;
+    @FXML private Button clearSelectionPatient;
     @FXML private TableView<PatientRow> patientTable;
+    @FXML private TableColumn<PatientRow, Integer> colPatientsSerial;
     @FXML private TableColumn<PatientRow, String> colNationalId;
     @FXML private TableColumn<PatientRow, String> colName;
     @FXML private TableColumn<PatientRow, String> colGender;
@@ -112,8 +135,8 @@ public class ReceptionController {
     @FXML private Label RemainingNum;
 
 
+
     @FXML private Circle ActiveStatus;
-    @FXML private TableColumn<?, ?> AppointmentIdColumn;
     @FXML private AnchorPane Appointments;
     @FXML private AnchorPane CenterAnchorPane;
     @FXML private AnchorPane Doctors;
@@ -138,6 +161,7 @@ public class ReceptionController {
     @FXML private Button clearSelectionDach;
     @FXML private TextField searchAppointmentDach;
     @FXML private TextField searchDoctor;
+    @FXML private Button clearSelectionDoctor;
     @FXML private Button insertAppointments;
     @FXML private Label TotalPatients;
     @FXML private Button BookAppointmentFromPateint;
@@ -161,11 +185,14 @@ public class ReceptionController {
     @FXML private TableColumn<ApptRow, String> colRoomNumber;
 
     @FXML private Label LabelToAlert;
+
     @FXML private Label getPatientName;
     @FXML private Label getPatientID;
 
     // ===== Doctors table =====
     @FXML private TableView<DoctorRow> DocTable_Recption;
+
+    @FXML private TableColumn<DoctorRow, Integer> colDoctorSerial;
     @FXML private TableColumn<DoctorRow, String> colDoctor_name;
     @FXML private TableColumn<DoctorRow, String> colDoctor_Gender;
     @FXML private TableColumn<DoctorRow, String> colDoctor_Phone;
@@ -227,6 +254,50 @@ public class ReceptionController {
     private volatile boolean apptLoading = false;
     private static final java.time.format.DateTimeFormatter UI_DATE =
             java.time.format.DateTimeFormatter.ofPattern("EEE, MMM d, yyyy");
+
+
+    private final AtomicBoolean refreshBusy = new AtomicBoolean(false);
+
+    public static final int DEFAULT_SESSION_MIN = 20;
+    // --- Coalesced UI refresh + DB NOTIFY ---
+    private final RefreshScheduler uiRefresh = new RefreshScheduler(600);
+    private DbNotifications apptDbListener;
+
+    // To color current nav button
+    private static final String ACTIVE_CLASS = "current";
+    private static final DateTimeFormatter SLOT_FMT_12H = DateTimeFormatter.ofPattern("hh:mm a");
+
+    /* ============ Types ============ */
+    public enum Gender {MALE, FEMALE}
+
+    /* ============ State ============ */
+    private final ObservableList<PatientRow> patientData = FXCollections.observableArrayList();
+    private FilteredList<PatientRow> filtered;
+
+    private final ObservableList<DoctorRow> doctorData = FXCollections.observableArrayList();
+    private FilteredList<DoctorRow> doctorFiltered;
+
+    private final PatientService patientService = new PatientService();
+    private final DoctorDAO doctorDAO = new DoctorDAO();
+    private final String cssPath = "/com/example/healthflow/Design/ReceptionDesign.css";
+
+    // When booking from patient, auto-pick nearest future slot once
+    private volatile boolean selectNearestSlotOnNextRefresh = false;
+
+    /* ============ Connectivity ============ */
+    private final ConnectivityMonitor monitor;
+    private static volatile boolean listenerRegistered = false;
+    private static volatile Boolean lastNotifiedOnline = null;
+
+    // Cache currently-selected patient to survive pane switches / refreshes
+    private PatientRow selectedPatient;
+    private boolean patientSelHooked = false;
+
+    private final Deque<AnchorPane> navigationHistory = new ArrayDeque<>();
+
+    // Gate for AppointmentsButton (avoid setDisable on a bound property)
+    private javafx.beans.property.BooleanProperty appointmentsAccess =
+            new javafx.beans.property.SimpleBooleanProperty(false);
 
     // helpers:
     private static java.time.OffsetDateTime toAppOffset(java.time.LocalDate d, java.time.LocalTime t) {
@@ -312,15 +383,6 @@ public class ReceptionController {
                 t.setDaemon(true);
                 return t;
             });
-    private final AtomicBoolean refreshBusy = new AtomicBoolean(false);
-
-    public static final int DEFAULT_SESSION_MIN = 20;
-    // --- Coalesced UI refresh + DB NOTIFY ---
-    private final RefreshScheduler uiRefresh = new RefreshScheduler(600);
-    private DbNotifications apptDbListener;
-
-    // --- DB NOTIFY handlers (appointments -> refresh dashboard & chart) ---
-
 
     private void startDbNotificationsSafe() {
         try {
@@ -369,9 +431,6 @@ public class ReceptionController {
         }
     }
 
-    // To color current nav button
-    private static final String ACTIVE_CLASS = "current";
-    private static final DateTimeFormatter SLOT_FMT_12H = DateTimeFormatter.ofPattern("hh:mm a");
 
     private void markNavActive(Button active) {
         Button[] all = {DachboardButton, DoctorsButton, PatientsButton, AppointmentsButton};
@@ -399,6 +458,10 @@ public class ReceptionController {
             // no-op if not supported
         }
     }
+
+    // ========== DASHBOARD TABLE RELOAD ==========
+    // This is the method referenced in the instruction (see log message)
+
 
     /* ============ slot load ============ */
 
@@ -445,29 +508,8 @@ public class ReceptionController {
     }
 
 
-    /* ============ Types ============ */
-    public enum Gender {MALE, FEMALE}
-
-    /* ============ State ============ */
-    private final ObservableList<PatientRow> patientData = FXCollections.observableArrayList();
-    private FilteredList<PatientRow> filtered;
-
-    private final ObservableList<DoctorRow> doctorData = FXCollections.observableArrayList();
-    private FilteredList<DoctorRow> doctorFiltered;
-
-    private final Navigation navigation = new Navigation();
-    private final PatientService patientService = new PatientService();
-    private final DoctorDAO doctorDAO = new DoctorDAO();
-    private final String cssPath = "/com/example/healthflow/Design/ReceptionDesign.css";
 
 
-    // When booking from patient, auto-pick nearest future slot once
-    private volatile boolean selectNearestSlotOnNextRefresh = false;
-
-    /* ============ Connectivity ============ */
-    private final ConnectivityMonitor monitor;
-    private static volatile boolean listenerRegistered = false;
-    private static volatile Boolean lastNotifiedOnline = null;
 
     public ReceptionController(ConnectivityMonitor monitor) {
         this.monitor = monitor;
@@ -475,14 +517,6 @@ public class ReceptionController {
 
     public ReceptionController() {
         this(new ConnectivityMonitor());
-    }
-
-
-    private void setupAppointmentSlotsListener() {
-        // listeners already wired in initialize():
-        // AppointmentDate.valueProperty() -> refreshSlots()
-        // avilabelDoctorApp.valueProperty() -> refreshSlots()
-        // cmbSlots.setOnShown(...) -> refreshSlots()
     }
 
     private void updateAppointmentDetailsLabel(Appointment.ApptRow row) {
@@ -516,6 +550,8 @@ public class ReceptionController {
                 // شكليّات + إصلاحات
                 picker.setEditable(true);
                 picker.setPromptText("yyyy-MM-dd");
+                picker.getStyleClass().addAll("table-cell","box");
+
 
                 // فور اختيار تاريخ جديد
                 picker.setOnAction(e -> {
@@ -585,6 +621,7 @@ public class ReceptionController {
             }
         };
     }
+
     private TableCell<Appointment.ApptRow, String> doctorComboCell() {
         return new TableCell<Appointment.ApptRow, String>() {
             private final ComboBox<DoctorDAO.DoctorOption> combo = new ComboBox<>();
@@ -792,33 +829,11 @@ public class ReceptionController {
     }
 
     /* ============ Navigation ============ */
-    @FXML
-    private void BackAction() {
-        Stage stage = (Stage) BackButton.getScene().getWindow();
-        try {
-            FXMLLoader loader = new FXMLLoader(getClass().getResource(new Navigation().Login_Fxml));
-            loader.setControllerFactory(type -> type == LoginController.class ? new LoginController(monitor) : null);
-            Parent loginRoot = loader.load();
 
-            var banner = new ConnectivityBanner(monitor);
-            javafx.scene.layout.BorderPane root = new javafx.scene.layout.BorderPane();
-            root.setTop(banner);
-            root.setCenter(loginRoot);
-
-            stage.setScene(new Scene(root));
-            stage.setTitle("HealthFlow");
-            stage.setResizable(false);
-            stage.show();
-
-            // أوقف المستمعين والـ executors عند الخروج
-            shutdown();
-        } catch (IOException e) {
-            showError("Navigation", e);
-        }
-    }
 
     /* ============ Panes ============ */
     private void showDashboardPane() {
+        disableAppointmentsAccess();
         DashboardAnchorPane.setVisible(true);
         PatientAnchorPane.setVisible(false);
         AppointmentsAnchorPane.setVisible(false);
@@ -827,6 +842,7 @@ public class ReceptionController {
     }
 
     private void showDoctorPane() {
+        disableAppointmentsAccess();
         DashboardAnchorPane.setVisible(false);
         PatientAnchorPane.setVisible(false);
         AppointmentsAnchorPane.setVisible(false);
@@ -835,10 +851,17 @@ public class ReceptionController {
     }
 
     private void showPatientsPane() {
+        disableAppointmentsAccess();
         DashboardAnchorPane.setVisible(false);
         PatientAnchorPane.setVisible(true);
         AppointmentsAnchorPane.setVisible(false);
         DoctorAnchorPane.setVisible(false);
+        markNavActive(PatientsButton);
+    }
+    @FXML
+    private void showPatientsPaneAction() {
+        disableAppointmentsAccess();
+        switchPane(PatientAnchorPane);
         markNavActive(PatientsButton);
     }
 
@@ -847,11 +870,16 @@ public class ReceptionController {
         PatientAnchorPane.setVisible(false);
         AppointmentsAnchorPane.setVisible(true);
         DoctorAnchorPane.setVisible(false);
+        enableAppointmentsAccess();
         markNavActive(AppointmentsButton);
+
     }
 
     /* ============ Patients: table & search ============ */
     private void wirePatientTable() {
+        colPatientsSerial.setCellValueFactory(cd ->
+                new ReadOnlyObjectWrapper<Integer>(patientTable.getItems().indexOf(cd.getValue()) + 1)
+        );
         colNationalId.setCellValueFactory(cd -> cd.getValue().nationalIdProperty());
         colName.setCellValueFactory(cd -> cd.getValue().fullNameProperty());
         colGender.setCellValueFactory(cd -> cd.getValue().genderProperty());
@@ -859,7 +887,7 @@ public class ReceptionController {
         colPhoneNumber.setCellValueFactory(cd -> cd.getValue().phoneProperty());
         colMedicalHistory.setCellValueFactory(cd -> cd.getValue().medicalHistoryProperty());
         patientTable.setItems(patientData);
-        patientTable.setEditable(true);
+//        patientTable.setEditable(true);
         setupPatientInlineEditing();
 
         patientTable.getSelectionModel().selectedItemProperty().addListener((obs, old, row) -> {
@@ -888,6 +916,7 @@ public class ReceptionController {
         sorted.comparatorProperty().bind(patientTable.comparatorProperty());
         patientTable.setItems(sorted);
     }
+
     private void setupPatientInlineEditing() {
         // Full Name -> users.full_name
         colName.setCellFactory(TextFieldTableCell.forTableColumn());
@@ -1051,6 +1080,9 @@ public class ReceptionController {
 
     /* ============ Doctors: table, search, load ============ */
     private void wireDoctorTable() {
+        colDoctorSerial.setCellValueFactory(cd ->
+                new ReadOnlyObjectWrapper<Integer>(DocTable_Recption.getItems().indexOf(cd.getValue()) + 1)
+        );
         if (colDoctor_name != null) colDoctor_name.setCellValueFactory(cd -> cd.getValue().fullNameProperty());
         if (colDoctor_Gender != null) colDoctor_Gender.setCellValueFactory(cd -> cd.getValue().genderProperty());
         if (colDoctor_Phone != null) colDoctor_Phone.setCellValueFactory(cd -> cd.getValue().phoneProperty());
@@ -1188,6 +1220,9 @@ public class ReceptionController {
 
     private void showWarn(String title, String msg) {
         Alert a = new Alert(Alert.AlertType.WARNING);
+        Stage stage = (Stage) rootPane.getScene().getWindow();
+        a.initOwner(stage);
+        a.initModality(Modality.WINDOW_MODAL);
         a.setTitle(title);
         a.setHeaderText(null);
         a.setContentText(msg);
@@ -1196,6 +1231,9 @@ public class ReceptionController {
 
     private void showInfo(String title, String msg) {
         Alert a = new Alert(Alert.AlertType.INFORMATION);
+        Stage stage = (Stage) rootPane.getScene().getWindow();
+        a.initOwner(stage);
+        a.initModality(Modality.WINDOW_MODAL);
         a.setTitle(title);
         a.setHeaderText(null);
         a.setContentText(msg);
@@ -1205,6 +1243,9 @@ public class ReceptionController {
     private String showError(String title, Exception ex) {
         if (ex != null) ex.printStackTrace();
         Alert a = new Alert(Alert.AlertType.ERROR);
+        Stage stage = (Stage) rootPane.getScene().getWindow();
+        a.initOwner(stage);
+        a.initModality(Modality.WINDOW_MODAL);
         a.setTitle(title);
         a.setHeaderText(null);
         a.setContentText(ex == null ? title : ex.getMessage());
@@ -1215,6 +1256,10 @@ public class ReceptionController {
 
     private boolean confirm(String title, String msg) {
         Alert a = new Alert(Alert.AlertType.CONFIRMATION);
+        Stage stage = (Stage) rootPane.getScene().getWindow();
+        a.initOwner(stage);
+        a.initModality(Modality.WINDOW_MODAL);
+
         a.setTitle(title);
         a.setHeaderText(null);
         a.setContentText(msg);
@@ -1230,8 +1275,16 @@ public class ReceptionController {
         String phone = trimOrNull(PhoneTextField.getText());
         String history = trimOrNull(medicalHistory.getText());
 
-        if (fullName == null || dob == null || gender == null) {
-            showWarn("Validation", "Full name, gender and date of birth are required.");
+        if (fullName == null) {
+            showWarn("Validation", "Full name is required.");
+            return;
+        }
+        if (dob == null) {
+            showWarn("Validation", "Date of birth is required.");
+            return;
+        }
+        if (gender == null) {
+            showWarn("Validation", "Gender is required.");
             return;
         }
         if (phone == null) {
@@ -1239,13 +1292,41 @@ public class ReceptionController {
             return;
         }
 
+        // Validate National ID: exactly 9 digits (client-side guard)
+        if (nid == null || !nid.matches("\\d{9}")) {
+            showWarn("National ID", "National ID must be exactly 9 digits.");
+            return;
+        }
+
         try {
-            // ننشئ المريض – ما بنعتمد على PatientView
             patientService.createPatient(fullName, nid, phone, dob, gender.name(), history);
-            // نحدّث الجدول من المصدر الرسمي (PatientRow)
             loadPatientsBG();
             clearForm();
             showInfo("Insert", "Patient inserted successfully.");
+        } catch (org.postgresql.util.PSQLException e) {
+            String msg = (e.getMessage() == null) ? "" : e.getMessage();
+            String sqlState = e.getSQLState(); // '23505' for unique-violation in PG
+            String constraint = null;
+            try {
+                var sev = e.getServerErrorMessage();
+                if (sev != null) constraint = sev.getConstraint();
+            } catch (Throwable ignore) { }
+
+            // 1) طول الهوية
+            if (msg.contains("value too long for type character(9)") ||
+                msg.toLowerCase().contains("national_id must be 9 digits")) {
+                showWarn("National ID", "National ID must be exactly 9 digits.");
+            }
+            // 2) تكرار الهوية (unique violation)
+            else if ("23505".equals(sqlState) ||
+                     (constraint != null && constraint.toLowerCase().contains("uniq_users_nid_nonnull")) ||
+                     msg.toLowerCase().contains("duplicate key value") && msg.toLowerCase().contains("national_id")) {
+                showWarn("Duplicate", "A patient with this National ID already exists. Please use Update instead.");
+            }
+            else {
+                showError("Insert Patient", e);
+            }
+            return;
         } catch (Exception ex) {
             showError("Insert Patient", ex);
             return;
@@ -1273,9 +1354,13 @@ public class ReceptionController {
         Gender gender = GenderComboBox.getValue();
         LocalDate dob = DateOfBirthPicker.getValue();
 
-
         if (fullName == null || dob == null || gender == null) {
             showWarn("Validation", "Full name, gender and date of birth are required.");
+            return;
+        }
+        // Validate National ID on update as well
+        if (nid != null && !nid.isBlank() && !nid.matches("\\d{9}")) {
+            showWarn("National ID", "National ID must be exactly 9 digits.");
             return;
         }
         try {
@@ -1289,10 +1374,20 @@ public class ReceptionController {
             row.setMedicalHistory(history);
             if (patientTable != null) patientTable.refresh();
             showInfo("Update", "Patient updated successfully.");
+        } catch (org.postgresql.util.PSQLException e) {
+            if (e.getMessage() != null && (
+                    e.getMessage().contains("value too long for type character(9)") ||
+                    e.getMessage().toLowerCase().contains("national_id must be 9 digits")
+            )) {
+                showWarn("National ID", "National ID must be exactly 9 digits.");
+            } else {
+                showError("Update Patient", e);
+            }
+            return;
         } catch (Exception ex) {
             showError("Update Patient", ex);
+            return;
         }
-
         try (Connection c = Database.get();
              PreparedStatement nps = c.prepareStatement("SELECT pg_notify('patients_changed','update')")) {
             nps.execute();
@@ -1333,6 +1428,9 @@ public class ReceptionController {
         if (GenderComboBox != null) GenderComboBox.setValue(Gender.MALE);
         if (DateOfBirthPicker != null) DateOfBirthPicker.setValue(null);
         if (patientTable != null) patientTable.getSelectionModel().clearSelection();
+        if (search != null) search.clear();
+        if (patientTable != null) patientTable.refresh();
+
     }
 
     private String trimOrNull(String s) {
@@ -1341,18 +1439,28 @@ public class ReceptionController {
         return t.isEmpty() ? null : t;
     }
 
+    // remember original widths per column (weak so columns can GC)
+    private final java.util.Map<TableColumn<?, ?>, Double> _origColWidth = new java.util.WeakHashMap<>();
+
     /* ===== Appointments table wiring & search (minimal) ===== */
     private void wireAppointmentsTables() {
         if (TableINAppointment == null) return;
-        TableINAppointment.setColumnResizePolicy(TableView.UNCONSTRAINED_RESIZE_POLICY);
+        //TableINAppointment.setColumnResizePolicy(TableView.UNCONSTRAINED_RESIZE_POLICY);
+        //TableINAppointment.setColumnResizePolicy(TableView.UNCONSTRAINED_RESIZE_POLICY);
+
+        TableINAppointment.setFixedCellSize(-1);
+
+        enableExpandAutoWidth(TableINAppointment, colPatientNameAppointment, 5000);
+        enableExpandAutoWidth(TableINAppointment, colSpecialty, 5000);
+        enableExpandAutoWidth(TableINAppointment, colDoctorNameAppointment, 5000);
+
         TableINAppointment.setItems(sortedAppt);
         sortedAppt.comparatorProperty().bind(TableINAppointment.comparatorProperty());
         // === تفعيل التحرير داخل جدول المواعيد ===
         TableINAppointment.setEditable(true);
         ensureAppointmentBindings();
         colDateAppointment.setEditable(true);
-
-
+//        colSpecialty.setEditable(true);
 
         setupInlineEditing();
         if (colDateAppointment != null) colDateAppointment.setCellValueFactory(cd -> cd.getValue().dateProperty());
@@ -1374,10 +1482,11 @@ public class ReceptionController {
         // -------- Serial Number Column (#) --------
         if (colAppointmentSerialNUm != null) {
             colAppointmentSerialNUm.setStyle("-fx-alignment: CENTER;");
+            /*
             colAppointmentSerialNUm.setMinWidth(60);
             colAppointmentSerialNUm.setPrefWidth(70);
             colAppointmentSerialNUm.setMaxWidth(100);
-
+            */
             // لا نحتاج Data من الموديل؛ نستخدم خلية تعرض getIndex()+1
             colAppointmentSerialNUm.setCellFactory(col -> new TableCell<ApptRow, Number>() {
                 @Override
@@ -1638,6 +1747,8 @@ public class ReceptionController {
                 }
             });
         }
+
+
         if (TableINAppointment != null) TableINAppointment.refresh();
     }
 
@@ -1713,17 +1824,24 @@ public class ReceptionController {
 
     private void applyAppointmentFilters() {
         ensureAppointmentBindings();
+
         final LocalDate selDate = (dataPickerAppointment == null) ? null : dataPickerAppointment.getValue();
         final String q = (searchAppointmentDach == null || searchAppointmentDach.getText() == null)
                 ? "" : searchAppointmentDach.getText().trim().toLowerCase();
+
+        // 👈 المفتاح: ALL = لا فلترة حالة
         final String statusSel = (statusFilter == null || statusFilter.getValue() == null)
-                ? "ALL" : statusFilter.getValue();
+                ? "ALL"
+                : statusFilter.getValue().toUpperCase();
 
         filteredAppt.setPredicate(r -> {
+            // صفوف تعبئة/فراغ (لو موجودة) لا تدخل المنطق
+            if (r == null) return false;
+
             // 1) فلتر التاريخ
             if (selDate != null && !selDate.equals(r.getDate())) return false;
 
-            // 2) فلتر الحالة
+            // 2) فلتر الحالة (ALL = مرّر)
             if (!"ALL".equals(statusSel)) {
                 String st = (r.getStatus() == null) ? "" : r.getStatus().toUpperCase();
                 if (!st.equals(statusSel)) return false;
@@ -1972,21 +2090,44 @@ public class ReceptionController {
 
     // Update start_at field for an appointment
     private void updateAppointmentStartAt(long id, LocalDate d, LocalTime t) {
-        if (isPastStart(d, t)) {
-            throw new IllegalArgumentException("Past time not allowed for today's date");
+        // 1) أغلق أي تحرير جارٍ في الجدول حتى تُحفظ القيم داخل ApptRow
+        if (TableINAppointment != null && TableINAppointment.getEditingCell() != null) {
+            TableINAppointment.edit(-1, null);
         }
 
+        // 2) تحقق مبدئي
         if (id <= 0 || d == null || t == null) return;
+
+        // 3) لا ترمِ استثناءً للمستخدم – أعرض رسالة لطيفة فقط
+        if (isPastStart(d, t)) {
+            showToast("error", "Past time not allowed for today's date");
+            return;
+        }
+
         final String sql = "UPDATE appointments SET appointment_date = ?, updated_at = now() WHERE id = ?";
         try (Connection c = Database.get(); PreparedStatement ps = c.prepareStatement(sql)) {
             java.time.OffsetDateTime startAt = toAppOffset(d, t); // Asia/Gaza
             ps.setObject(1, startAt); // write timestamptz correctly
             ps.setLong(2, id);
             ps.executeUpdate();
+
             try (PreparedStatement n = c.prepareStatement("SELECT pg_notify('appointments_changed','update')")) {
                 n.execute();
             }
             lastApptTs = new java.sql.Timestamp(System.currentTimeMillis());
+
+            // 4) تحديث تفاؤلي للـ UI
+            if (TableINAppointment != null) {
+                ApptRow sel = TableINAppointment.getItems().stream()
+                        .filter(r -> r != null && r.getId() == id)
+                        .findFirst().orElse(null);
+                if (sel != null) {
+                    sel.setDate(d);
+                    sel.setTime(t);
+                    sel.setDirty(false);
+                    TableINAppointment.refresh();
+                }
+            }
         } catch (SQLException e) {
             Platform.runLater(() -> showError("Update appointment_date", e));
         }
@@ -1994,11 +2135,24 @@ public class ReceptionController {
 
     // Delete currently selected appointment
     private void doDeleteAppointment() {
+        // 1) أغلق أي تحرير جارٍ
+        if (TableINAppointment != null && TableINAppointment.getEditingCell() != null) {
+            TableINAppointment.edit(-1, null);
+        }
+
         var row = (TableINAppointment == null) ? null : TableINAppointment.getSelectionModel().getSelectedItem();
         if (row == null) {
             showWarn("Delete", "Select an appointment row first.");
             return;
         }
+
+        // 2) لو مسودة (id = 0) احذف محليًا فقط
+        if (row.getId() <= 0) {
+            apptEditable.remove(row);
+            showToast("info", "Draft row removed.");
+            return;
+        }
+
         if (!confirm("Delete", "Delete appointment #" + row.getId() + "?")) return;
 
         try (Connection c = Database.get()) {
@@ -2009,15 +2163,50 @@ public class ReceptionController {
             try (PreparedStatement n = c.prepareStatement("SELECT pg_notify('appointments_changed','delete')")) {
                 n.execute();
             }
+
+            // 3) حدث الواجهة فورًا
+            apptEditable.remove(row);
+            if (TableINAppointment != null) {
+                TableINAppointment.getSelectionModel().clearSelection();
+                TableINAppointment.refresh();
+            }
+
             showInfo("Delete", "Appointment deleted.");
-//            scheduleCoalescedRefresh();
         } catch (Exception e) {
             showError("Delete Appointment", e);
         }
     }
 
+//    private void doDeleteAppointment() {
+//        var row = (TableINAppointment == null) ? null : TableINAppointment.getSelectionModel().getSelectedItem();
+//        if (row == null) {
+//            showWarn("Delete", "Select an appointment row first.");
+//            return;
+//        }
+//        if (!confirm("Delete", "Delete appointment #" + row.getId() + "?")) return;
+//
+//        try (Connection c = Database.get()) {
+//            try (PreparedStatement ps = c.prepareStatement("DELETE FROM appointments WHERE id = ?")) {
+//                ps.setLong(1, row.getId());
+//                ps.executeUpdate();
+//            }
+//            try (PreparedStatement n = c.prepareStatement("SELECT pg_notify('appointments_changed','delete')")) {
+//                n.execute();
+//            }
+//            showInfo("Delete", "Appointment deleted.");
+////            scheduleCoalescedRefresh();
+//        } catch (Exception e) {
+//            showError("Delete Appointment", e);
+//        }
+//    }
+
     private void doInsertAppointment() {
         try {
+            // --- 0) Commit any in-cell edits first so row values are up-to-date ---
+            if (TableINAppointment != null && TableINAppointment.getEditingCell() != null) {
+                TableINAppointment.edit(-1, null); // forces commit/cancel → updates ApptRow model
+            }
+
             Long doctorId = null;
             LocalDate day = null;
             LocalTime time = null;
@@ -2025,13 +2214,13 @@ public class ReceptionController {
             String location = null;
 
             // ===== Path A: from mini booking form (preferred) =====
-            var formDoc = (avilabelDoctorApp == null) ? null : avilabelDoctorApp.getValue();
-            var formDay = (AppointmentDate == null) ? null : AppointmentDate.getValue();
-            var formSlot = (cmbSlots == null) ? null : cmbSlots.getValue();
+            var formDoc  = (avilabelDoctorApp == null) ? null : avilabelDoctorApp.getValue();
+            var formDay  = (AppointmentDate   == null) ? null : AppointmentDate.getValue();
+            var formSlot = (cmbSlots           == null) ? null : cmbSlots.getValue();
             if (formDoc != null && formDay != null && formSlot != null) {
                 doctorId = formDoc.doctorId;
-                day = formDay;
-                time = formSlot.from().toLocalTime();
+                day      = formDay;
+                time     = formSlot.from().toLocalTime();
                 duration = (int) java.time.Duration.between(formSlot.from(), formSlot.to()).toMinutes();
             }
 
@@ -2039,17 +2228,28 @@ public class ReceptionController {
             if (doctorId == null || day == null || time == null) {
                 ApptRow row = (TableINAppointment == null) ? null : TableINAppointment.getSelectionModel().getSelectedItem();
                 if (row != null) {
-                    if (row.getDoctorId() > 0) doctorId = row.getDoctorId();
+                    // date/time/room taken directly from row (after commit above)
                     if (row.getDate() != null) day = row.getDate();
                     if (row.getTime() != null) time = row.getTime();
                     if (row.getRoomNumber() != null && !row.getRoomNumber().isBlank()) location = row.getRoomNumber();
-                    // استخدم مدة الجدولة إن وُجدت وإلا القيمة الافتراضية
                     duration = (row.getSessionTime() > 0) ? row.getSessionTime() : DEFAULT_SESSION_MIN;
+
+                    // doctor id: use explicit id if already set; otherwise resolve by doctor name (+ optional specialty)
+                    // doctor id: explicit, or resolve from displayed name (tolerant)
+                    if (row.getDoctorId() > 0) {
+                        doctorId = row.getDoctorId();
+                    } else {
+                        doctorId = resolveDoctorIdForRow(row);
+                    }
                 }
             }
 
             // ===== Validation =====
             if (doctorId == null || day == null || time == null) {
+                // محاولة إضافية: لو المستخدم اختار من ComboBox داخل الخلية ولم يغادرها، اجبر فقدان التركيز
+                if (TableINAppointment != null) {
+                    TableINAppointment.requestFocus();
+                }
                 showWarn("Insert Appointment", "Select specialty, doctor and time slot.");
                 return;
             }
@@ -2083,7 +2283,7 @@ public class ReceptionController {
                 ps.setLong(2, patientId);
                 ps.setObject(3, startAt);
                 ps.setInt(4, duration);
-                if (location != null) ps.setString(5, location);
+                if (location != null && !location.isBlank()) ps.setString(5, location);
                 else ps.setNull(5, Types.VARCHAR);
                 ps.setLong(6, doctorId); // for COALESCE subselect
                 ps.setLong(7, Session.get().getId());
@@ -2098,6 +2298,7 @@ public class ReceptionController {
                         ar.setPatientName((draft != null) ? draft.getPatientName() : null); // للعرض فقط
                         ar.setSpecialty((draft != null) ? draft.getSpecialty() : null);
                         ar.setStatus(rs.getString("status"));
+
                         java.time.OffsetDateTime odt = rs.getObject("appointment_date", java.time.OffsetDateTime.class);
                         java.time.LocalDateTime ldt = toLocal(odt);
                         if (ldt != null) {
@@ -2131,7 +2332,6 @@ public class ReceptionController {
             }
 
             showInfo("Insert", "Appointment created.");
-//            scheduleCoalescedRefresh();
         } catch (Exception e) {
             if (e instanceof java.sql.SQLException se && "23505".equals(se.getSQLState())) {
                 showWarn("Insert Appointment", "Conflict: another appointment exists for the same doctor or room at this start time.");
@@ -2139,13 +2339,59 @@ public class ReceptionController {
             }
             showError("Insert Appointment", e);
         }
+    }
 
+    /** Resolve doctor_id from the displayed doctor name in the row.
+     *  Tolerates "Dr." prefix and "(Room ...)" suffix; filters by specialty if present.
+     */
+    private Long resolveDoctorIdForRow(ApptRow row) {
+        if (row == null) return null;
+        if (row.getDoctorId() > 0) return row.getDoctorId();
+
+        String disp = row.getDoctorName();
+        if (disp == null || disp.isBlank()) return null;
+
+        // strip "Dr." و أي لاحقة أقواس مثل (Room: …)
+        String name = disp
+                .replaceAll("(?i)^\\s*dr\\.?\\s*", "")
+                .replaceAll("\\(.*$", "")
+                .trim();
+        if (name.isEmpty()) return null;
+
+        final String sql =
+                "SELECT d.id " +
+                        "FROM doctors d JOIN users u ON u.id = d.user_id " +
+                        "WHERE lower(u.full_name) LIKE lower(?) " +
+                        "AND ( ? IS NULL OR d.specialty = ? ) " +
+                        "ORDER BY u.full_name ASC " +
+                        "LIMIT 1";
+
+        try (Connection c = Database.get();
+             PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setString(1, "%" + name + "%");
+            ps.setString(2, (row.getSpecialty() == null ? null : row.getSpecialty()));
+            ps.setString(3, (row.getSpecialty() == null ? null : row.getSpecialty()));
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) return rs.getLong(1);
+            }
+        } catch (SQLException ignore) { }
+        return null;
     }
 
     private void doUpdateAppointment() {
-        var row = (TableINAppointment == null) ? null : TableINAppointment.getSelectionModel().getSelectedItem();
+        // 0) Commit any active cell edit to ensure model is up-to-date
+        if (TableINAppointment != null && TableINAppointment.getEditingCell() != null) {
+            TableINAppointment.edit(-1, null);
+        }
+
+        // 1) Re-read selection after committing edits
+        ApptRow row = (TableINAppointment == null) ? null : TableINAppointment.getSelectionModel().getSelectedItem();
         if (row == null) {
             showWarn("Update", "Select an appointment row first.");
+            return;
+        }
+        if (row.getId() <= 0) {
+            showWarn("Update", "Please save this draft as a new appointment first.");
             return;
         }
 
@@ -2156,7 +2402,7 @@ public class ReceptionController {
             try (PreparedStatement ps = c.prepareStatement(sql)) {
                 LocalDate date = row.getDate();
                 LocalTime time = row.getTime();
-                // 🚫 منع تحديث موعد لوقت ماضي
+                // 🚫 Prevent moving appointment to the past
                 if (date != null && time != null && isPastStart(date, time)) {
                     showToast("error", "Cannot update appointment to a past time.");
                     return;
@@ -2166,7 +2412,14 @@ public class ReceptionController {
                         : null;
                 int duration = (row.getSessionTime() > 0) ? row.getSessionTime() : DEFAULT_SESSION_MIN;
 
-                ps.setLong(1, row.getDoctorId());
+                // Resolve doctorId if not set (tolerate edits in combo before commit)
+                long doctorId = row.getDoctorId() > 0 ? row.getDoctorId() : (Optional.ofNullable(resolveDoctorIdForRow(row)).orElse(0L));
+                if (doctorId <= 0) {
+                    showWarn("Update Appointment", "Select a valid doctor for this appointment.");
+                    return;
+                }
+
+                ps.setLong(1, doctorId);
                 if (startAt != null) ps.setObject(2, startAt);
                 else ps.setNull(2, java.sql.Types.TIMESTAMP_WITH_TIMEZONE);
                 ps.setInt(3, duration);
@@ -2176,7 +2429,7 @@ public class ReceptionController {
                 else
                     ps.setNull(4, Types.VARCHAR);
 
-                ps.setLong(5, row.getDoctorId()); // for COALESCE subselect
+                ps.setLong(5, doctorId); // for COALESCE subselect
 
                 if (row.getStatus() != null && !row.getStatus().isBlank())
                     ps.setString(6, row.getStatus());
@@ -2191,7 +2444,6 @@ public class ReceptionController {
             }
             lastApptTs = new java.sql.Timestamp(System.currentTimeMillis());
             showInfo("Update", "Appointment updated.");
-//            scheduleCoalescedRefresh();
         } catch (Exception e) {
             if (e instanceof java.sql.SQLException se && "23505".equals(se.getSQLState())) {
                 showWarn("Update Appointment", "Conflict: another appointment exists for the same doctor or room at this start time.");
@@ -2201,42 +2453,88 @@ public class ReceptionController {
         }
     }
 
+//    private void reloadDashboardAppointments() {
+//        if (TableAppInDashboard == null) return;
+//
+//        java.time.LocalDate sel = (dataPickerDashboard != null && dataPickerDashboard.getValue() != null)
+//                ? dataPickerDashboard.getValue()
+//                : java.time.LocalDate.now();
+//
+//        // اجلب البيانات بالخلفية حتى ما يعلق الـ UI
+//        new Thread(() -> {
+//            try {
+//                var rows = com.example.healthflow.dao.AppointmentJdbcDAO.listByDateAll(sel);
+//
+//                // كل تفاعل مع الواجهة يتم داخل FX thread
+//                Platform.runLater(() -> {
+//                    if (rows != null && !rows.isEmpty()) {
+//                        dashBase.setAll(rows);
+//                        TableAppInDashboard.setPlaceholder(new Label(""));
+//                    } else {
+//                        System.out.println("[Dashboard] no appointments found, keeping previous rows temporarily");
+//                        TableAppInDashboard.setPlaceholder(new Label("No appointments on " + sel));
+//                    }
+//
+//                    applyDashboardFilters();
+//                    TableAppInDashboard.refresh();
+//                    System.out.println("[ReceptionController] reloadDashboardAppointments sel=" + sel + " rows=" + (rows == null ? 0 : rows.size()));
+//                });
+//
+//            } catch (Exception ex) {
+//                System.err.println("[ReceptionController] reloadDashboardAppointments error: " + ex);
+//                Platform.runLater(() -> {
+//                    if (TableAppInDashboard != null)
+//                        TableAppInDashboard.setPlaceholder(new Label("Failed to load"));
+//                });
+//            }
+//        }, "reload-dashboard").start();
+//    }
+
+
+    // ========== DASHBOARD TABLE RELOAD ==========
+    // This is the method referenced in the instruction (see log message)
     private void reloadDashboardAppointments() {
-        if (TableAppInDashboard == null) return;
+        LocalDate day = (dataPickerDashboard == null || dataPickerDashboard.getValue() == null)
+                ? java.time.LocalDate.now()
+                : dataPickerDashboard.getValue();        java.util.List<DoctorDAO.AppointmentRow> rows = null;
+        try {
+            rows = doctorDAO.listDashboardAppointments(day);
+        } catch (Exception e) {
+            e.printStackTrace();
+            showWarn("Dashboard", "Failed to load dashboard appointments: " + e.getMessage());
+            return;
+        }
+        System.out.println("[ReceptionController] reloadDashboardAppointments sel=" + day + " rows=" + (rows == null ? 0 : rows.size()));
 
-        java.time.LocalDate sel = (dataPickerDashboard != null && dataPickerDashboard.getValue() != null)
-                ? dataPickerDashboard.getValue()
-                : java.time.LocalDate.now();
-
-        // اجلب البيانات بالخلفية حتى ما يعلق الـ UI
-        new Thread(() -> {
+        // --- Apply rows to dashboard table (clear when empty) ---
+        if (rows == null || rows.isEmpty()) {
+            // Clear backing list and selection
+            try { dashBase.clear(); } catch (Throwable ignore) {}
             try {
-                var rows = com.example.healthflow.dao.AppointmentJdbcDAO.listByDateAll(sel);
-
-                // كل تفاعل مع الواجهة يتم داخل FX thread
-                Platform.runLater(() -> {
-                    if (rows != null && !rows.isEmpty()) {
-                        dashBase.setAll(rows);
-                        TableAppInDashboard.setPlaceholder(new Label(""));
-                    } else {
-                        System.out.println("[Dashboard] no appointments found, keeping previous rows temporarily");
-                        TableAppInDashboard.setPlaceholder(new Label("No appointments on " + sel));
+                if (TableAppInDashboard != null) {
+                    TableAppInDashboard.getSelectionModel().clearSelection();
+                    if (TableAppInDashboard.getItems() != sortedDash) {
+                        TableAppInDashboard.setItems(sortedDash);
                     }
-
-                    applyDashboardFilters();
+                    TableAppInDashboard.setPlaceholder(new Label(
+                            (day == null ? "No appointments" : ("No appointments for " + day))
+                    ));
                     TableAppInDashboard.refresh();
-                    System.out.println("[ReceptionController] reloadDashboardAppointments sel=" + sel + " rows=" + (rows == null ? 0 : rows.size()));
-                });
+                }
+            } catch (Throwable ignore) {}
+            System.out.println("[ReceptionController] reloadDashboardAppointments: no rows → cleared table");
+            return; // stop here; nothing more to populate
+        }
 
-            } catch (Exception ex) {
-                System.err.println("[ReceptionController] reloadDashboardAppointments error: " + ex);
-                Platform.runLater(() -> {
-                    if (TableAppInDashboard != null)
-                        TableAppInDashboard.setPlaceholder(new Label("Failed to load"));
-                });
+        // If we have rows → show them
+        dashBase.setAll(rows);
+        try {
+            if (TableAppInDashboard != null && TableAppInDashboard.getItems() != dashSorted) {
+                TableAppInDashboard.setItems(dashSorted);
             }
-        }, "reload-dashboard").start();
+        } catch (Throwable ignore) {}
     }
+
 
     // -- Dashboard DatePicker wiring: today by default + reload on change
     private void wireDashboardDatePicker() {
@@ -2441,7 +2739,7 @@ public class ReceptionController {
         }
 
         // --- 1) Table wiring (idempotent) ---
-        TableAppInDashboard.setColumnResizePolicy(TableView.UNCONSTRAINED_RESIZE_POLICY);
+        //TableAppInDashboard.setColumnResizePolicy(TableView.UNCONSTRAINED_RESIZE_POLICY);
         try { dashSorted.comparatorProperty().bind(TableAppInDashboard.comparatorProperty()); } catch (Throwable ignore) {}
         if (TableAppInDashboard.getItems() != dashSorted) {
             TableAppInDashboard.setItems(dashSorted);
@@ -2453,11 +2751,12 @@ public class ReceptionController {
         // -------- Appointment ID (index shown 1..n) --------
         if (colAppointmentID != null) {
             colAppointmentID.setStyle("-fx-alignment: CENTER;");
-            colAppointmentID.setMinWidth(60);
-            colAppointmentID.setPrefWidth(70);
-            colAppointmentID.setMaxWidth(120);
-            colAppointmentID.setResizable(true);
+            /*
+            colAppointmentID.setMinWidth(10);
+            colAppointmentID.setPrefWidth(30);
+            colAppointmentID.setMaxWidth(30);
 
+             */
             colAppointmentID.setCellFactory(col -> new TableCell<DoctorDAO.AppointmentRow, Number>() {
                 @Override
                 protected void updateItem(Number item, boolean empty) {
@@ -2471,22 +2770,34 @@ public class ReceptionController {
         // -------- Patient Name --------
         if (colPatientNameDash != null) {
             colPatientNameDash.setCellValueFactory(cd -> new SimpleStringProperty(cd.getValue().patientName));
-            colPatientNameDash.setMinWidth(140);
-            colPatientNameDash.setPrefWidth(200);
+            /*
+            colPatientNameDash.setMinWidth(160);
+            colPatientNameDash.setPrefWidth(160);
+            //colPatientNameDash.setMaxWidth(250);
+
+             */
         }
 
         // -------- Doctor Name --------
         if (colDoctorNameDash != null) {
             colDoctorNameDash.setCellValueFactory(cd -> new SimpleStringProperty(cd.getValue().doctorName));
-            colDoctorNameDash.setMinWidth(140);
-            colDoctorNameDash.setPrefWidth(200);
+            /*
+            colDoctorNameDash.setMinWidth(160);
+            colDoctorNameDash.setPrefWidth(160);
+            //colDoctorNameDash.setMaxWidth(250);
+
+             */
         }
 
         // -------- Specialty --------
         if (colSpecialtyDash != null) {
             colSpecialtyDash.setCellValueFactory(cd -> new SimpleStringProperty(cd.getValue().specialty));
+            /*
             colSpecialtyDash.setMinWidth(120);
-            colSpecialtyDash.setPrefWidth(140);
+            colSpecialtyDash.setPrefWidth(120);
+            //colSpecialtyDash.setMaxWidth(140);
+
+             */
         }
 
         // -------- Date --------
@@ -2497,8 +2808,12 @@ public class ReceptionController {
             });
             colAppintementDateDash.setEditable(false);
             colAppintementDateDash.setStyle("-fx-alignment: CENTER;");
-            colAppintementDateDash.setMinWidth(120);
-            colAppintementDateDash.setPrefWidth(130);
+            /*
+            colAppintementDateDash.setMinWidth(100);
+            colAppintementDateDash.setPrefWidth(100);
+            //colAppintementDateDash.setMaxWidth(120);
+
+             */
         }
 
         // -------- Time --------
@@ -2511,25 +2826,36 @@ public class ReceptionController {
                 return new SimpleStringProperty(from.format(SLOT_FMT_12H) + " \u2192 " + to.format(SLOT_FMT_12H));
             });
             colAppintementTimeDash.setStyle("-fx-alignment: CENTER;");
-            colAppintementTimeDash.setMinWidth(160);
+            /*
+            colAppintementTimeDash.setMinWidth(180);
             colAppintementTimeDash.setPrefWidth(180);
+            //colAppintementTimeDash.setMaxWidth(260);
+
+             */
+
         }
 
         // -------- Room --------
         if (colRoomDash != null) {
             colRoomDash.setCellValueFactory(cd -> new SimpleStringProperty(cd.getValue().location));
             colRoomDash.setStyle("-fx-alignment: CENTER;");
+            /*
             colRoomDash.setMinWidth(100);
-            colRoomDash.setPrefWidth(120);
+            colRoomDash.setPrefWidth(100);
+
+             */
         }
 
         // -------- Action (button) --------
         if (colActionDash != null) {
             colActionDash.setStyle("-fx-alignment: CENTER;");
+            /*
             colActionDash.setMinWidth(100);
-            colActionDash.setPrefWidth(110);
-            colActionDash.setMaxWidth(150);
+            colActionDash.setPrefWidth(100);
+            //colActionDash.setMaxWidth(100);
             colActionDash.setResizable(true);
+
+             */
 
             colActionDash.setCellFactory(col -> new TableCell<DoctorDAO.AppointmentRow, Void>() {
                 private final Button btn = new Button("Open");
@@ -2718,13 +3044,6 @@ public class ReceptionController {
         }, "appt-status-chart").start();
     }
 
-    // =======================
-    // Controller initialization (add wireDashboardDatePicker to the wiring section)
-    // =======================
-    // (Assuming a method like initialize() exists, insert wiring call)
-    // (You may need to find the actual initialize() method in the file and add the following line
-    //   wireDashboardDatePicker();
-    //   right after other wire... calls)
 
 
     // Ensure tables are bound to their proper Sorted/Filtered lists (idempotent)
@@ -2761,6 +3080,35 @@ public class ReceptionController {
             }
         } catch (Throwable ignore) {
         }
+    }
+    /** Ensure we remember patient selection even if items refresh or pane changes. */
+    private void ensurePatientSelectionHook() {
+        if (patientSelHooked) return;
+        if (patientTable == null) return;
+        patientSelHooked = true;
+
+        var sm = patientTable.getSelectionModel();
+        if (sm != null) {
+            sm.setSelectionMode(SelectionMode.SINGLE);
+            sm.selectedItemProperty().addListener((obs, ov, nv) -> {
+                if (nv != null) selectedPatient = nv;
+            });
+        }
+
+        // في حال حصل Click بدون firing للـ selectedItem لسبب ما
+        patientTable.setOnMouseClicked(e -> {
+            var cur = (patientTable.getSelectionModel() == null)
+                    ? null : patientTable.getSelectionModel().getSelectedItem();
+            if (cur != null) selectedPatient = cur;
+        });
+    }
+    private PatientRow getSelectedPatientOrNull() {
+        ensurePatientSelectionHook();
+        if (selectedPatient != null) return selectedPatient;
+        if (patientTable != null && patientTable.getSelectionModel() != null) {
+            return patientTable.getSelectionModel().getSelectedItem();
+        }
+        return null;
     }
 
     // Unified, debounced UI refresh pipeline used by DB NOTIFY and manual triggers
@@ -2948,11 +3296,31 @@ public class ReceptionController {
         }
 
         DachboardButton.setOnAction(e -> showDashboardPane());
-        PatientsButton.setOnAction(e -> showPatientsPane());
+        PatientsButton.setOnAction(e -> showPatientsPaneAction());
         AppointmentsButton.setOnAction(e -> showAppointmentPane());
         DoctorsButton.setOnAction(e -> showDoctorPane());
-        BackButton.setOnAction(e -> BackAction());
 
+        if (AppointmentsButton != null) {
+            appointmentsAccess = new javafx.beans.property.SimpleBooleanProperty(false);
+            AppointmentsButton.disableProperty().bind(appointmentsAccess.not());
+
+            appointmentsAccess.addListener((obs, oldVal, enabled) -> {
+                try {
+                    AppointmentsButton.setOpacity(enabled ? 1.0 : 0.6);
+                    var css = AppointmentsButton.getStyleClass();
+                    if (enabled) {
+                        css.remove("btn-disabled");
+                        if (!css.contains("btn-enabled")) css.add("btn-enabled");
+                    } else {
+                        css.remove("btn-enabled");
+                        if (!css.contains("btn-disabled")) css.add("btn-disabled");
+                    }
+                } catch (Throwable ignore) {}
+            });
+        }
+
+
+        disableAppointmentsAccess(); //for disable btn
         startClock();
 
         GenderComboBox.setItems(FXCollections.observableArrayList(Gender.values()));
@@ -2964,6 +3332,7 @@ public class ReceptionController {
         }
 
         wirePatientTable();
+        ensurePatientSelectionHook();
         wireDoctorTable();
         wireSearchPatients();
         wireSearchDoctors();
@@ -2978,11 +3347,60 @@ public class ReceptionController {
         deleteButton.setOnAction(e -> {
             if (ensureOnlineOrAlert()) doDeletePatient();
         });
-        clearBtn.setOnAction(e -> clearForm());
+        clearBtn.setOnAction(e -> {
+            selectedPatient = null;
+            clearForm();
+        });
+
         BookAppointmentFromPateint.setOnAction(e -> {
-            PatientRow row = (patientTable == null) ? null : patientTable.getSelectionModel().getSelectedItem();
-            if (row == null) {
+            // --- تشخيص سريع ---
+            ensurePatientSelectionHook();
+            PatientRow cached = selectedPatient;
+            PatientRow direct = (patientTable != null && patientTable.getSelectionModel() != null)
+                    ? patientTable.getSelectionModel().getSelectedItem() : null;
+            int fIdx = (patientTable != null && patientTable.getFocusModel() != null)
+                    ? patientTable.getFocusModel().getFocusedIndex() : -1;
+            String formNid  = (getPatientID   != null && getPatientID.getText()   != null) ? getPatientID.getText().trim()   : "";
+            String formName = (getPatientName != null && getPatientName.getText() != null) ? getPatientName.getText().trim() : "";
+            System.out.println("[BookBtn] cached=" + (cached==null?"null":cached.getFullName())
+                    + " direct=" + (direct==null?"null":direct.getFullName())
+                    + " focusIdx=" + fIdx + " formNid=" + formNid + " formName=" + formName);
+
+            // --- حسم المريض من 3 مصادر + الفورم كـ fallback ---
+            PatientRow p = (cached != null) ? cached : direct;
+
+            if (p == null && patientTable != null && fIdx >= 0 && fIdx < patientTable.getItems().size()) {
+                Object o = patientTable.getItems().get(fIdx);
+                if (o instanceof PatientRow pr) p = pr;
+            }
+
+            if (p == null && (!formNid.isEmpty() || !formName.isEmpty()) && patientTable != null && patientTable.getItems() != null) {
+                for (Object o : patientTable.getItems()) {
+                    if (!(o instanceof PatientRow pr)) continue;
+                    boolean nidMatch  = !formNid.isEmpty()  && formNid.equalsIgnoreCase(String.valueOf(pr.getNationalId()));
+                    boolean nameMatch = !formName.isEmpty() && formName.equalsIgnoreCase(String.valueOf(pr.getFullName()));
+                    if (nidMatch || nameMatch) { p = pr; break; }
+                }
+            }
+
+            if (p == null) {
+                // آخر فallback: لو الفورم مليان، كمّل التنقل واملأ الحقول (بدون مسودة) عشان ما توقف شغلك
+                if (!formName.isEmpty() || !formNid.isEmpty()) {
+                    enableAppointmentsAccess();
+                    showAppointmentPane();
+                    if (getPatientName != null) getPatientName.setText(formName);
+                    if (getPatientID   != null) getPatientID.setText(formNid);
+                    selectNearestSlotOnNextRefresh = true;
+                    Platform.runLater(this::applyAppointmentFilters);
+                    showToast("warn", "Using form values (no table selection).");
+                    return; // لاحقًا نكمّل إضافة draft لما نربط الـ NID بـ patient_id من الداتابيز
+                }
+
                 Alert a = new Alert(Alert.AlertType.WARNING);
+                Stage stage = (Stage) rootPane.getScene().getWindow();
+                a.initOwner(stage);
+                a.initModality(Modality.WINDOW_MODAL);
+
                 a.setTitle("Select a patient");
                 a.setHeaderText(null);
                 a.setContentText("Please select a patient from the table first.");
@@ -2990,13 +3408,31 @@ public class ReceptionController {
                 showToast("warn", "Please select a patient from the table first.");
                 return;
             }
-            if (getPatientName != null) getPatientName.setText(row.getFullName());
-            if (getPatientID != null) getPatientID.setText(row.getNationalId());
-            selectNearestSlotOnNextRefresh = true;
+
+            System.out.println("BookAppointmentFromPateint: " + p.getFullName() + "  Age :" + p.getAge());
+
+            enableAppointmentsAccess();
             showAppointmentPane();
-            if (DoctorspecialtyApp != null && DoctorspecialtyApp.getItems().isEmpty()) loadSpecialtiesAsync();
-            addOrFocusDraftForPatient(row);
+
+            if (getPatientName != null) getPatientName.setText(p.getFullName());
+            if (getPatientID   != null) getPatientID.setText(p.getNationalId());
+
+            if (DoctorspecialtyApp != null &&
+                    (DoctorspecialtyApp.getItems() == null || DoctorspecialtyApp.getItems().isEmpty())) {
+                loadSpecialtiesAsync();
+            }
+
+            addOrFocusDraftForPatient(p);
+            selectNearestSlotOnNextRefresh = true;
+            Platform.runLater(this::applyAppointmentFilters);
         });
+        if (AppointmentsAnchorPane != null) {
+            AppointmentsAnchorPane.visibleProperty().addListener((o, was, isNow) -> {
+                if (Boolean.FALSE.equals(isNow)) {
+                    disableAppointmentsAccess();
+                }
+            });
+        }
 
         Platform.runLater(() -> {
             new Thread(() -> {
@@ -3042,15 +3478,15 @@ public class ReceptionController {
 
         // appointments wiring + load
         wireAppointmentsTables();
-        setupAppointmentSlotsListener();
+//        setupAppointmentSlotsListener();
         wireDashboardAppointmentsSearch();
         wireDashboardAppointmentsSearchDP();
         wireAppointmentDateFilter();      // لاستخدام datePiker مهم
         wireDashboardTable();
-        wireStatusFilter();
-        wireStatusFilter();
-        wireAppointmentFilters();
-        loadFilteredAppointments();
+//
+        wireAppointmentStatusFilter();  // ثبّت الافتراضي (SCHEDULED) أولًا
+        wireAppointmentFilters();       // بعدين أربط باقي الفلاتر (التاريخ/البحث)
+        loadFilteredAppointments();     // أخيرًا حمّل البيانات أول مرة
 
         ComboAnimations.applySmoothSelect(statusFilter, s -> s);
 //        ComboAnimations.enableSlidingSelection(statusFilter, Duration.millis(260));
@@ -3064,7 +3500,7 @@ public class ReceptionController {
         }
         reloadDashboardAppointments();
 
-        if (appointmentStatusChart != null) refreshAppointmentStatusChart(dataPickerDashboard.getValue());
+//        if (appointmentStatusChart != null) refreshAppointmentStatusChart(dataPickerDashboard.getValue());
         if (dataPickerDashboard != null) {
             dataPickerDashboard.valueProperty().addListener((obs, oldD, newD) -> {
                 reloadDashboardAppointments(); // عشان يعرض بيانات اليوم المختار
@@ -3082,7 +3518,6 @@ public class ReceptionController {
         }
         // Ensure dashboard initially shows today's appointments
         reloadDashboardAppointments();
-
         applyDashboardFilters();
         if (appointmentStatusChart != null && dataPickerDashboard != null) {
             refreshAppointmentStatusChart(dataPickerDashboard.getValue());
@@ -3092,7 +3527,63 @@ public class ReceptionController {
         if (clearSelectionDach != null) clearSelectionDach.setOnAction(e -> {
             if (TableAppInDashboard != null) TableAppInDashboard.getSelectionModel().clearSelection();
             if (searchAppointmentDach != null) searchAppointmentDach.clear();
+            // إعادة التركيز لحقل البحث بعد المسح (اختياري)
+            if (searchAppointmentDach != null)
+                searchAppointmentDach.requestFocus();
         });
+        if (clearSelectionDoctor != null) {
+            clearSelectionDoctor.setOnAction(e -> {
+                // إزالة التحديد من جدول الأطباء
+                if (DocTable_Recption != null)
+                    DocTable_Recption.getSelectionModel().clearSelection();
+
+                // مسح النص داخل مربع البحث
+                if (searchDoctor != null)
+                    searchDoctor.clear();
+
+                // إعادة التركيز لحقل البحث بعد المسح (اختياري)
+                if (searchDoctor != null)
+                    searchDoctor.requestFocus();
+            });
+        }
+        if (clearSelectionPatient != null) {
+            clearSelectionPatient.setOnAction(e -> {
+                // 1) Clear selection in the patients table
+                if (patientTable != null) {
+                    patientTable.getSelectionModel().clearSelection();
+                }
+
+                // 2) Reset any cached/selected model object
+                try { selectedPatient = null; } catch (Throwable ignore) {}
+
+                // 3) Clear form fields explicitly (defensive null checks)
+                try { if (getPatientID != null)   getPatientID.setText("");} catch (Throwable ignore) {}
+                try { if (getPatientName != null) getPatientName.setText(""); } catch (Throwable ignore) {}
+                try { if (PatientIdTextField != null) PatientIdTextField.clear(); } catch (Throwable ignore) {}
+                try { if (FullNameTextField != null) FullNameTextField.clear(); } catch (Throwable ignore) {}
+                try { if (PhoneTextField != null) PhoneTextField.clear(); } catch (Throwable ignore) {}
+                try { if (medicalHistory != null) medicalHistory.clear(); } catch (Throwable ignore) {}
+                try { if (GenderComboBox != null) GenderComboBox.getSelectionModel().clearSelection(); } catch (Throwable ignore) {}
+                try { if (DateOfBirthPicker != null) DateOfBirthPicker.setValue(null); } catch (Throwable ignore) {}
+
+                // 4) Clear the search box and return focus to it (optional UX)
+                try {
+                    if (search != null) {
+                        search.clear();
+                        search.requestFocus();
+                    }
+                } catch (Throwable ignore) {}
+
+                // 5) If a general clearForm() exists, call it to keep logic centralized
+                try { clearForm(); } catch (Throwable ignore) {}
+
+                // 6) Refresh table visuals in case any cell depends on selection-bound properties
+                try { if (patientTable != null) patientTable.refresh(); } catch (Throwable ignore) {}
+
+                // Optional: toast feedback
+                try { showToast("info", "Patient selection and form cleared."); } catch (Throwable ignore) {}
+            });
+        }
 
         // CRUD buttons
         if (insertAppointments != null) insertAppointments.setOnAction(e -> doInsertAppointment());
@@ -3174,28 +3665,51 @@ public class ReceptionController {
             }
         });
 
-    }
 
-    private void wireStatusFilter() {
-        if (statusFilter != null) {
-            statusFilter.setItems(STATUS_CHOICES);
-            statusFilter.getSelectionModel().select("ALL");
-            statusFilter.valueProperty().addListener((obs, old, v) -> applyAppointmentFilters());
-        }
+        try {
+            try {
+                TableUtils.optOutCopy(colSpecialty, colDoctorNameAppointment, colStatusAppointment, colStartTime);
+            } catch (Throwable ignore) {}
+
+            TableUtils.applyUnifiedTableStyle(
+                    rootPane,
+                    TableINAppointment,
+                    TableAppInDashboard,
+                    patientTable,
+                    DocTable_Recption
+            );
+            if (TableINAppointment != null) TableINAppointment.setEditable(true);
+            setupInlineEditing();
+
+            // Attach lightweight copy menu to ComboBox columns (non-intrusive)
+            try {
+                TableUtils.addCopyMenuNonIntrusive(colSpecialty, colDoctorNameAppointment, colStatusAppointment, colRoomNumber);
+            } catch (Throwable ignore) {}
+
+
+
+        } catch (Throwable ignore) {}
+
     }
 
     private void wireAppointmentFilters() {
         if (dataPickerAppointment != null) {
             dataPickerAppointment.setValue(LocalDate.now());
             dataPickerAppointment.valueProperty().addListener((obs, oldV, newV) -> {
-                loadFilteredAppointments();   // فقط
+                loadFilteredAppointments();
             });
         }
         if (statusFilter != null) {
             statusFilter.valueProperty().addListener((obs, oldV, newV) -> {
-                loadFilteredAppointments();   // فقط
+                loadFilteredAppointments();
             });
         }
+    }
+    private void wireAppointmentStatusFilter() {
+        if (statusFilter == null) return;
+        statusFilter.setItems(FXCollections.observableArrayList("ALL","SCHEDULED","COMPLETED","CANCELLED"));
+        statusFilter.getSelectionModel().select("SCHEDULED"); // ← الافتراضي المتّسق مع التحميل الحالي
+        statusFilter.valueProperty().addListener((obs, ov, nv) -> applyAppointmentFilters());
     }
 
     private void loadFilteredAppointments() {
@@ -3289,6 +3803,10 @@ public class ReceptionController {
         }, "load-appts-filtered").start();
     }
 
+    // --- Gate Appointments navigation ---
+    private void enableAppointmentsAccess()  { appointmentsAccess.set(true);  }
+    private void disableAppointmentsAccess() { appointmentsAccess.set(false); }
+
 
     /**
      * Attach /com/example/healthflow/Design/combobox.css to the current scene
@@ -3333,4 +3851,160 @@ public class ReceptionController {
             } catch (Throwable ignore) { }
         });
     }
+
+    /**
+     * Enables hover/selection-based column width expansion for a TableColumn, preserving original cellFactory logic.
+     * If the column already has a cellFactory (e.g., for copyable or editable cells), it wraps it instead of replacing.
+     */
+
+    // لحتى الان مش راضية تشتغل صح فيها مشكلة
+    private <R> void enableExpandAutoWidth(TableView<R> table, TableColumn<R, String> column, double maxWidth) {
+        // keep any existing factory (copyable cells, inline editors, etc.)
+        javafx.util.Callback<TableColumn<R, String>, TableCell<R, String>> original = column.getCellFactory();
+        if (original == null) {
+            original = tc -> new TableCell<>() {
+                @Override protected void updateItem(String item, boolean empty) {
+                    super.updateItem(item, empty);
+                    setText(empty ? null : item);
+                }
+            };
+        }
+
+        javafx.util.Callback<TableColumn<R, String>, TableCell<R, String>> finalOriginal = original;
+        column.setCellFactory(tc -> {
+            TableCell<R, String> cell = finalOriginal.call(tc);
+
+            // handlers to expand/restore
+            Runnable expand = () -> {
+                String txt = cell.getItem();
+                if (txt == null || txt.isEmpty()) return;
+                javafx.scene.text.Text t = new javafx.scene.text.Text(txt);
+                t.setFont(cell.getFont());
+                double needed = t.getLayoutBounds().getWidth() + 28; // padding
+                double cur = column.getWidth();
+                needed = Math.min(Math.max(needed, cur), maxWidth);
+
+                _origColWidth.putIfAbsent(column, cur);
+                table.setColumnResizePolicy(TableView.UNCONSTRAINED_RESIZE_POLICY);
+                column.setPrefWidth(needed);
+
+                cell.setWrapText(false);
+                cell.setTextOverrun(javafx.scene.control.OverrunStyle.CLIP);
+            };
+
+            Runnable restore = () -> {
+                Double orig = _origColWidth.get(column);
+                if (orig != null) column.setPrefWidth(orig);
+                cell.setWrapText(false);
+                cell.setTextOverrun(javafx.scene.control.OverrunStyle.ELLIPSIS);
+            };
+
+            cell.setOnMouseEntered(e -> expand.run());
+            cell.setOnMouseExited(e -> restore.run());
+            cell.selectedProperty().addListener((o, ov, nv) -> { if (nv) expand.run(); else restore.run(); });
+            cell.focusedProperty().addListener((o, ov, nv) -> { if (nv) expand.run(); else restore.run(); });
+
+            return cell; // keep original graphic/text behavior
+        });
+    }
+
+    // Helper: resolve the current Stage safely from rootPane or logout button
+    // To Turn on LogOut Btn
+
+    private Stage getCurrentStageSafely() {
+        try {
+            if (rootPane != null && rootPane.getScene() != null) {
+                return (Stage) rootPane.getScene().getWindow();
+            }
+        } catch (Throwable ignore) {}
+
+        try {
+            if (LogOutBtn != null && LogOutBtn.getScene() != null) {
+                return (Stage) LogOutBtn.getScene().getWindow();
+            }
+        } catch (Throwable ignore) {}
+
+        return null;
+    }
+
+    // ---- Logout (single confirmation attached to this window) ----
+    @FXML
+    private void handleLogoutAction() {
+        Stage stage = getCurrentStageSafely();
+
+        // Single app-attached confirmation (no duplicate prompts)
+        Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+
+        alert.setTitle("Confirm Logout");
+        alert.setHeaderText(null);
+        alert.setContentText("Are you sure you want to log out?");
+        if (stage != null) {
+            alert.initOwner(stage);
+            alert.initModality(javafx.stage.Modality.WINDOW_MODAL);
+        }
+
+        Optional<ButtonType> result = alert.showAndWait();
+        if (result.isEmpty() || result.get() != ButtonType.OK) {
+            return; // user cancelled
+        }
+
+        // Proceed with logout and return to fixed-size Login
+        doLogout(stage);
+    }
+
+    private void doLogout(Stage stage) {
+        try {
+            shutdown(); // graceful cleanup
+
+            if (stage == null) {
+                stage = getCurrentStageSafely();
+            }
+
+            // Navigate back to Login with fixed size (handled by Navigation)
+            new Navigation().showLoginFixed(stage, monitor);
+
+        } catch (Exception e) {
+            showError("Logout", e);
+        }
+    }
+
+    /** تنفيذ الخروج بدون أي حوارات إضافية */
+
+    @FXML
+    private void handleBack() {
+        if (!navigationHistory.isEmpty()) {
+            AnchorPane previous = navigationHistory.pop();
+            // أخفِ الكل
+            DashboardAnchorPane.setVisible(false);
+            PatientAnchorPane.setVisible(false);
+            AppointmentsAnchorPane.setVisible(false);
+            DoctorAnchorPane.setVisible(false);
+
+            // أظهر السابقة
+            previous.setVisible(true);
+        }
+    }
+    private AnchorPane getCurrentPane() {
+        if (DashboardAnchorPane.isVisible()) return DashboardAnchorPane;
+        if (PatientAnchorPane.isVisible()) return PatientAnchorPane;
+        if (AppointmentsAnchorPane.isVisible()) return AppointmentsAnchorPane;
+        if (DoctorAnchorPane.isVisible()) return DoctorAnchorPane;
+        return null;
+    }
+    private void switchPane(AnchorPane paneToShow) {
+        // خزن الصفحة الحالية قبل التبديل
+        if (getCurrentPane() != paneToShow) {
+            navigationHistory.push(getCurrentPane());
+        }
+
+        // أخفِ الكل
+        DashboardAnchorPane.setVisible(false);
+        PatientAnchorPane.setVisible(false);
+        AppointmentsAnchorPane.setVisible(false);
+        DoctorAnchorPane.setVisible(false);
+
+        // أظهر الصفحة الجديدة
+        paneToShow.setVisible(true);
+    }
+
 }

@@ -16,6 +16,7 @@ module com.example.healthflow {
     requires javafx.base;
     requires org.jetbrains.annotations;
     requires org.controlsfx.controls;
+    requires org.apache.poi.ooxml;
 
 //    requires jdk.internal.md;
 

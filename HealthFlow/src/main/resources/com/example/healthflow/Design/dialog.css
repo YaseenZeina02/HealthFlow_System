@@ -1,0 +1,18 @@
+.custom-dialog {
+    -fx-font-family: "Segoe UI";
+    -fx-font-size: 13px;
+    -fx-background-color: linear-gradient(to bottom, #fdfdfd, #e6f0ff);
+    -fx-border-color: #c3d9ff;
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+}
+
+.custom-dialog .button {
+    -fx-background-radius: 6;
+    -fx-font-weight: bold;
+}
+
+.button:default {
+    -fx-background-color: linear-gradient(to right, #0078d7, #0053a0);
+    -fx-text-fill: white;
+}

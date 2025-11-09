@@ -2,21 +2,18 @@ package com.example.healthflow.controllers;
 
 import com.example.healthflow.dao.DoctorDAO;
 import com.example.healthflow.db.Database;
-import com.example.healthflow.model.Role;
-import com.example.healthflow.model.User;
-import com.example.healthflow.model.PatientRow;
+import com.example.healthflow.model.*;
+import com.example.healthflow.ui.fx.TableUtils;
 import javafx.beans.property.ReadOnlyStringWrapper;
-import javafx.beans.property.ReadOnlyIntegerWrapper;
 import com.example.healthflow.model.dto.MedicineRow;
 import com.example.healthflow.model.dto.PrescItemRow;
+//import com.example.healthflow.model.dto.Appointment;
 import com.example.healthflow.dao.PrescriptionItemDAO;
 import com.example.healthflow.dao.PrescriptionDAO;
-import com.example.healthflow.model.PrescriptionItem;
 import com.example.healthflow.net.ConnectivityMonitor;
 import com.example.healthflow.service.AuthService.Session;
 import com.example.healthflow.service.DoctorDashboardService;
 import com.example.healthflow.service.DoctorDashboardService.Appt;
-import com.example.healthflow.service.DoctorDashboardService.Stats;
 import com.example.healthflow.ui.ComboAnimations;
 import com.example.healthflow.ui.ConnectivityBanner;
 import javafx.animation.ScaleTransition;
@@ -41,7 +38,6 @@ import javafx.scene.layout.*;
 import javafx.scene.shape.Circle;
 import javafx.stage.Stage;
 import javafx.util.Duration;
-import org.kordamp.ikonli.javafx.FontIcon;
 
 
 import java.io.IOException;
@@ -50,13 +46,18 @@ import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.sql.Types;
 import java.time.LocalDate;
-import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Optional;
+
+import static com.example.healthflow.db.Database.shutdown;
 
 public class DoctorController {
 
     /* ====== Cards / header / nav ====== */
+    @FXML private Button LogOutBtn;
+
+
     @FXML
     private AnchorPane Appointments;
     @FXML
@@ -74,8 +75,7 @@ public class DoctorController {
     @FXML
     private Label AppointmentRemainingWithSpecificDoctor;
 
-    @FXML
-    private Button BackButton;
+
     @FXML
     private Button DachboardButton;
     @FXML
@@ -163,7 +163,7 @@ public class DoctorController {
     @FXML
     private TableColumn<PatientRow, String> colGender;
     @FXML
-    private TableColumn<PatientRow, Integer> colDob; // age
+    private TableColumn<PatientRow, String> colDob; // age
     @FXML
     private TableColumn<PatientRow, String> colMedicalHistory;
     @FXML
@@ -179,6 +179,10 @@ public class DoctorController {
     // ---- Hybrid Search (patients) ----
     private final Timeline patientSearchDebounce = new Timeline();
     private volatile String lastPatientSearchText = "";
+    // Gate for AppointmentsButton (avoid setDisable on a bound property)
+    private final javafx.beans.property.BooleanProperty appointmentsAccess =
+            new javafx.beans.property.SimpleBooleanProperty(false);
+
 
     /* ====== Medicine tab ====== */
     @FXML
@@ -218,7 +222,7 @@ public class DoctorController {
     private TableColumn<PrescItemRow, String> colPresesStatus;
 
     // In-memory draft prescription items (source list for the table)
-    private final ObservableList<PrescItemRow> prescItemsEditable = FXCollections.observableArrayList();
+    private ObservableList<PrescItemRow> prescItemsEditable = FXCollections.observableArrayList();
 
     // Medicine autocomplete suggestions
 
@@ -293,7 +297,11 @@ public class DoctorController {
     private final ObservableList<AppointmentRow> apptData = FXCollections.observableArrayList();
     private FilteredList<AppointmentRow> apptFiltered = new FilteredList<>(apptData, r -> true);
     private SortedList<AppointmentRow> apptSorted = new SortedList<>(apptFiltered);
-    private org.controlsfx.control.textfield.AutoCompletionBinding<String> apptSearchBinding;
+//    private org.controlsfx.control.textfield.AutoCompletionBinding<String> apptSearchBinding;
+
+    // Lightweight autocomplete (no ControlsFX modules needed) (Dashbord)
+    private final ContextMenu apptAutoMenu = new ContextMenu();
+    private final java.util.ArrayList<String> apptSuggestions = new java.util.ArrayList<>();
 
     private final ObservableList<PatientRow> patientData = FXCollections.observableArrayList();
 
@@ -353,7 +361,7 @@ public class DoctorController {
             // Make PatientNameTF editable with placeholder so user can type "name • NID"
             setPatientHeader("", null, true);
         });
-        Add_Medication.setOnAction(e -> showPrescriptionPaneToAddMedication());
+//        Add_Medication.setOnAction(e -> showPrescriptionPaneToAddMedication());
 
         Add_Medication.setOnAction(e -> {
             System.out.println("[ADD_MEDICATION BUTTON] Current patient context -> userId="
@@ -363,8 +371,6 @@ public class DoctorController {
         });
         cancelAddMedication.setOnAction(e -> showPrescriptionPane());
 
-
-        BackButton.setOnAction(e -> goBackToLogin());
 
         if (searchDB != null) {
 //            searchDB.setOnAction(e -> hybridPatientSearchNow());
@@ -491,8 +497,22 @@ public class DoctorController {
 
         // When doctor finishes composing the draft and wants to send to pharmacy:
         if (sendToPharmacy != null) {
-            sendToPharmacy.setOnAction(e -> handleSendToPharmacy());
+            sendToPharmacy.setOnAction(e -> sendToPharmacy());
         }
+
+        try {
+            TableUtils.applyUnifiedTableStyle(
+                    rootPane,
+                    AppointmentsTable,
+                    TablePrescriptionItems,
+                    TablePrescriptionItems
+            );
+        } catch (Throwable ignore) {}
+
+        apptData.addListener((javafx.collections.ListChangeListener<? super AppointmentRow>) c -> {
+            // إعادة بناء الاقتراحات بعد اكتمال التغيير
+            Platform.runLater(this::buildAppointmentSearchIndex);
+        });
 
 
         if (loadUserAndEnsureDoctorProfile()) {
@@ -513,44 +533,29 @@ public class DoctorController {
             Exception err = null;
 
             try (Connection c = Database.get()) {
-//                String sql = """
-//                SELECT DISTINCT
-//                     pu.national_id,
-//                     pu.full_name AS patient_name,
-//                     pu.gender,
-//                     p.date_of_birth,
-//                     p.medical_history,
-//                     p.user_id AS patient_user_id
-//                FROM appointments a
-//                JOIN doctors d  ON d.id = a.doctor_id
-//                JOIN users   du ON du.id = d.user_id      -- doctor user
-//                JOIN patients p ON p.id = a.patient_id
-//                JOIN users   pu ON pu.id = p.user_id      -- patient user
-//                WHERE du.id = ?
-//                ORDER BY pu.full_name;
-//                """;
                 String sql = """
-    WITH last_appt AS (
-        SELECT a.patient_id, MAX(a.appointment_date) AS last_dt
-        FROM appointments a
-        JOIN doctors d  ON d.id = a.doctor_id
-        JOIN users   du ON du.id = d.user_id
-        WHERE du.id = ?                -- الدكتور الحالي
-        GROUP BY a.patient_id
-    )
-    SELECT
-         pu.national_id,
-         pu.full_name AS patient_name,
-         pu.gender,
-         p.date_of_birth,
-         p.medical_history,
-         p.user_id AS patient_user_id
-    FROM last_appt la
-    JOIN patients p ON p.id = la.patient_id
-    JOIN users   pu ON pu.id = p.user_id
-    ORDER BY la.last_dt DESC
-    LIMIT 5;
-""";
+                    WITH last_appt AS (
+                        SELECT a.patient_id, MAX(a.appointment_date) AS last_dt
+                        FROM appointments a
+                        JOIN doctors d  ON d.id = a.doctor_id
+                        JOIN users   du ON du.id = d.user_id
+                        WHERE du.id = ?                -- الدكتور الحالي
+                        GROUP BY a.patient_id
+                    )
+                    SELECT
+                         pu.national_id,
+                         pu.full_name AS patient_name,
+                         pu.gender,
+                         p.date_of_birth,
+                         p.medical_history,
+                         p.user_id AS patient_user_id
+                    FROM last_appt la
+                    JOIN patients p ON p.id = la.patient_id
+                    JOIN users   pu ON pu.id = p.user_id
+                    ORDER BY la.last_dt DESC
+                --    LIMIT 5
+                    ;
+                """;
 
                 try (var ps = c.prepareStatement(sql)) {
                     ps.setLong(1, u.getId());
@@ -712,40 +717,6 @@ public class DoctorController {
     private static void setNullableInt(PreparedStatement ps, int idx, Integer value) throws SQLException {
         if (value == null) ps.setNull(idx, Types.INTEGER); else ps.setInt(idx, value);
     }
-    private void goBackToLogin() {
-        Stage stage = (Stage) BackButton.getScene().getWindow();
-        try {
-            FXMLLoader loader = new FXMLLoader(getClass().getResource(new Navigation().Login_Fxml));
-            loader.setControllerFactory(type ->
-                    type == LoginController.class ? new LoginController(monitor) : null
-            );
-
-            Parent loginRoot = loader.load();
-
-            ConnectivityBanner banner = new ConnectivityBanner(monitor);
-            AnchorPane.setTopAnchor(banner, 0.0);
-            AnchorPane container = new AnchorPane(loginRoot);
-            container.setPrefSize(900, 600);
-            AnchorPane.setTopAnchor(loginRoot, 0.0);
-            AnchorPane.setRightAnchor(loginRoot, 0.0);
-            AnchorPane.setBottomAnchor(loginRoot, 0.0);
-            AnchorPane.setLeftAnchor(loginRoot, 0.0);
-
-            AnchorPane root = new AnchorPane();
-            AnchorPane.setTopAnchor(container, 0.0);
-            AnchorPane.setRightAnchor(container, 0.0);
-            AnchorPane.setBottomAnchor(container, 0.0);
-            AnchorPane.setLeftAnchor(container, 0.0);
-            root.getChildren().addAll(container, banner);
-
-            stage.setTitle("HealthFlow");
-            stage.setScene(new Scene(root));
-            stage.setResizable(false);
-            stage.show();
-        } catch (IOException e) {
-            showError("Navigation", e);
-        }
-    }
 
     /* ================= User & role ================= */
     private boolean loadUserAndEnsureDoctorProfile() {
@@ -903,41 +874,82 @@ public class DoctorController {
         loadAppointmentsForDateAsync(date);
     }
 
-    /**
-     * Build the search suggestions for the Appointments table and wire the live filter.
-     */
+
     private void buildAppointmentSearchIndex() {
         if (searchLabel == null) return;
 
-        java.util.LinkedHashSet<String> suggestions = new java.util.LinkedHashSet<>();
+        apptSuggestions.clear();
+
+        // اجمع اقتراحات فريدة من الاسم والوقت + سطر مركب
+        java.util.LinkedHashSet<String> uniq = new java.util.LinkedHashSet<>();
         for (AppointmentRow r : apptData) {
             if (r == null) continue;
-            String idStr = String.valueOf(r.getId());
-            String name = nullToEmpty(r.getPatientName());
-            String nid = nullToEmpty(r.getNationalId());
-            String status = nullToEmpty(r.getStatus());
-            String dateStr = (r.getDate() == null) ? "" : r.getDate().toString();
-            String timeStr = nullToEmpty(r.getTimeStr());
-            for (String p : java.util.Arrays.asList(idStr, name, nid, status, dateStr, timeStr)) {
-                String t = nullToEmpty(p).trim();
-                if (!t.isEmpty()) suggestions.add(t);
+            String name = s(r.getPatientName());
+            String time = s(r.getTimeStr());
+            if (!name.isBlank()) uniq.add(name);
+            if (!time.isBlank()) uniq.add(time);
+            if (!name.isBlank() && !time.isBlank()) uniq.add(name + " • " + time);
+        }
+        apptSuggestions.addAll(uniq);
+
+        // فلترة مباشرة أثناء الكتابة
+        try { searchLabel.textProperty().removeListener(searchLiveListener); } catch (Throwable ignore) {}
+        searchLabel.textProperty().addListener(searchLiveListener);
+
+        // أظهر قائمة الاقتراحات أثناء الكتابة/التركيز
+        searchLabel.setOnKeyReleased(e -> showApptSuggestions(searchLabel.getText()));
+        searchLabel.focusedProperty().addListener((o, was, isNow) -> {
+            if (!isNow) apptAutoMenu.hide();
+        });
+    }
+
+
+    private void showApptSuggestions(String query) {
+        if (searchLabel == null) return;
+        String q = (query == null) ? "" : query.trim().toLowerCase();
+        apptAutoMenu.getItems().clear();
+
+        if (q.isEmpty()) { apptAutoMenu.hide(); return; }
+
+        int shown = 0;
+        for (String s : apptSuggestions) {
+            if (s == null) continue;
+            String t = s.trim();
+            if (t.toLowerCase().contains(q)) {
+                MenuItem mi = new MenuItem(t);
+                mi.setOnAction(ev -> {
+                    searchLabel.setText(t);
+                    applyAppointmentsFilter(t);
+                    apptAutoMenu.hide();
+                });
+                apptAutoMenu.getItems().add(mi);
+                shown++;
+                if (shown >= 8) break; // حد أقصى للاقتراحات
             }
         }
 
-        try {
-            if (apptSearchBinding != null) apptSearchBinding.dispose();
-            apptSearchBinding = org.controlsfx.control.textfield.TextFields.bindAutoCompletion(searchLabel, suggestions);
-        } catch (IllegalAccessError err) {
-            apptSearchBinding = null;
-            System.out.println("[AutoComplete] Disabled due to module access error: " + err.getMessage());
-        } catch (Throwable t) {
-            // Any other runtime issue with ControlsFX; keep the app running.
-            apptSearchBinding = null;
-            System.out.println("[AutoComplete] Disabled: " + t.getClass().getSimpleName() + ": " + t.getMessage());
-        }
+        if (shown == 0) { apptAutoMenu.hide(); return; }
 
-        searchLabel.textProperty().removeListener(searchAppointmentsListener);
-        searchLabel.textProperty().addListener(searchAppointmentsListener);
+        if (!apptAutoMenu.isShowing()) {
+            apptAutoMenu.show(searchLabel, javafx.geometry.Side.BOTTOM, 0, 0);
+        }
+    }
+
+    private final javafx.beans.value.ChangeListener<String> searchLiveListener =
+            (obs, ov, nv) -> applyAppointmentsFilter(nv);
+
+    private static String s(String v) { return v == null ? "" : v; }
+
+    private void applyAppointmentsFilter(String query) {
+        final String q = (query == null ? "" : query.trim().toLowerCase());
+        if (apptFiltered == null) return;
+        apptFiltered.setPredicate(r -> {
+            if (r == null) return false;
+            if (q.isEmpty()) return true;
+            String name = s(r.getPatientName()).toLowerCase();
+            String time = s(r.getTimeStr()).toLowerCase();
+            return name.contains(q) || time.contains(q);
+        });
     }
 
     // listener لفلترة جدول المواعيد حسب النص
@@ -971,7 +983,6 @@ public class DoctorController {
     private static String nullToEmpty(String s) {
         return s == null ? "" : s;
     }
-
 
     private void loadPatientsAsync() { // kept for compatibility in other calls
         var d = (datePickerPatientsWithDoctor != null && datePickerPatientsWithDoctor.getValue() != null)
@@ -1231,89 +1242,114 @@ public class DoctorController {
         }
     }
 
-    private void loadAppointmentsForDateAsync(LocalDate date) {
-        var u = Session.get();
-        if (u == null || date == null) return;
-        new Thread(() -> {
-            List<Appt> list = null;
-            Exception lastErr = null;
-            try {
-                // Preferred service call with explicit date
-                list = svc.listTodayAppointments(u.getId(), date);
-            } catch (Exception ex) {
-                lastErr = ex;
-                System.out.println("[Appointments] service call failed: " + ex.getMessage());
-                ex.printStackTrace();
-            }
+private void loadAppointmentsForDateAsync(LocalDate date) {
+    var u = Session.get();
+    if (u == null || date == null) return;
 
-            // Fallback: query by doctor email + specific date
-            if (list == null || list.isEmpty()) {
-                String email = (u.getEmail() == null) ? "" : u.getEmail().trim().toLowerCase();
-                try (Connection c = Database.get()) {
-                    String sql = """
-                            SELECT a.id,
-                                   pu.full_name              AS patient_name,
-                                   pu.national_id            AS patient_nid,
-                                   a.appointment_date        AS ts,
-                                   a.status,
-                                   p.user_id                 AS patient_user_id,
-                                   p.medical_history         AS medical_history
-                            FROM appointments a
-                            JOIN doctors d  ON d.id = a.doctor_id
-                            JOIN users   du ON du.id = d.user_id        -- doctor user
-                            JOIN patients p ON p.id = a.patient_id
-                            JOIN users   pu ON pu.id = p.user_id        -- patient user
-                            WHERE lower(du.email) = ? AND a.appointment_date::date = ?
-                            ORDER BY a.appointment_date
-                            """;
-                    try (var ps = c.prepareStatement(sql)) {
-                        ps.setString(1, email);
-                        ps.setDate(2, java.sql.Date.valueOf(date));
-                        try (var rs = ps.executeQuery()) {
-                            java.util.ArrayList<Appt> fb = new java.util.ArrayList<>();
-                            while (rs.next()) {
-                                Appt a = new Appt();
-                                a.id = rs.getLong("id");
-                                a.patientName = rs.getString("patient_name");
-                                a.patientNationalId = rs.getString("patient_nid");
-                                java.sql.Timestamp ts = rs.getTimestamp("ts");
-                                if (ts != null) {
-                                    var zdt = ts.toInstant().atZone(APP_TZ);
-                                    a.date = zdt.toLocalDate();
-                                    a.time = zdt.toLocalTime();
-                                }
-                                a.status = rs.getString("status");
-                                a.patientUserId = rs.getLong("patient_user_id");
-                                a.medicalHistory = rs.getString("medical_history");
-                                fb.add(a);
+    // احضر مواعيد اليوم المحدد بالخلفية ثم حدّث الواجهة بأمان
+    Thread t = new Thread(() -> {
+        List<Appt> list = null;
+        Exception lastErr = null;
+
+        // 1) النداء المفضّل للخدمة (يمرَّر التاريخ صراحة)
+        try {
+            list = svc.listTodayAppointments(u.getId(), date);
+        } catch (Exception ex) {
+            lastErr = ex;
+            System.out.println("[Appointments] service call failed: " + ex.getMessage());
+        }
+
+        // 2) بديل آمن: استعلام بالايميل + التاريخ المحدد
+        if (list == null || list.isEmpty()) {
+            String email = (u.getEmail() == null) ? "" : u.getEmail().trim().toLowerCase();
+            try (Connection c = Database.get()) {
+                String sql = """
+                        SELECT a.id,
+                               pu.full_name       AS patient_name,
+                               pu.national_id     AS patient_nid,
+                               a.appointment_date AS ts,
+                               a.status,
+                               p.user_id          AS patient_user_id,
+                               p.medical_history  AS medical_history
+                        FROM appointments a
+                        JOIN doctors d  ON d.id = a.doctor_id
+                        JOIN users   du ON du.id = d.user_id        -- doctor user
+                        JOIN patients p ON p.id = a.patient_id
+                        JOIN users   pu ON pu.id = p.user_id        -- patient user
+                        WHERE lower(du.email) = ? AND a.appointment_date::date = ?
+                        ORDER BY a.appointment_date
+                        """;
+                try (var ps = c.prepareStatement(sql)) {
+                    ps.setString(1, email);
+                    ps.setDate(2, java.sql.Date.valueOf(date));
+                    try (var rs = ps.executeQuery()) {
+                        java.util.ArrayList<Appt> fb = new java.util.ArrayList<>();
+                        while (rs.next()) {
+                            Appt a = new Appt();
+                            a.id = rs.getLong("id");
+                            a.patientName = rs.getString("patient_name");
+                            a.patientNationalId = rs.getString("patient_nid");
+                            java.sql.Timestamp ts = rs.getTimestamp("ts");
+                            if (ts != null) {
+                                var zdt = ts.toInstant().atZone(APP_TZ);
+                                a.date = zdt.toLocalDate();
+                                a.time = zdt.toLocalTime();
                             }
-                            System.out.println("[Appointments] email fallback succeeded using appointment_date casts.");
-                            list = fb;
+                            a.status = rs.getString("status");
+                            a.patientUserId = rs.getLong("patient_user_id");
+                            a.medicalHistory = rs.getString("medical_history");
+                            fb.add(a);
                         }
+                        list = fb;
+                        System.out.println("[Appointments] email fallback succeeded using appointment_date casts.");
                     }
-                } catch (SQLException e) {
-                    lastErr = (lastErr == null) ? e : lastErr;
                 }
+            } catch (SQLException e) {
+                lastErr = (lastErr == null) ? e : lastErr;
+            }
+        }
+
+        // 3) حدّث واجهة المستخدم على خيط JavaFX
+        final List<Appt> finalList = list;
+        final Exception finalErr = lastErr;
+        Platform.runLater(() -> {
+            // امسح القائمة الحالية دائمًا ثم املأ
+            apptData.clear();
+
+            if (finalList != null && !finalList.isEmpty()) {
+                for (Appt a : finalList) {
+                    apptData.add(AppointmentRow.of(a));
+                }
+            } else if (finalErr != null) {
+                String msg = "Failed to load appointments for the selected date.";
+                if (finalErr.getMessage() != null && !finalErr.getMessage().isBlank()) {
+                    msg += " (" + finalErr.getMessage() + ")";
+                }
+                showWarn("Appointments", msg);
             }
 
-            // Update UI on FX thread
-            List<Appt> finalList = list;
-            Exception finalErr = lastErr;
-            Platform.runLater(() -> {
-                apptData.clear();
-                if (finalList != null && !finalList.isEmpty()) {
-                    for (Appt a : finalList) apptData.add(AppointmentRow.of(a));
-                } else if (finalErr != null) {
-                    String msg = "Failed to load appointments for the selected date.";
-                    if (finalErr.getMessage() != null && !finalErr.getMessage().isBlank()) {
-                        msg += " (" + finalErr.getMessage() + ")";
-                    }
-                    showWarn("Appointments", msg);
+            // أعِد بناء اقتراحات الـ AutoComplete بعد تحديث البيانات فقط (مرّة واحدة)
+            try { buildAppointmentSearchIndex(); } catch (Throwable ignore) { }
+
+            // طبّق الفلترة الحالية إن كان مربع البحث غير فارغ، وإلا أعد الضبط للوضع الافتراضي
+            try {
+                String q = (searchLabel == null) ? "" : searchLabel.getText();
+                if (q != null && !q.trim().isEmpty()) {
+                    applyAppointmentsFilter(q);
+                } else {
+                    if (apptFiltered != null) apptFiltered.setPredicate(r -> true);
                 }
-                refitAppointmentsColumnsLater();
-            });
-        }, "doc-appts-by-date").start();
-    }
+            } catch (Throwable ignore) { }
+
+            refitAppointmentsColumnsLater();
+            try { if (AppointmentsTable != null) AppointmentsTable.refresh(); } catch (Throwable ignore) { }
+        });
+    }, "doc-appts-by-date");
+
+    // خيط خفيف Daemon حتى لا يمنع إغلاق التطبيق
+    t.setDaemon(true);
+    t.start();
+}
 
     private void wireAppointmentsTable() {
         if (AppointmentsTable == null) return;
@@ -1740,6 +1776,90 @@ public class DoctorController {
         }
     }
 
+
+    /**
+     * Ensure a DRAFT prescription exists for a specific appointment (doctor+patient).
+     * Returns the prescription id.
+     */
+    private Long ensureDraftPrescriptionFor(Long appointmentId, long doctorId, long patientId) throws Exception {
+        try (java.sql.Connection c = com.example.healthflow.db.Database.get()) {
+            Long foundId = null;
+
+            if (appointmentId == null) {
+                try (java.sql.PreparedStatement ps = c.prepareStatement(
+                        "SELECT id FROM prescriptions " +
+                                "WHERE appointment_id IS NULL AND doctor_id = ? AND patient_id = ? " +
+                                "ORDER BY id DESC LIMIT 1")) {
+                    ps.setLong(1, doctorId);
+                    ps.setLong(2, patientId);
+                    try (java.sql.ResultSet rs = ps.executeQuery()) {
+                        if (rs.next()) foundId = rs.getLong(1);
+                    }
+                }
+            } else {
+                try (java.sql.PreparedStatement ps = c.prepareStatement(
+                        "SELECT id FROM prescriptions " +
+                                "WHERE appointment_id = ? AND doctor_id = ? AND patient_id = ? " +
+                                "ORDER BY id DESC LIMIT 1")) {
+                    ps.setLong(1, appointmentId);
+                    ps.setLong(2, doctorId);
+                    ps.setLong(3, patientId);
+                    try (java.sql.ResultSet rs = ps.executeQuery()) {
+                        if (rs.next()) foundId = rs.getLong(1);
+                    }
+                }
+            }
+
+            if (foundId != null) {
+                currentPrescriptionId = foundId;
+                return foundId;
+            }
+
+            String diagnosisText = (DiagnosisTF != null && DiagnosisTF.getText() != null)
+                    ? DiagnosisTF.getText().trim() : null;
+
+            try (java.sql.PreparedStatement ps = c.prepareStatement(
+                    "INSERT INTO prescriptions (appointment_id, doctor_id, patient_id, pharmacist_id, status, diagnosis) " +
+                            "VALUES (?, ?, ?, NULL, 'DRAFT', ?) RETURNING id")) {
+                if (appointmentId == null) ps.setNull(1, java.sql.Types.BIGINT);
+                else                       ps.setLong(1, appointmentId);
+                ps.setLong(2, doctorId);
+                ps.setLong(3, patientId);
+                if (diagnosisText == null || diagnosisText.isBlank()) ps.setNull(4, java.sql.Types.VARCHAR);
+                else                                                   ps.setString(4, diagnosisText);
+                try (java.sql.ResultSet rs = ps.executeQuery()) {
+                    rs.next();
+                    long newId = rs.getLong(1);
+                    currentPrescriptionId = newId;
+                    return newId;
+                }
+            }
+        }
+    }
+
+    /** Always create a fresh DRAFT (never reuse). */
+    private Long createNewDraftFor(Long appointmentId, long doctorId, long patientId) throws Exception {
+        try (java.sql.Connection c = com.example.healthflow.db.Database.get()) {
+            String diagnosisText = (DiagnosisTF != null && DiagnosisTF.getText() != null)
+                    ? DiagnosisTF.getText().trim() : null;
+            try (java.sql.PreparedStatement ps = c.prepareStatement(
+                    "INSERT INTO prescriptions (appointment_id, doctor_id, patient_id, pharmacist_id, status, diagnosis) " +
+                            "VALUES (?, ?, ?, NULL, 'DRAFT', ?) RETURNING id")) {
+                if (appointmentId == null) ps.setNull(1, java.sql.Types.BIGINT);
+                else                       ps.setLong(1, appointmentId);
+                ps.setLong(2, doctorId);
+                ps.setLong(3, patientId);
+                if (diagnosisText == null || diagnosisText.isBlank()) ps.setNull(4, java.sql.Types.VARCHAR);
+                else                                                   ps.setString(4, diagnosisText);
+                try (java.sql.ResultSet rs = ps.executeQuery()) {
+                    rs.next();
+                    currentPrescriptionId = rs.getLong(1);
+                    return currentPrescriptionId;
+                }
+            }
+        }
+    }
+
     /**
      * Load items for a given prescription and push into the items table.
      */
@@ -1852,7 +1972,6 @@ public class DoctorController {
                     prescItemsEditable.addAll(rows);
                 } else if (TablePrescriptionItems != null) {
                     // fallback لو الجدول غير مربوط بلستة خارجية
-//                    TablePrescriptionItems.getItems().addAll(rows);
                     Platform.runLater(this::reloadPrescriptionItemsFromDb);
                 }
                 if (TablePrescriptionItems != null) TablePrescriptionItems.refresh();
@@ -1887,7 +2006,14 @@ public class DoctorController {
         if (colNationalId != null) colNationalId.setCellValueFactory(new PropertyValueFactory<>("nationalId"));
         if (colName != null) colName.setCellValueFactory(new PropertyValueFactory<>("fullName"));
         if (colGender != null) colGender.setCellValueFactory(new PropertyValueFactory<>("gender"));
-        if (colDob != null) colDob.setCellValueFactory(new PropertyValueFactory<>("age"));
+        if (colDob != null) {
+//            colDob.setCellValueFactory(new PropertyValueFactory<>("age"));
+            colDob.setCellValueFactory(cd -> {
+                var r = cd.getValue(); // النوع حسب صفك (مثلاً PatientRow أو PrescPatientRow)
+                java.time.LocalDate dob = r.getDateOfBirth();
+                return new ReadOnlyStringWrapper(com.example.healthflow.core.time.AgeText.format(dob));
+            });
+        }
         if (colMedicalHistory != null)
             colMedicalHistory.setCellValueFactory(new PropertyValueFactory<>("medicalHistory"));
         if (colAction2 != null) {
@@ -2027,37 +2153,10 @@ public class DoctorController {
                             }
                         }
                     });
-
-//                    btnPresc.setOnAction(e -> {
-//                        PatientRow row = getItem();
-//                        if (row == null) return;
-//
-//                        // مسودة: لا تنشئ وصفة في الداتابيز
-//                        currentPrescriptionId = null;
-//
-//                        // سياق المريض
-//                        selectedPatientUserId      = (row.getUserId() > 0) ? row.getUserId() : null;
-//                        selectedPatientName        = row.getFullName();
-//                        selectedPatientNationalId  = row.getNationalId();
-//
-//                        // نظافة للمسودة
-//                        if (prescItemsEditable != null) prescItemsEditable.clear();
-//
-//                        // افتح واجهة الوصفة كمسودة
-//                        showPrescriptionPane();
-//
-//                        // حدِّث الهيدر + تحسين تجربة الكتابة في الاسم
-//                        Platform.runLater(() -> {
-//                            setPatientHeader(row.getFullName(), row.getNationalId(), false);
-//                            if (PatientNameTF != null) {
-//                                PatientNameTF.positionCaret(PatientNameTF.getText().length());
-//                            }
-//                        });
-//                    });
                     btnPresc.setOnAction(e -> {
                         PatientRow row = getItem();
                         if (row == null) return;
-                        openPrescriptionForPatient(row);   // دالة جديدة بالأسفل
+                        openPrescriptionForPatient(row);
                     });
 
                 }
@@ -2072,21 +2171,6 @@ public class DoctorController {
 
             loadAllPatientsForDoctorAsync();
         }
-        // توزيع أبعاد الأعمدة كنِسَب من عرض الجدول ليتكيّف مع الشاشة
-//        if (patientTable != null) {
-//            var w2 = patientTable.widthProperty().subtract(15);
-//            if (colNationalId != null)     colNationalId.prefWidthProperty().bind(w2.multiply(0.1));
-//            if (colName    != null)        colName.prefWidthProperty().bind(w2.multiply(0.16));
-//            if (colGender  != null)        colGender.prefWidthProperty().bind(w2.multiply(0.6));
-//            if (colDob     != null)        colDob.prefWidthProperty().bind(w2.multiply(0.10));
-//            if (colMedicalHistory != null) colMedicalHistory.prefWidthProperty().bind(w2.multiply(0.22));
-//            if (colAction2 != null) {
-//                colAction2.prefWidthProperty().bind(w2.multiply(0.08));
-//                colAction2.setResizable(true);
-//                colAction2.setSortable(true);
-//                colAction2.setMinWidth(90);
-//            }
-//        }
 
         // --- Bind patients table to filtered/sorted wrappers (one-time) ---
         if (filtered == null) {
@@ -2114,13 +2198,11 @@ public class DoctorController {
         patientTable.setItems(patientData);
     }
 
-    /**
-     * افتح واجهة الوصفة للمريض (من جدول المرضى) بدون إنشاء وصفة جديدة.
-     * يبحث عن آخر وصفة "اليوم" لنفس الدكتور والمريض؛ إن لم توجد يفتح مسودة فارغة.
-     */
     private void openPrescriptionForPatient(PatientRow row) {
+        if (row == null) return;
+
         try (Connection c = Database.get()) {
-            var u = Session.get();
+            var u = com.example.healthflow.service.AuthService.Session.get();
             if (u == null) { showWarn("Prescription", "No logged-in user."); return; }
 
             Long doctorId = doctorDAO.findDoctorIdByUserId(c, u.getId());
@@ -2130,50 +2212,62 @@ public class DoctorController {
             }
             if (doctorId == null) { showWarn("Prescription", "Doctor profile missing."); return; }
 
-            // resolve patient_user_id
-            Long patientUserId = (row.getUserId() > 0) ? row.getUserId() : null;
-            if (patientUserId == null && row.getNationalId() != null && !row.getNationalId().isBlank()) {
-                patientUserId = doctorDAO.findPatientUserIdByNationalId(c, row.getNationalId());
-            }
-            if (patientUserId == null) { showWarn("Prescription", "Patient user id not found."); return; }
-
-            Long patientId = doctorDAO.findPatientIdByUserId(c, patientUserId);
+            Long patientId = doctorDAO.findPatientIdByUserId(c, row.getUserId());
             if (patientId == null) { showWarn("Prescription", "Patient profile not found."); return; }
 
-            // ابحث عن وصفة موجودة اليوم لنفس الدكتور والمريض (اختياري: ORDER BY id DESC)
-            Long existingPrescId = null;
-            try (var ps = c.prepareStatement(
-                    "SELECT id FROM prescriptions " +
-                            "WHERE doctor_id=? AND patient_id=? AND created_at::date = CURRENT_DATE " +
-                            "ORDER BY id DESC LIMIT 1")) {
-                ps.setLong(1, doctorId);
-                ps.setLong(2, patientId);
-                try (var rs = ps.executeQuery()) {
-                    if (rs.next()) existingPrescId = rs.getLong(1);
+            // 1) حاول أخذ appointment_id من السطر المحدّد في جدول المواعيد لنفس المريض
+            Long apptId = null;
+            if (AppointmentsTable != null) {
+                AppointmentRow sel = AppointmentsTable.getSelectionModel().getSelectedItem();
+                if (sel != null) {
+                    boolean matchByUser = (row.getUserId() > 0) && (sel.getPatientUserId() == row.getUserId());
+                    boolean matchByNid  = (row.getNationalId() != null) && row.getNationalId().equals(sel.getNationalId());
+                    if (matchByUser || matchByNid) apptId = sel.getId();
                 }
             }
 
-            // خزّن سياق المريض للـ UI
-            this.selectedPatientUserId     = patientUserId;
-            this.selectedPatientName       = row.getFullName();
-            this.selectedPatientNationalId = row.getNationalId();
-
-            if (existingPrescId != null) {
-                this.currentPrescriptionId = existingPrescId;
-                showPrescriptionPane();
-                loadPrescriptionItemsFromDb(existingPrescId);
-            } else {
-                this.currentPrescriptionId = null;          // مسودة
-                if (prescItemsEditable != null) prescItemsEditable.clear();
-                showPrescriptionPane();
+            // 2) لو ما في تحديد، جرّب إيجاد موعد نشط لنفس اليوم لنفس الطبيب/المريض
+            if (apptId == null) {
+                try (var ps = c.prepareStatement(
+                        "SELECT a.id FROM appointments a " +
+                                "JOIN patients p ON p.id = a.patient_id " +
+                                "WHERE a.doctor_id = ? AND p.user_id = ? " +
+                                "AND a.appointment_date::date = CURRENT_DATE " +
+                                "AND a.status NOT IN ('COMPLETED','CANCELLED') " +
+                                "ORDER BY a.appointment_date LIMIT 1")) {
+                    ps.setLong(1, doctorId);
+                    ps.setLong(2, row.getUserId());
+                    try (var rs = ps.executeQuery()) {
+                        if (rs.next()) apptId = rs.getLong(1);
+                    }
+                }
             }
 
-            Platform.runLater(() -> {
-                setPatientHeader(row.getFullName(), row.getNationalId(), false);
-                if (PatientNameTF != null) PatientNameTF.positionCaret(PatientNameTF.getText().length());
-            });
+            // خزّن سياق المريض في الهيدر
+            this.selectedPatientUserId = row.getUserId();
+            this.selectedPatientName   = row.getFullName();
+            this.selectedPatientNationalId = row.getNationalId();
+
+            Long prescId;
+
+            if (apptId != null) {
+                // عندنا موعد: يجوز إعادة استخدام وصفة نفس الموعد
+                prescId = ensureDraftPrescriptionFor(apptId, doctorId, patientId);
+                this.currentPrescriptionId = prescId;
+                showPrescriptionPane();
+                loadPrescriptionItemsFromDb(prescId); // لو فيها عناصر سيُعاد تحميلها
+            } else {
+                // بدون موعد: أنشئ مسودة جديدة دائمًا (لا تعيد استخدام آخر مسودة)
+                prescId = createNewDraftFor(null, doctorId, patientId);
+                this.currentPrescriptionId = prescId;
+                if (prescItemsEditable != null) prescItemsEditable.clear();
+                showPrescriptionPane();
+                // لا تحميل عناصر: مسودة جديدة فارغة
+            }
+
+            Platform.runLater(() -> setPatientHeader(row.getFullName(), row.getNationalId(), false));
         } catch (Exception ex) {
-            showWarn("Prescription", "Open failed: " + ex.getMessage());
+            showError("Open Prescription", ex);
         }
     }
 
@@ -2206,7 +2300,7 @@ private void wirePrescriptionItemsTable() {
     if (TablePrescriptionItems == null) return;
 
     TablePrescriptionItems.setItems(prescItemsEditable);
-    TablePrescriptionItems.setColumnResizePolicy(TableView.UNCONSTRAINED_RESIZE_POLICY);
+    //TablePrescriptionItems.setColumnResizePolicy(TableView.UNCONSTRAINED_RESIZE_POLICY);
 
     final double actionBase = (colPresesAction == null) ? 0 : Math.max(180, colPresesAction.getPrefWidth());
     final double actionMax  = 240; // cap expansion so we don't kill H-scroll
@@ -2323,6 +2417,7 @@ private void wirePrescriptionItemsTable() {
     if (colDuration != null)     colDuration.setPrefWidth(70);
     if (colRoute != null)        colRoute.setPrefWidth(100);
     if (colQuantity != null)     colQuantity.setPrefWidth(80);
+
 
     ChangeListener<Number> _refit = (obs, ov, nv) -> fitLastColumn.run();
     TablePrescriptionItems.widthProperty().addListener(_refit);
@@ -2556,26 +2651,76 @@ private void wirePrescriptionItemsTable() {
         return r;
     }
 
-    private void reloadPrescriptionItemsFromDb() {
-        if (currentPrescriptionId == null || currentPrescriptionId <= 0) return;
+private void reloadPrescriptionItemsFromDb() {
+    if (currentPrescriptionId == null || currentPrescriptionId <= 0) return;
+
+    // Capture current selection to restore it later
+    final Long selId = (TablePrescriptionItems != null && TablePrescriptionItems.getSelectionModel().getSelectedItem() != null)
+            ? TablePrescriptionItems.getSelectionModel().getSelectedItem().getId()
+            : null;
+    final int selIndex = (TablePrescriptionItems != null)
+            ? TablePrescriptionItems.getSelectionModel().getSelectedIndex()
+            : -1;
+
+    // Load on background thread to keep UI responsive
+    new Thread(() -> {
         try (java.sql.Connection conn = Database.get()) {
-            // Backfill suggestions so Pack values are available even when opening from Prescription button
+            conn.setAutoCommit(true);
             try {
-                conn.setAutoCommit(true);
+                // Ensure packaging suggestions are populated
                 new com.example.healthflow.dao.PrescriptionItemDAO().backfillSuggestions(conn, currentPrescriptionId);
-            } catch (Throwable ignore) { /* non-fatal; continue loading */ }
+            } catch (Throwable ignore) { /* non-fatal */ }
+
             java.util.List<com.example.healthflow.model.PrescriptionItem> fresh =
                     new com.example.healthflow.dao.PrescriptionItemDAO().listByPrescription(conn, currentPrescriptionId);
-            javafx.collections.ObservableList<PrescItemRow> rows = javafx.collections.FXCollections.observableArrayList();
+
+            // Map to UI rows
+            java.util.List<PrescItemRow> mapped = new java.util.ArrayList<>();
             for (var it : fresh) {
-                PrescItemRow r = toRow(it);    // تحويل موحّد
-                rows.add(r);
+                mapped.add(toRow(it));
             }
-            if (TablePrescriptionItems != null) TablePrescriptionItems.setItems(rows);
+
+            javafx.application.Platform.runLater(() -> {
+                // Ensure backing list exists
+                if (prescItemsEditable == null) {
+                    prescItemsEditable = javafx.collections.FXCollections.observableArrayList();
+                }
+
+                // In-place update to preserve bindings/listeners
+                prescItemsEditable.setAll(mapped);
+
+                // Keep the table bound to the canonical backing list
+                if (TablePrescriptionItems != null && TablePrescriptionItems.getItems() != prescItemsEditable) {
+                    TablePrescriptionItems.setItems(prescItemsEditable);
+                }
+
+                if (TablePrescriptionItems != null) {
+                    // Try restore selection by id first, then by previous index
+                    boolean restored = false;
+                    if (selId != null) {
+                        for (int i = 0; i < prescItemsEditable.size(); i++) {
+                            if (prescItemsEditable.get(i) != null && prescItemsEditable.get(i).getId() == selId) {
+                                TablePrescriptionItems.getSelectionModel().select(i);
+                                TablePrescriptionItems.scrollTo(i);
+                                restored = true;
+                                break;
+                            }
+                        }
+                    }
+                    if (!restored && selIndex >= 0 && selIndex < prescItemsEditable.size()) {
+                        TablePrescriptionItems.getSelectionModel().select(selIndex);
+                        TablePrescriptionItems.scrollTo(selIndex);
+                    }
+
+                    TablePrescriptionItems.refresh();
+                }
+            });
         } catch (Exception ex) {
-            toast("Failed to reload items: " + ex.getMessage(), "warn");
+            javafx.application.Platform.runLater(() -> toast("Failed to reload items: " + ex.getMessage(), "warn"));
         }
-    }
+    }, "reload-presc-items").start();
+}
+
 
     private Long ensurePatientFromHeaderIfPossible(Connection c) {
         try {
@@ -2719,12 +2864,12 @@ private void wirePrescriptionItemsTable() {
                 throw new IllegalStateException("Patient profile not found for userId=" + patientUserId + " (patients.id lookup failed)");
             }
 
-            // 4) خُذ التشخيص من الهيدر (نخزّنه في prescriptions.notes)
+            // 4) خُذ التشخيص من الهيدر (نخزّنه في prescriptions.diagnosis)
             String diagnosisText = (DiagnosisTF != null) ? DiagnosisTF.getText() : null;
 
             // 5) أنشئ وصفة بحالة DRAFT (بدون موعد)
             try (var ps = c.prepareStatement(
-                    "INSERT INTO prescriptions (appointment_id, doctor_id, patient_id, pharmacist_id, status, notes) " +
+                    "INSERT INTO prescriptions (appointment_id, doctor_id, patient_id, pharmacist_id, status, diagnosis) " +
                             "VALUES (NULL, ?, ?, NULL, 'DRAFT', ?) RETURNING id")) {
                 ps.setLong(1, doctorId);
                 ps.setLong(2, realPatientId);
@@ -2737,6 +2882,112 @@ private void wirePrescriptionItemsTable() {
 
             toast("Draft prescription #" + currentPrescriptionId + " created.", "ok");
             return currentPrescriptionId;
+        }
+    }
+
+    /**
+     * Send current draft prescription to Pharmacy:
+     * - saves Diagnosis (from DiagnosisTF) into prescriptions.diagnosis
+     * - moves status from DRAFT -> PENDING
+     */
+    @FXML
+    private void sendToPharmacy() {
+//        try {
+//            Long prescId = ensureDraftPrescription(); // make sure DB row exists and currentPrescriptionId set
+//            String diagnosisText = (DiagnosisTF != null && DiagnosisTF.getText() != null)
+//                    ? DiagnosisTF.getText().trim() : null;
+//
+//            try (java.sql.Connection c = Database.get()) {
+//                c.setAutoCommit(true);
+//                try (java.sql.PreparedStatement ps = c.prepareStatement(
+//                        "UPDATE prescriptions " +
+//                                "SET diagnosis = ?, status = 'PENDING' " +
+//                                "WHERE id = ?")) {
+//                    if (diagnosisText == null || diagnosisText.isBlank()) {
+//                        ps.setNull(1, java.sql.Types.VARCHAR);
+//                    } else {
+//                        ps.setString(1, diagnosisText);
+//                    }
+//                    ps.setLong(2, prescId);
+//                    ps.executeUpdate();
+//                }
+//            }
+//
+//            toast("Prescription #" + prescId + " sent to Pharmacy (status: PENDING).", "ok");
+//            // اختياري: أعد تحميل عناصر الوصفة بعد الإرسال
+//            try { loadPrescriptionItemsFromDb(prescId); } catch (Throwable ignore) {}
+//        } catch (Exception ex) {
+//            showError("Send to Pharmacy", ex);
+//        }
+
+        try {
+            var u = com.example.healthflow.service.AuthService.Session.get();
+            if (u == null) { showWarn("Prescription", "No logged-in user."); return; }
+
+            // 1) استخرج doctor_id
+            Long doctorId;
+            try (java.sql.Connection c0 = com.example.healthflow.db.Database.get()) {
+                doctorId = doctorDAO.findDoctorIdByUserId(c0, u.getId());
+                if (doctorId == null) {
+                    doctorDAO.ensureProfileForUser(c0, u.getId());
+                    doctorId = doctorDAO.findDoctorIdByUserId(c0, u.getId());
+                }
+            }
+            if (doctorId == null) { showWarn("Prescription", "Doctor profile missing."); return; }
+
+            // 2) استنتج سياق المريض
+            Long patientUserId = this.selectedPatientUserId;
+            if (patientUserId == null && selectedPatientNationalId != null && !selectedPatientNationalId.isBlank()) {
+                try (java.sql.Connection c1 = com.example.healthflow.db.Database.get()) {
+                    patientUserId = doctorDAO.findPatientUserIdByNationalId(c1, selectedPatientNationalId);
+                }
+            }
+            if (patientUserId == null) { showWarn("Prescription", "Select a patient first."); return; }
+
+            Long patientId;
+            try (java.sql.Connection c2 = com.example.healthflow.db.Database.get()) {
+                patientId = doctorDAO.findPatientIdByUserId(c2, patientUserId);
+            }
+            if (patientId == null) { showWarn("Prescription", "Patient profile not found."); return; }
+
+            // 3) لو في Appointment محدد حاليًا اربطه، وإلا خليه NULL
+            Long appointmentId = null;
+            if (AppointmentsTable != null) {
+                var sel = AppointmentsTable.getSelectionModel().getSelectedItem();
+                if (sel != null) appointmentId = sel.getId();
+            }
+
+            // 4) تأكد من وجود Prescription (DRAFT) ولا تشترط COMPLETED
+            Long prescId = ensureDraftPrescriptionFor(appointmentId, doctorId, patientId);
+            if (prescId == null) { showWarn("Prescription", "Could not create/find draft."); return; }
+
+            // 5) تحقّق أن فيها عناصر
+            int itemCount = 0;
+            try {
+                if (TablePrescriptionItems != null && TablePrescriptionItems.getItems() != null) {
+                    itemCount = TablePrescriptionItems.getItems().size();
+                } else if (prescItemsEditable != null) {
+                    itemCount = prescItemsEditable.size();
+                }
+            } catch (Throwable ignore) {}
+            if (itemCount <= 0) { showWarn("Prescription", "Add at least one item before sending."); return; }
+
+            // 6) غيّر الحالة إلى SUBMITTED (أو SENT) فورًا
+            try (java.sql.Connection c = com.example.healthflow.db.Database.get();
+                 java.sql.PreparedStatement ps = c.prepareStatement(
+                         "UPDATE prescriptions SET status = 'SUBMITTED', updated_at = NOW() WHERE id = ?")) {
+                ps.setLong(1, prescId);
+                ps.executeUpdate();
+            }
+
+            toast("Prescription sent to Pharmacy.", "ok");
+
+            // مزامنة محلية بسيطة
+            try { if (currentPrescriptionId == null) currentPrescriptionId = prescId; } catch (Throwable ignore) {}
+            try { reloadPrescriptionItemsFromDb(); } catch (Throwable ignore) {}
+
+        } catch (Exception ex) {
+            showError("Send to Pharmacy", ex);
         }
     }
 
@@ -3542,6 +3793,64 @@ private void wirePrescriptionItemsTable() {
                 });
             } catch (Throwable ignore) { }
         });
+    }
+
+
+    // To Turn on LogOut Btn
+    private Stage getCurrentStageSafely() {
+        try {
+            if (rootPane != null && rootPane.getScene() != null) {
+                return (Stage) rootPane.getScene().getWindow();
+            }
+        } catch (Throwable ignore) {}
+
+        try {
+            if (LogOutBtn != null && LogOutBtn.getScene() != null) {
+                return (Stage) LogOutBtn.getScene().getWindow();
+            }
+        } catch (Throwable ignore) {}
+
+        return null;
+    }
+
+    // ---- Logout (single confirmation attached to this window) ----
+    @FXML
+    private void handleLogoutAction() {
+        Stage stage = getCurrentStageSafely();
+
+        // Single app-attached confirmation (no duplicate prompts)
+        Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+        alert.setTitle("Confirm Logout");
+        alert.setHeaderText(null);
+        alert.setContentText("Are you sure you want to log out?");
+        if (stage != null) {
+            alert.initOwner(stage);
+            alert.initModality(javafx.stage.Modality.WINDOW_MODAL);
+        }
+
+        Optional<ButtonType> result = alert.showAndWait();
+        if (result.isEmpty() || result.get() != ButtonType.OK) {
+            return; // user cancelled
+        }
+
+        // Proceed with logout and return to fixed-size Login
+        doLogout(stage);
+    }
+
+    private void doLogout(Stage stage) {
+        try {
+            shutdown(); // graceful cleanup
+
+            if (stage == null) {
+                stage = getCurrentStageSafely();
+            }
+
+            // Navigate back to Login with fixed size (handled by Navigation)
+            new Navigation().showLoginFixed(stage, monitor);
+
+        } catch (Exception e) {
+            showError("Logout", e);
+        }
     }
 
 

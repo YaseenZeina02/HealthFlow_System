@@ -928,3 +928,263 @@ ALTER TABLE prescriptions
 -- (اختياري) تأكيد الـ default على DRAFT
 ALTER TABLE prescriptions
     ALTER COLUMN status SET DEFAULT 'DRAFT';
+
+ALTER TABLE medicines
+    ADD COLUMN IF NOT EXISTS strength VARCHAR(50),
+    ADD COLUMN IF NOT EXISTS form     VARCHAR(30);
+
+ALTER TABLE medicines
+DROP CONSTRAINT IF EXISTS medicines_name_key;
+
+DROP INDEX IF EXISTS uniq_medicines_sku;
+CREATE UNIQUE INDEX IF NOT EXISTS uniq_medicines_sku ON medicines (
+    lower(name),
+    COALESCE(strength,''),
+    COALESCE(form,''),
+    COALESCE(tablets_per_blister, 0),
+    COALESCE(blisters_per_box,     0),
+    COALESCE(ml_per_bottle,        0),
+    COALESCE(grams_per_tube,       0)
+    );
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'medicines' AND column_name = 'display_name'
+  ) THEN
+ALTER TABLE medicines
+    ADD COLUMN display_name TEXT
+        GENERATED ALWAYS AS (
+            btrim(
+                    COALESCE(name,'') ||
+                    CASE WHEN strength IS NOT NULL AND btrim(strength) <> '' THEN ' ' || strength ELSE '' END ||
+                    CASE WHEN form     IS NOT NULL AND btrim(form)     <> '' THEN ' ' || form     ELSE '' END ||
+                    CASE
+                        WHEN grams_per_tube IS NOT NULL THEN ' (' || grams_per_tube::text || ' g)'
+                        WHEN ml_per_bottle  IS NOT NULL THEN ' (' || ml_per_bottle::text  || ' mL)'
+                        WHEN tablets_per_blister IS NOT NULL AND blisters_per_box IS NOT NULL
+                            THEN ' (' || tablets_per_blister::text || '×' || blisters_per_box::text || ')'
+                        ELSE ''
+                        END
+            )
+            ) STORED;
+END IF;
+END $$;
+
+ALTER TYPE med_unit ADD VALUE IF NOT EXISTS 'SPRAY';
+
+ALTER TABLE medicines
+    ADD COLUMN IF NOT EXISTS reorder_threshold INT NOT NULL DEFAULT 20 CHECK (reorder_threshold >= 0);
+
+
+ALTER TABLE inventory_transactions
+    ADD COLUMN IF NOT EXISTS pharmacist_id BIGINT REFERENCES pharmacists(id);
+
+
+ALTER TABLE medicine_batches
+    ADD COLUMN IF NOT EXISTS reason TEXT;
+
+ALTER TABLE medicine_batches
+    ADD COLUMN IF NOT EXISTS type TEXT;
+
+
+-- 1) مزامنة quantity في medicine_batches من inventory_transactions
+CREATE OR REPLACE FUNCTION refresh_batch_quantity(p_batch_id BIGINT)
+RETURNS VOID LANGUAGE plpgsql AS $$
+BEGIN
+UPDATE medicine_batches b
+SET quantity = COALESCE(
+        (SELECT SUM(qty_change) FROM inventory_transactions t
+         WHERE t.batch_id = p_batch_id), 0)
+WHERE b.id = p_batch_id;
+END $$;
+
+-- 2) اجعل الـ AFTER trigger يحدّث الدواء والدفعة
+CREATE OR REPLACE FUNCTION inv_tx_after_change()
+RETURNS TRIGGER LANGUAGE plpgsql AS $$
+DECLARE
+v_med   BIGINT;
+  v_batch BIGINT;
+BEGIN
+  v_med   := COALESCE(NEW.medicine_id, OLD.medicine_id);
+  v_batch := COALESCE(NEW.batch_id,    OLD.batch_id);
+
+  IF v_med IS NOT NULL THEN
+    PERFORM refresh_medicine_available_qty(v_med);  -- كانت موجودة عندك
+END IF;
+  IF v_batch IS NOT NULL THEN
+    PERFORM refresh_batch_quantity(v_batch);        -- جديدة
+END IF;
+
+RETURN COALESCE(NEW, OLD);
+END $$;
+
+-- أعد إنشاء التريغرز الثلاثة لضمان استدعاء النسخة الجديدة
+DROP TRIGGER IF EXISTS inv_tx_after_ins ON inventory_transactions;
+DROP TRIGGER IF EXISTS inv_tx_after_upd ON inventory_transactions;
+DROP TRIGGER IF EXISTS inv_tx_after_del ON inventory_transactions;
+
+CREATE TRIGGER inv_tx_after_ins
+    AFTER INSERT ON inventory_transactions
+    FOR EACH ROW EXECUTE FUNCTION inv_tx_after_change();
+
+CREATE TRIGGER inv_tx_after_upd
+    AFTER UPDATE ON inventory_transactions
+    FOR EACH ROW EXECUTE FUNCTION inv_tx_after_change();
+
+CREATE TRIGGER inv_tx_after_del
+    AFTER DELETE ON inventory_transactions
+    FOR EACH ROW EXECUTE FUNCTION inv_tx_after_change();
+
+
+-- 3) إلزام batch_id لكل العمليات الطبيعية؛ السماح فقط لـ ADJUSTMENT
+CREATE OR REPLACE FUNCTION ensure_batch_for_standard_refs()
+RETURNS TRIGGER LANGUAGE plpgsql AS $$
+BEGIN
+  IF (NEW.ref_type IS NULL OR NEW.ref_type NOT IN ('ADJUSTMENT'))
+     AND NEW.batch_id IS NULL THEN
+    RAISE EXCEPTION 'batch_id is required for inventory_transactions (ref_type=%)', NEW.ref_type;
+END IF;
+RETURN NEW;
+END $$;
+
+DROP TRIGGER IF EXISTS inv_tx_need_batch ON inventory_transactions;
+CREATE TRIGGER inv_tx_need_batch
+    BEFORE INSERT OR UPDATE ON inventory_transactions
+    FOR EACH ROW EXECUTE FUNCTION ensure_batch_for_standard_refs();
+
+
+-- بديل للخطوة 4: إنشاء قيود افتتاحية تسوية بالفرق (Backfill كـ ADJUSTMENT)
+INSERT INTO inventory_transactions (medicine_id, batch_id, qty_change, reason, ref_type, created_at)
+SELECT mb.medicine_id,
+       mb.id,
+       (mb.quantity - COALESCE(tx.sum_tx,0)) AS missing_qty,
+       'Opening balance (backfill)',
+       'ADJUSTMENT',
+       mb.received_at
+FROM medicine_batches mb
+         LEFT JOIN (
+    SELECT batch_id, SUM(qty_change) AS sum_tx
+    FROM inventory_transactions
+    GROUP BY batch_id
+) tx ON tx.batch_id = mb.id
+WHERE (mb.quantity - COALESCE(tx.sum_tx,0)) <> 0     -- أدخِل الفرق سالب/موجب
+  AND COALESCE(tx.sum_tx,0) IS DISTINCT FROM mb.quantity;
+
+
+DO $$
+DECLARE
+r_tx RECORD;           -- السطر غير المعيّن (batch_id IS NULL)
+  r_b  RECORD;           -- دفعة مرشّحة بالتسلسل FIFO
+  remaining INT;         -- الكمية السالبة المتبقية للتوزيع (موجبة القيمة)
+  alloc INT;             -- الكمية التي سنخصمها من الدفعة الحالية
+  cur_balance INT;       -- رصيد الدفعة الحالي من الـ ledger
+BEGIN
+FOR r_tx IN
+SELECT id, medicine_id, qty_change, reason, ref_type, ref_id, created_at
+FROM inventory_transactions
+WHERE batch_id IS NULL
+ORDER BY created_at
+    LOOP
+    -- الحالات الموجبة: اربطها بأقدم دفعة لنفس الدواء (لن تسبب سالب)
+    IF r_tx.qty_change >= 0 THEN
+UPDATE inventory_transactions t
+SET batch_id = (
+    SELECT b.id
+    FROM medicine_batches b
+    WHERE b.medicine_id = r_tx.medicine_id
+    ORDER BY b.received_at ASC
+    LIMIT 1
+    )
+WHERE t.id = r_tx.id;
+CONTINUE;
+END IF;
+
+    -- الحالات السالبة: وزّعها على دفعات بقدر المتاح
+    remaining := ABS(r_tx.qty_change);
+
+FOR r_b IN
+SELECT b.id AS batch_id
+FROM medicine_batches b
+WHERE b.medicine_id = r_tx.medicine_id
+ORDER BY b.received_at ASC
+    LOOP
+      EXIT WHEN remaining <= 0;
+
+-- احصل على الرصيد الحالي للدفعة من الـ ledger (ليس من عمود quantity مباشرة)
+SELECT COALESCE(SUM(t.qty_change),0)
+INTO cur_balance
+FROM inventory_transactions t
+WHERE t.batch_id = r_b.batch_id;
+
+-- لو ما في رصيد، انتقل للدفعة التالية
+IF cur_balance <= 0 THEN
+        CONTINUE;
+END IF;
+
+      alloc := LEAST(cur_balance, remaining);
+
+      -- أنشئ سطرًا جديدًا مخصصًا لهذه الدفعة بالقيمة السالبة المخصصة
+INSERT INTO inventory_transactions
+(medicine_id, batch_id, qty_change, reason, ref_type, ref_id, created_at)
+VALUES
+    (r_tx.medicine_id, r_b.batch_id, -alloc,
+     COALESCE(r_tx.reason,'') || ' [attach FIFO]',
+     COALESCE(r_tx.ref_type, 'ADJUSTMENT'),
+     r_tx.ref_id, r_tx.created_at);
+
+remaining := remaining - alloc;
+END LOOP;
+
+    -- إذا نجحنا في تغطية كامل السالب، احذف السطر الأصلي غير المعيّن
+    IF remaining = 0 THEN
+DELETE FROM inventory_transactions WHERE id = r_tx.id;
+ELSE
+      -- لم نجد رصيدًا كافيًا لتغطية كل السالب → اترك السطر كما هو
+      RAISE NOTICE 'Skipped tx id % (needed %, deficit remains %). Attach more opening/receipt first.',
+                   r_tx.id, ABS(r_tx.qty_change), remaining;
+END IF;
+END LOOP;
+END $$;
+
+
+-- Rename prescriptions.decision_note -> prescriptions.diagnosis
+DO $$
+BEGIN
+  IF EXISTS (
+      SELECT 1
+      FROM information_schema.columns
+      WHERE table_name = 'prescriptions'
+        AND column_name = 'decision_note'
+  ) THEN
+    EXECUTE 'ALTER TABLE prescriptions RENAME COLUMN decision_note TO diagnosis';
+END IF;
+END $$;
+
+
+-- امنع تحويل الوصفة إلى PENDING إن لم يكن لها عناصر
+CREATE OR REPLACE FUNCTION presc_require_items_on_pending()
+RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  IF NEW.status = 'PENDING' THEN
+    IF NOT EXISTS (SELECT 1 FROM prescription_items i WHERE i.prescription_id = NEW.id) THEN
+      RAISE EXCEPTION 'Cannot set PENDING without at least one prescription item (id=%)', NEW.id;
+END IF;
+END IF;
+RETURN NEW;
+END $$;
+
+
+DROP TRIGGER IF EXISTS trg_presc_require_items ON prescriptions;
+CREATE TRIGGER trg_presc_require_items
+    BEFORE UPDATE ON prescriptions
+    FOR EACH ROW EXECUTE FUNCTION presc_require_items_on_pending();
+
+
+-- “ممنوع يكون في وصفة بحالة PENDING بدون أدوية”.
+DROP TRIGGER IF EXISTS trg_presc_require_items ON prescriptions;
+CREATE TRIGGER trg_presc_require_items
+    BEFORE INSERT OR UPDATE ON prescriptions
+    FOR EACH ROW EXECUTE FUNCTION presc_require_items_on_pending();
+

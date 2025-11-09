@@ -1,0 +1,231 @@
+
+.table-view {
+    -fx-selection-bar: #2d6aa6;
+    -fx-selection-bar-non-focused: #8aaed3;
+    -fx-padding: 0;
+    -fx-border-radius: 8;
+    -fx-background-insets: 0;
+    -fx-border-color: linear-gradient(to bottom right, #188ba7, #306090);
+}
+
+.hf-ctx {
+    -fx-background-color:
+            linear-gradient(to bottom, rgba(14,165,183,0.06), rgba(14,165,183,0.03)),
+            rgba(255,255,255,0.72);
+    -fx-background-radius: 16;
+    -fx-padding: 10;
+    -fx-border-color: rgba(14,165,183,0.54);
+    -fx-border-width: 1.9;
+    -fx-border-radius: 16;
+    -fx-effect: dropshadow(gaussian, rgba(14,165,183,0.25), 20, 0.4, 0, 6);
+}
+.hf-ctx .separator .line {
+    -fx-border-color: rgba(14,165,183,0.35);
+    -fx-border-width: 0 0 1 0;
+}
+
+/* صفوف العناصر العادية داخل القائمة */
+.hf-ctx .hf-ctx-item {
+    -fx-background-color: transparent;
+    -fx-background-radius: 8;
+    -fx-background-insets: 0;
+}
+.hf-ctx .hf-ctx-item:focused,
+.hf-ctx .hf-ctx-item:hover,
+.hf-ctx .hf-ctx-item:armed {
+    -fx-background-radius: 8;
+    -fx-background-insets: 0;
+    -fx-background-color: rgba(14,165,183,0.18);
+}
+.hf-ctx .hf-ctx-item > * { -fx-padding: 10 14; }
+
+/* الهيدر (Clipboard / Export) بلا hover */
+.hf-ctx .hf-ctx-header,
+.hf-ctx .hf-ctx-header:focused,
+.hf-ctx .hf-ctx-header:armed,
+.hf-ctx .hf-ctx-header:hover {
+    -fx-background-color: transparent !important;
+    -fx-cursor: default;
+}
+.hf-ctx .hf-ctx-header > * {
+    -fx-background-radius: 10;
+    -fx-padding: 6 12;
+}
+
+/* نصوص وأيقونات داخل صف العنصر */
+.hf-ctx .hf-ctx-item .label { -fx-text-fill: #111827; }
+.hf-ctx .hf-ctx-item:hover .label,
+.hf-ctx .hf-ctx-item:focused .label,
+.hf-ctx .hf-ctx-item:armed  .label { -fx-text-fill: #0f172a; }
+
+.hf-ctx .hf-ctx-item .ikonli-font-icon { -fx-icon-color: #111827; -fx-fill: #111827; }
+.hf-ctx .hf-ctx-item:hover .ikonli-font-icon,
+.hf-ctx .hf-ctx-item:focused .ikonli-font-icon,
+.hf-ctx .hf-ctx-item:armed  .ikonli-font-icon { -fx-icon-color: #0f172a; -fx-fill: #0f172a; }
+
+/* ==========================
+   TableView selection/hover (hf-select)
+   ========================== */
+
+/* لو عندك RowFactory تضيف hf-row، هذا الـhover */
+.table-row-cell.hf-row:hover {
+    -fx-background-color: rgba(14,165,183,0.10);
+    -fx-background-insets: 0;
+    -fx-background-radius: 8;
+}
+.table-row-cell.hf-row:focused {
+    -fx-background-color: rgba(54, 178, 195, 0.12) !important;
+    -fx-background-insets: 0;
+    -fx-background-radius: 8;
+}
+
+/* ألوان الـselection-bar الافتراضية للنظام */
+.table-view {
+    -fx-selection-bar: rgba(14,165,183,0.26);
+    -fx-selection-bar-non-focused: rgba(14,165,183,0.18);
+}
+
+/* Hover عام عند استخدام hf-select */
+.table-view.hf-select .table-row-cell:filled:hover {
+    -fx-background-color: rgba(14,165,183,0.10);
+    -fx-background-insets: 0;
+    -fx-background-radius: 6;
+}
+
+/* مهم: أثناء row-selection خلّي خلايا الصف شفافة لتظهر خلفية الصف */
+.table-view.hf-select:row-selection .table-cell:selected {
+    -fx-background-color: transparent;
+}
+
+
+
+/* التحديد الواضح للصف بالكامل */
+.table-view.hf-select .table-row-cell:filled:selected {
+    -fx-background-color:
+            linear-gradient(to bottom, rgba(14,165,183,0.24), rgba(14,165,183,0.18)),
+            #0ea5b7; /* شريط يسار بسيط */
+    -fx-background-insets: 0, 0 0 0 3; /* شريط يسار بسيط */
+    -fx-background-radius: 6, 6;
+}
+
+/* خفّ تراكب الخلايا: خلّيها شفافة فوق صف محدد */
+.table-view.hf-select .table-row-cell:filled:selected .table-cell {
+    /*-fx-background-color: transparent !important;*/
+    -fx-text-fill: #0f172a;
+}
+
+/* لو الجدول فوكس، خلي التحديد أغمق قليلًا */
+.table-view.hf-select:focused .table-row-cell:filled:selected {
+    -fx-background-color:
+            linear-gradient(to bottom, rgba(14,165,183,0.28), rgba(14,165,183,0.22)),
+            #0ea5b7;
+}
+
+/* Hover للصفوف */
+.table-view.hf-select .table-row-cell:filled:hover {
+    -fx-background-color: rgba(14,165,183,0.10);
+    -fx-background-insets: 0;
+    -fx-background-radius: 6;
+}
+
+
+.table-row-cell.hf-empty-row {
+    -fx-background-color: rgba(14, 81, 89, 0.06); /* اختيارية تظليل خفيف */
+}
+.table-row-cell.hf-empty-row .table-cell {
+    -fx-text-fill: transparent; /* تأكد أنها فعلاً فارغة بصريًا */
+}
+/* =========================================================
+   HF FORCE OVERRIDE LAYER
+   اجعل هذا الملف صاحب الأولوية عند وجود تعارضات.
+   الاستعمال:
+     1) أضف "hf-theme" على الـ root (AnchorPane/StackPane).
+     2) أضف "hf-force" على أي TableView تريد تطبيق هذه القواعد عليه.
+     3) حمّل هذا الـ CSS بعد أي CSS آخر (append to Scene stylesheets).
+========================================================== */
+
+/* تأكيد ألوان شريط التحديد حتى مع تعارضات خارجية */
+.root.hf-theme .table-view.hf-force {
+    -fx-selection-bar: transparent !important;
+    -fx-selection-bar-non-focused: transparent !important;
+}
+
+/* صف محدد — خلفية موحّدة وشريط يسار */
+.root.hf-theme .table-view.hf-force .table-row-cell:filled:selected {
+    -fx-background-color:
+            linear-gradient(to bottom, rgba(14,165,183,0.24), rgba(14,165,183,0.18)),
+            #0ea5b7 !important;
+    /*-fx-background-insets: 0, 0 0 0 3 !important;*/
+    -fx-background-radius: 6, 6 !important;
+}
+
+/* اجعل خلايا الصف المحدد شفافة فوق الخلفية */
+.root.hf-theme .table-view.hf-force .table-row-cell:filled:selected .table-cell {
+    -fx-background-color: transparent !important;
+    -fx-text-fill: #0f172a !important;
+}
+
+/* Hover  */
+.root.hf-theme .table-view.hf-force .table-row-cell:filled:hover {
+    -fx-background-color: rgba(14,165,183,0.10) !important;
+    -fx-background-insets: 0 !important;
+    -fx-background-radius: 6 !important;
+}
+/* جدول مركّز: صف محدد */
+.root.hf-theme .table-view.hf-force:focused .table-row-cell:filled:selected {
+    -fx-background-color: rgba(14,165,183,0.26) !important;
+    -fx-background-insets: 0, 1, 2 !important;
+    -fx-background-radius: 6 !important;
+}
+/* جدول مركّز: Selected + Hover = نفس اللون (لا تغيّر) */
+.root.hf-theme .table-view.hf-force:focused .table-row-cell:filled:selected:hover {
+    -fx-background-color: rgba(14,165,183,0.26) !important;
+    -fx-background-insets: 0, 1, 2 !important;
+    -fx-background-radius: 6 !important;
+}
+
+/* جدول غير مركّز: صف محدد */
+.root.hf-theme .table-view.hf-force .table-row-cell:filled:selected {
+    -fx-background-color: rgba(14,165,183,0.18) !important;
+    -fx-background-insets: 0, 1, 2 !important;
+    -fx-background-radius: 6 !important;
+}
+/* غير مركّز: Selected + Hover = نفس اللون */
+.root.hf-theme .table-view.hf-force .table-row-cell:filled:selected:hover {
+    -fx-background-color: rgba(14,165,183,0.18) !important;
+    -fx-background-insets: 0, 1, 2 !important;
+    -fx-background-radius: 6 !important;
+}
+
+/* Hover فقط (غير محدد) */
+.root.hf-theme .table-view.hf-force .table-row-cell:filled:hover {
+    -fx-background-color: rgba(14,165,183,0.10) !important;
+    -fx-background-insets: 0, 1, 2 !important;
+    -fx-background-radius: 6 !important;
+}
+
+/* خلايا داخل الصف تظل شفافة حتى لا تظهر طبقة ثانية */
+.root.hf-theme .table-view.hf-force .table-row-cell:filled:selected .table-cell,
+.root.hf-theme .table-view.hf-force .table-row-cell:filled:hover   .table-cell {
+    -fx-background-color: transparent !important;
+}
+
+/* (اختياري) إزالة “الزِبرا” تحت الزوايا الدائرية حتى لا يبان لون خفيف تحت */
+.root.hf-theme .table-view.hf-force .table-row-cell {
+    -fx-background-color: transparent, -fx-background !important;
+    -fx-background-insets: 0, 0 !important;
+}
+
+/* لون موحّد لأيقونات قائمة النسخ/التصدير */
+.hf-ctx .ikonli-font-icon,
+.hf-ctx .hf-icon {
+    -fx-icon-color: #1e293b !important;
+    -fx-fill:       #1e293b !important;
+}
+
+/* لو آيتم Disabled خليه أفتح */
+.context-menu .menu-item:disabled .ikonli-font-icon,
+.context-menu .menu-item:disabled .hf-icon {
+    -fx-icon-color: #94a3b8 !important;
+    -fx-fill:       #94a3b8 !important;
+}

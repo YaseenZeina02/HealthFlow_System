@@ -105,6 +105,28 @@ public final class Database {
             // (أحيانًا يفيد مع JPMS)
             cfg.setDriverClassName("org.postgresql.Driver");
 
+            // --- Extra PostgreSQL socket hardening (without altering current behavior) ---
+            try {
+                // Keep TCP alive at OS level (helps during sleep/idle networks)
+                cfg.addDataSourceProperty("tcpKeepAlive", "true");
+                // Fail faster on broken sockets (seconds)
+                cfg.addDataSourceProperty("socketTimeout", "30");
+                // Login/connect timeout (seconds)
+                cfg.addDataSourceProperty("loginTimeout", "10");
+                // Prefer query rewrite for batched inserts (no behavior change if unused)
+                cfg.addDataSourceProperty("reWriteBatchedInserts", "true");
+            } catch (Throwable ignore) {}
+
+            // Ensure minIdle never exceeds max (in case of external props)
+            try {
+                if (cfg.getMinimumIdle() > cfg.getMaximumPoolSize()) {
+                    cfg.setMinimumIdle(cfg.getMaximumPoolSize());
+                }
+            } catch (Throwable ignore) {}
+
+            // Optional: explicit pool name helps reading logs without changing behavior
+            try { cfg.setPoolName("HikariPool-Main"); } catch (Throwable ignore) {}
+
             HikariDataSource candidate = new HikariDataSource(cfg);
 
             // جرّب أخذ اتصال واحد فورًا من الـpool (يفشل الآن إن كان في مشكلة)

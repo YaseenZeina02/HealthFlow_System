@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <?import java.lang.String?>
+<?import java.net.URL?>
 <?import javafx.scene.chart.BarChart?>
 <?import javafx.scene.chart.CategoryAxis?>
 <?import javafx.scene.chart.NumberAxis?>
@@ -21,7 +22,7 @@
 <?import javafx.scene.text.Font?>
 <?import org.kordamp.ikonli.javafx.FontIcon?>
 
-<StackPane fx:id="rootPane" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="600.0" prefWidth="1100.0" stylesheets="@../Design/ReceptionDesign.css" xmlns="http://javafx.com/javafx/19" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.example.healthflow.controllers.ReceptionController">
+<StackPane fx:id="rootPane" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="600.0" prefWidth="1100.0" xmlns="http://javafx.com/javafx/23.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.example.healthflow.controllers.ReceptionController">
 
     <children>
         <AnchorPane prefHeight="200.0" prefWidth="200.0">
@@ -34,17 +35,11 @@
                             <children>
                                 <AnchorPane prefHeight="40.0" prefWidth="210.0" stylesheets="@../Design/ReceptionDesign.css">
                                     <children>
-                                        <Label layoutX="54.0" layoutY="8.0" prefHeight="23.0" prefWidth="130.0" text="HealthFlow System" textFill="WHITE">
+                                        <Label layoutX="40.0" layoutY="8.0" prefHeight="23.0" prefWidth="130.0" text="HealthFlow System" textFill="WHITE">
                                             <font>
                                                 <Font size="15.0" />
                                             </font>
                                         </Label>
-
-                                        <Button fx:id="BackButton" layoutX="4.0" layoutY="5.0" mnemonicParsing="false" prefHeight="18.0" prefWidth="18.0" styleClass="btn-1" stylesheets="@../Design/ReceptionDesign.css">
-                                            <graphic>
-                                                <FontIcon iconColor="TURQUOISE" iconLiteral="fas-arrow-left" iconSize="18" text="" />
-                                            </graphic>
-                                        </Button>
                                     </children>
                                     <styleClass>
                                         <String fx:value="bg-color-1" />
@@ -52,16 +47,16 @@
                                     </styleClass>
                                 </AnchorPane>
 
-                                <Label layoutX="226.0" layoutY="9.0" prefHeight="21.0" prefWidth="275.0" styleClass="header-top" stylesheets="@../Design/ReceptionDesign.css" text="Dashboard Form" AnchorPane.leftAnchor="226.0" AnchorPane.topAnchor="9.0">
+                                <Label layoutX="226.0" layoutY="9.0" prefHeight="20.0" prefWidth="300.0" styleClass="header-top" stylesheets="@../Design/ReceptionDesign.css" text="Dashboard Form" AnchorPane.leftAnchor="226.0" AnchorPane.topAnchor="9.0">
                                     <font>
                                         <Font size="15.0" />
                                     </font>
                                 </Label>
 
-                                <Label fx:id="DateOfDay" layoutX="597.0" layoutY="12.5" prefHeight="18.0" prefWidth="105.0" text="MM:DD:YYYY" AnchorPane.rightAnchor="433.0" AnchorPane.topAnchor="12.0" />
-                                <Label fx:id="time" layoutX="673.0" layoutY="12.5" prefHeight="18.0" prefWidth="100.0" text="00:00:00 " AnchorPane.rightAnchor="327.0" AnchorPane.topAnchor="12.0" />
-                                <Label layoutX="815.0" layoutY="10.0" prefHeight="18.0" prefWidth="56.0" text="Welcome," AnchorPane.rightAnchor="250.0" AnchorPane.topAnchor="10.0" />
-                                <Label fx:id="welcomeUser" layoutX="850.0" layoutY="10.0" prefHeight="18.0" prefWidth="103.0" stylesheets="@../Design/ReceptionDesign.css" text="user" AnchorPane.rightAnchor="146.0">
+                                <Label fx:id="DateOfDay" layoutX="558.0" layoutY="10.0" prefHeight="20.0" prefWidth="105.0" text="MM:DD:YYYY" AnchorPane.rightAnchor="436.4" AnchorPane.topAnchor="10.0" />
+                                <Label fx:id="time" layoutX="662.0" layoutY="11.0" prefHeight="20.0" prefWidth="100.0" text="00:00:00 " AnchorPane.rightAnchor="338.0" AnchorPane.topAnchor="11.0" />
+                                <Label layoutX="779.0" layoutY="11.0" prefHeight="20.0" prefWidth="70.0" text="Welcome," AnchorPane.rightAnchor="250.60000000000002" />
+                                <Label fx:id="welcomeUser" layoutX="849.0" layoutY="11.0" prefHeight="20.0" prefWidth="100.0" stylesheets="@../Design/ReceptionDesign.css" text="user" AnchorPane.rightAnchor="151.0">
                                     <font>
                                         <Font name="System Bold" size="13.0" />
                                     </font>
@@ -83,13 +78,13 @@
                             <children>
                                 <FontIcon iconColor="WHITE" iconLiteral="fas-user" iconSize="80" layoutX="73.0" layoutY="83.0" text="" />
 
-                                <Label fx:id="UsernameLabel" layoutX="88.0" layoutY="104.0" prefHeight="19.0" prefWidth="89.0" text="User name " textFill="WHITE">
+                                <Label fx:id="UsernameLabel" layoutX="93.0" layoutY="108.0" prefHeight="20.0" prefWidth="100.0" text="..." textFill="WHITE">
                                     <font>
                                         <Font name="System Bold" size="13.0" />
                                     </font>
                                 </Label>
-                                <Label layoutX="14.0" layoutY="130.0" prefHeight="18.0" prefWidth="56.0" text="UserID:" textFill="WHITE" />
-                                <Label fx:id="UserIdLabel" layoutX="59.0" layoutY="127.0" prefHeight="22.0" prefWidth="100.0" text="user id " textFill="WHITE">
+                                <Label layoutX="14.0" layoutY="133.0" prefHeight="20.0" prefWidth="70.0" text="UserID:" textFill="WHITE" />
+                                <Label fx:id="UserIdLabel" layoutX="93.0" layoutY="133.0" prefHeight="20.0" prefWidth="100.0" text="...." textFill="WHITE">
                                     <font>
                                         <Font name="System Bold" size="13.0" />
                                     </font>
@@ -97,7 +92,7 @@
                                 <Line endX="86.99998474121094" endY="-1.52587890625E-5" layoutX="107.0" layoutY="189.0" startX="-90.19999694824219" startY="-1.52587890625E-5" />
                                 <Label layoutX="15.0" layoutY="206.0" text="Feature" textFill="WHITE" />
 
-                                <Button fx:id="DachboardButton" layoutX="7.0" layoutY="237.0" mnemonicParsing="false" prefHeight="40.0" prefWidth="200.0" styleClass="btn-1" stylesheets="@../Design/ReceptionDesign.css" text="Dashboard">
+                                <Button fx:id="DachboardButton" layoutX="5.0" layoutY="226.0" mnemonicParsing="false" prefHeight="40.0" prefWidth="200.0" styleClass="btn-1" stylesheets="@../Design/ReceptionDesign.css" text="Dashboard">
 
                                     <graphic>
                                         <FontIcon iconColor="#66ccff" iconLiteral="fas-tachometer-alt" iconSize="18" />
@@ -105,27 +100,38 @@
                                 </Button>
 
 
-                                <Button fx:id="DoctorsButton" layoutX="5.0" layoutY="301.0" mnemonicParsing="false" prefHeight="40.0" prefWidth="200.0" styleClass="btn-1" stylesheets="@../Design/ReceptionDesign.css" text="Doctors">
+                                <Button fx:id="DoctorsButton" layoutX="4.0" layoutY="279.0" mnemonicParsing="false" prefHeight="40.0" prefWidth="200.0" styleClass="btn-1" stylesheets="@../Design/ReceptionDesign.css" text="Doctors">
                                     <graphic>
                                         <FontIcon iconColor="#66ccff" iconLiteral="fas-user-md" iconSize="18" />
                                     </graphic>
                                 </Button>
 
-                                <Button fx:id="PatientsButton" layoutX="5.0" layoutY="371.0" mnemonicParsing="false" prefHeight="40.0" prefWidth="200.0" styleClass="btn-1" stylesheets="@../Design/ReceptionDesign.css" text="Patients">
+                                <Button fx:id="PatientsButton" layoutX="4.0" layoutY="330.0" mnemonicParsing="false" onAction="#showPatientsPaneAction" prefHeight="40.0" prefWidth="200.0" styleClass="btn-1" stylesheets="@../Design/ReceptionDesign.css" text="Patients">
                                     <graphic>
                                         <FontIcon iconColor="#66ccff" iconLiteral="fas-user" iconSize="18" />
                                     </graphic>
                                 </Button>
 
-                                <Button fx:id="AppointmentsButton" layoutX="7.0" layoutY="439.0" mnemonicParsing="false" prefHeight="40.0" prefWidth="200.0" styleClass="btn-1" stylesheets="@../Design/ReceptionDesign.css" text="Appointments">
+                                <Button fx:id="AppointmentsButton" layoutX="4.0" layoutY="381.0" mnemonicParsing="false" prefHeight="40.0" prefWidth="200.0" styleClass="btn-1" stylesheets="@../Design/ReceptionDesign.css" text="Appointments">
                                     <graphic>
                                         <FontIcon iconColor="#66ccff" iconLiteral="fas-calendar" iconSize="18" />
                                     </graphic>
                                 </Button>
 
-                                <FontIcon iconColor="#9dbfc7" iconLiteral="fas-hospital" iconSize="64" layoutX="81.0" layoutY="534.0" AnchorPane.bottomAnchor="15.257143402099587" />
-
-                                <Label layoutX="14.0" layoutY="104.0" prefHeight="18.0" prefWidth="74.0" text="Username:" textFill="WHITE" />
+                                <Label layoutX="14.0" layoutY="108.0" prefHeight="20.0" prefWidth="70.0" text="Username:" textFill="WHITE" />
+                        <FontIcon iconColor="#9dbfc7" iconLiteral="fas-hospital" iconSize="64" layoutX="76.0" layoutY="493.0" text="" AnchorPane.bottomAnchor="57.0" />
+                        <Button fx:id="LogOutBtn" layoutX="40.0" layoutY="516.0" mnemonicParsing="false" onAction="#handleLogoutAction" prefHeight="33.0" prefWidth="124.0" styleClass="btn-logout" text="Log out" AnchorPane.bottomAnchor="15.0">
+                           <font>
+                              <Font size="8.0" />
+                           </font>
+                            <graphic>
+                                <FontIcon iconColor="WHITE" iconLiteral="fas-sign-out-alt" iconSize="16" layoutX="56.0" layoutY="534.0" rotate="180" text="" />
+                            </graphic>
+                           <stylesheets>
+                              <URL value="@../Design/ReceptionDesign.css" />
+                              <URL value="@../Design/ButtonsStyles.css" />
+                           </stylesheets>
+                        </Button>
                             </children>
                         </AnchorPane>
                     </left>
@@ -136,7 +142,7 @@
                             <children>
 
                                 <!-- ===== Dashboard ===== -->
-                                <AnchorPane fx:id="DashboardAnchorPane" prefHeight="558.4" prefWidth="889.6" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+                                <AnchorPane fx:id="DashboardAnchorPane" prefHeight="558.4" prefWidth="889.6" visible="false" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
                                     <children>
 
                                         <AnchorPane layoutY="184.8" prefHeight="360.0" prefWidth="600.0" stylesheets="@../Design/ReceptionDesign.css" AnchorPane.bottomAnchor="14.0" AnchorPane.leftAnchor="11.0" AnchorPane.rightAnchor="273.0" AnchorPane.topAnchor="185.0">
@@ -146,23 +152,27 @@
                                                         <Font size="14.0" />
                                                     </font>
                                                 </Label>
-                                                <TableView fx:id="TableAppInDashboard" layoutX="15.0" layoutY="49.0" prefHeight="290.0" prefWidth="576.0" stylesheets="@../Design/ReceptionDesign.css" AnchorPane.bottomAnchor="14.0" AnchorPane.leftAnchor="15.0" AnchorPane.rightAnchor="12.0" AnchorPane.topAnchor="49.0">
+                                                <TableView fx:id="TableAppInDashboard" layoutX="15.0" layoutY="49.0" prefHeight="300.0" prefWidth="580.0" stylesheets="@../Design/ReceptionDesign.css" AnchorPane.bottomAnchor="10.0" AnchorPane.leftAnchor="15.0" AnchorPane.rightAnchor="10.0" AnchorPane.topAnchor="49.0">
                                                     <columns>
-                                                        <TableColumn fx:id="colAppointmentID" maxWidth="1800.0" prefWidth="38.0" text="#" />
-                                                        <TableColumn fx:id="colPatientNameDash" prefWidth="87.0" text="Patient Name" />
-                                                        <TableColumn fx:id="colSpecialtyDash" prefWidth="69.0" text="Specialty" />
-                                                        <TableColumn fx:id="colDoctorNameDash" prefWidth="75.0" text="Doctor name" />
-                                                        <TableColumn fx:id="colAppintementDateDash" prefWidth="114.0" text="Date" />
-                                                        <TableColumn fx:id="colAppintementTimeDash" prefWidth="77.0" text="Time" />
-                                                        <TableColumn fx:id="colRoomDash" prefWidth="77.0" text="Room" />
-                                                        <TableColumn fx:id="colActionDash" prefWidth="74.0" text="Action" />
+                                                        <TableColumn fx:id="colAppointmentID" maxWidth="50.0" prefWidth="30.0" resizable="false" text="#" />
+                                                        <TableColumn fx:id="colPatientNameDash" minWidth="100.0" prefWidth="90.0" text="Patient Name" />
+                                                        <TableColumn fx:id="colSpecialtyDash" minWidth="70.0" prefWidth="70.0" text="Specialty" />
+                                                        <TableColumn fx:id="colDoctorNameDash" minWidth="90.0" prefWidth="90.0" text="Doctor name" />
+                                                        <TableColumn fx:id="colAppintementDateDash" minWidth="60.0" prefWidth="60.0" text="Date" />
+                                                        <TableColumn fx:id="colAppintementTimeDash" minWidth="90.0" prefWidth="75.0" text="Time" />
+                                                        <TableColumn fx:id="colRoomDash" minWidth="60.0" prefWidth="60.0" text="Room" />
+                                                        <TableColumn fx:id="colActionDash" minWidth="70.0" prefWidth="70.0" text="Action" />
                                                     </columns>
                                                     <columnResizePolicy>
                                                         <TableView fx:constant="CONSTRAINED_RESIZE_POLICY" />
                                                     </columnResizePolicy>
                                                 </TableView>
                                                 <TextField fx:id="searchAppointmentDach" layoutX="394.0" layoutY="6.0" prefHeight="0.0" prefWidth="130.0" promptText="search" styleClass="box" AnchorPane.rightAnchor="81.19999999999993" AnchorPane.topAnchor="6.0" />
-                                                <Button fx:id="clearSelectionDach" layoutX="532.0" layoutY="10.0" mnemonicParsing="false" prefHeight="20.0" prefWidth="60.0" styleClass="btn-2" stylesheets="@../Design/ReceptionDesign.css" text="Clear" AnchorPane.rightAnchor="13.599999999999909" AnchorPane.topAnchor="10.0" />
+                                                <Button fx:id="clearSelectionDach" layoutX="532.4000000000001" layoutY="7.0" mnemonicParsing="false" prefHeight="30.0" prefWidth="60.0" styleClass="btn-2" text="Clear" AnchorPane.rightAnchor="13.599999999999909" AnchorPane.topAnchor="7.0">
+                                       <stylesheets>
+                                          <URL value="@../Design/ButtonsStyles.css" />
+                                          <URL value="@../Design/ReceptionDesign.css" />
+                                       </stylesheets></Button>
                                     <DatePicker fx:id="dataPickerDashboard" layoutX="257.0" layoutY="6.0" prefHeight="30.0" prefWidth="130.0" styleClass="boxDataPickar" AnchorPane.rightAnchor="218.19999999999993" />
                                             </children>
                                  <styleClass>
@@ -322,13 +332,14 @@
                                 <!-- ===== Doctors Table ===== -->
                                 <AnchorPane fx:id="DoctorAnchorPane" layoutX="345.0" prefHeight="563.0" prefWidth="892.0" stylesheets="@../Design/ReceptionDesign.css" visible="false" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
                                     <children>
-                                        <Label layoutX="19.0" layoutY="17.0" prefHeight="20.0" prefWidth="120.0" styleClass="header-top" stylesheets="@../Design/ReceptionDesign.css" text="Doctors Details">
+                                        <Label layoutX="19.0" layoutY="27.0" prefHeight="20.0" prefWidth="120.0" styleClass="header-top" stylesheets="@../Design/ReceptionDesign.css" text="Doctors Details">
                                             <font>
                                                 <Font size="14.0" />
                                             </font>
                                         </Label>
                                         <TableView fx:id="DocTable_Recption" layoutX="19.0" layoutY="73.0" prefHeight="463.0" prefWidth="851.0" stylesheets="@../Design/ReceptionDesign.css" AnchorPane.bottomAnchor="15.0" AnchorPane.leftAnchor="19.0" AnchorPane.rightAnchor="20.0" AnchorPane.topAnchor="73.0">
                                             <columns>
+                                    <TableColumn fx:id="colDoctorSerial" maxWidth="50.0" prefWidth="30.0" resizable="false" text="#" />
                                                 <TableColumn fx:id="colDoctor_name" prefWidth="100.0" text="Name" />
                                                 <TableColumn fx:id="colDoctor_Gender" prefWidth="100.0" text="Gender" />
                                                 <TableColumn fx:id="colDoctor_Phone" prefWidth="100.0" text="Phone" />
@@ -341,12 +352,13 @@
                                                 <TableView fx:constant="CONSTRAINED_RESIZE_POLICY" />
                                             </columnResizePolicy>
                                         </TableView>
-                                        <Label alignment="CENTER" layoutX="578.0" layoutY="27.0" prefHeight="30.0" prefWidth="65.0" styleClass="text-gradient" stylesheets="@../Design/ReceptionDesign.css" text="Search" AnchorPane.rightAnchor="246.66666666666669">
-                                            <font>
-                                                <Font name="System Bold Italic" size="20.0" />
-                                            </font>
-                                        </Label>
-                                        <TextField fx:id="searchDoctor" layoutX="663.0" layoutY="28.0" prefHeight="26.0" prefWidth="197.0" promptText="searchDoctor" styleClass="box" AnchorPane.rightAnchor="29.666666666666657" />
+                                        <TextField fx:id="searchDoctor" layoutX="597.0" layoutY="21.0" prefHeight="30.0" prefWidth="200.0" promptText="searchDoctor" styleClass="box" AnchorPane.rightAnchor="92.60000000000002" />
+                              <Button fx:id="clearSelectionDoctor" layoutX="810.0" layoutY="23.0" mnemonicParsing="false" prefHeight="30.0" prefWidth="60.0" styleClass="btn-2" text="Clear" AnchorPane.rightAnchor="19.600000000000023">
+                                 <stylesheets>
+                                    <URL value="@../Design/ButtonsStyles.css" />
+                                    <URL value="@../Design/ReceptionDesign.css" />
+                                 </stylesheets>
+                              </Button>
                                     </children>
                                     <styleClass>
                                         <String fx:value="radius" />
@@ -356,7 +368,7 @@
                                 </AnchorPane>
 
                                 <!-- ===== Patients Pane ===== -->
-                                <AnchorPane fx:id="PatientAnchorPane" prefHeight="558.4" prefWidth="889.6" visible="false" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+                                <AnchorPane fx:id="PatientAnchorPane" prefHeight="558.4" prefWidth="889.6" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
                                     <children>
                                         <AnchorPane layoutX="11.0" layoutY="14.0" prefHeight="200.0" prefWidth="867.0" stylesheets="@../Design/ReceptionDesign.css" AnchorPane.bottomAnchor="343.0" AnchorPane.leftAnchor="11.0" AnchorPane.rightAnchor="12.0" AnchorPane.topAnchor="14.0">
                                             <children>
@@ -367,6 +379,7 @@
                                                 </Label>
                                                 <TableView fx:id="patientTable" layoutX="11.0" layoutY="54.0" prefHeight="142.0" prefWidth="844.0" styleClass="table-cell" stylesheets="@../Design/ReceptionDesign.css" AnchorPane.bottomAnchor="4.0" AnchorPane.leftAnchor="11.0" AnchorPane.rightAnchor="11.0" AnchorPane.topAnchor="54.0">
                                                     <columns>
+                                          <TableColumn fx:id="colPatientsSerial" maxWidth="50.0" prefWidth="30.0" resizable="false" text="#" />
                                                         <TableColumn fx:id="colNationalId" prefWidth="75.0" text="National ID" />
                                                         <TableColumn fx:id="colName" prefWidth="75.0" text="Name" />
                                                         <TableColumn fx:id="colGender" prefWidth="75.0" text="Gender" />
@@ -378,13 +391,13 @@
                                                         <TableView fx:constant="CONSTRAINED_RESIZE_POLICY" />
                                                     </columnResizePolicy>
                                                 </TableView>
-
-                                                <Label alignment="CENTER" layoutX="635.0" layoutY="16.0" prefHeight="30.0" prefWidth="60.0" styleClass="text-gradient" stylesheets="@../Design/ReceptionDesign.css" text="Search" AnchorPane.rightAnchor="171.66666666666663" AnchorPane.topAnchor="16.0">
-                                                    <font>
-                                                        <Font name="System Bold Italic" size="20.0" />
-                                                    </font>
-                                                </Label>
-                                                <TextField fx:id="search" layoutX="705.0" layoutY="14.0" prefHeight="30.0" prefWidth="150.0" promptText="search" styleClass="box" AnchorPane.rightAnchor="11.666666666666629" AnchorPane.topAnchor="14.0" />
+                                                <TextField fx:id="search" layoutX="575.6" layoutY="16.0" prefHeight="30.0" prefWidth="200.0" promptText="search" styleClass="box" AnchorPane.rightAnchor="91.39999999999998" AnchorPane.topAnchor="16.0" />
+                                    <Button fx:id="clearSelectionPatient" layoutX="786.0" layoutY="15.0" mnemonicParsing="false" prefHeight="30.0" prefWidth="60.0" styleClass="btn-2" text="Clear" AnchorPane.rightAnchor="20.399999999999977">
+                                       <stylesheets>
+                                          <URL value="@../Design/ButtonsStyles.css" />
+                                          <URL value="@../Design/ReceptionDesign.css" />
+                                       </stylesheets>
+                                    </Button>
                                             </children>
                                             <styleClass>
                                                 <String fx:value="radius" />
@@ -401,17 +414,37 @@
                                                     </font>
                                                 </Label>
 
-                                                <Button fx:id="InsertButton" layoutX="94.0" layoutY="257.0" mnemonicParsing="false" prefHeight="30.0" prefWidth="100.0" styleClass="btn-2" stylesheets="@../Design/ReceptionDesign.css" text="Insert" />
-                                                <Button fx:id="UpdateButton" layoutX="309.0" layoutY="257.0" mnemonicParsing="false" prefHeight="30.0" prefWidth="100.0" styleClass="btn-2" stylesheets="@../Design/ReceptionDesign.css" text="Update" />
-                                                <Button fx:id="clearBtn" layoutX="202.0" layoutY="257.0" mnemonicParsing="false" prefHeight="30.0" prefWidth="100.0" styleClass="btn-2" stylesheets="@../Design/ReceptionDesign.css" text="Clear" />
-                                                <Button fx:id="deleteButton" layoutX="413.0" layoutY="257.0" mnemonicParsing="false" prefHeight="30.0" prefWidth="100.0" styleClass="btn-2" stylesheets="@../Design/ReceptionDesign.css" text="Delete" />
+                                                <Button fx:id="InsertButton" layoutX="94.0" layoutY="253.0" mnemonicParsing="false" prefHeight="30.0" prefWidth="100.0" styleClass="btn-2" text="Insert">
+                                       <stylesheets>
+                                          <URL value="@../Design/ButtonsStyles.css" />
+                                          <URL value="@../Design/ReceptionDesign.css" />
+                                       </stylesheets></Button>
+                                                <Button fx:id="UpdateButton" layoutX="309.0" layoutY="253.0" mnemonicParsing="false" prefHeight="30.0" prefWidth="100.0" styleClass="btn-2" text="Update">
+                                       <stylesheets>
+                                          <URL value="@../Design/ButtonsStyles.css" />
+                                          <URL value="@../Design/ReceptionDesign.css" />
+                                       </stylesheets></Button>
+                                                <Button fx:id="clearBtn" layoutX="202.0" layoutY="253.0" mnemonicParsing="false" prefHeight="30.0" prefWidth="100.0" styleClass="btn-2" text="Clear">
+                                       <stylesheets>
+                                          <URL value="@../Design/ButtonsStyles.css" />
+                                          <URL value="@../Design/ReceptionDesign.css" />
+                                       </stylesheets></Button>
+                                                <Button fx:id="deleteButton" layoutX="413.0" layoutY="253.0" mnemonicParsing="false" prefHeight="30.0" prefWidth="100.0" styleClass="btn-2" text="Delete">
+                                       <stylesheets>
+                                          <URL value="@../Design/ButtonsStyles.css" />
+                                          <URL value="@../Design/ReceptionDesign.css" />
+                                       </stylesheets></Button>
 
-                                                <Label layoutX="385.0" layoutY="184.0" prefHeight="34.0" prefWidth="110.0" styleClass="text-gradient" stylesheets="@../Design/ReceptionDesign.css" text="Medical History">
+                                                <Label layoutX="385.0" layoutY="184.0" prefHeight="34.0" prefWidth="110.0" styleClass="text-gradient" text="Medical History">
                                                     <font>
                                                         <Font name="System Bold Italic" size="20.0" />
                                                     </font>
+                                       <stylesheets>
+                                          <URL value="@../Design/ButtonsStyles.css" />
+                                          <URL value="@../Design/ReceptionDesign.css" />
+                                       </stylesheets>
                                                 </Label>
-                                                <TextArea fx:id="medicalHistory" layoutX="513.0" layoutY="193.0" prefHeight="60.0" prefWidth="180.0" style="-fx-background-color: #ffffff;" />
+                                                <TextArea fx:id="medicalHistory" layoutX="519.0" layoutY="168.0" prefHeight="69.0" prefWidth="180.0" style="-fx-background-color: #ffffff;" styleClass="boxTFA" />
 
                                                 <Label layoutX="14.0" layoutY="63.0" prefHeight="30.0" prefWidth="80.0" styleClass="text-gradient" stylesheets="@../Design/ReceptionDesign.css" text="National ID">
                                                     <font>
@@ -422,7 +455,7 @@
 
                                                 <TextField fx:id="FullNameTextField" layoutX="105.0" layoutY="121.0" prefHeight="30.0" prefWidth="180.0" styleClass="box" />
 
-                                                <ComboBox fx:id="GenderComboBox" layoutX="105.0" layoutY="179.0" prefHeight="30.0" prefWidth="180.0" styleClass="box" />
+                                                <ComboBox fx:id="GenderComboBox" layoutX="105.0" layoutY="186.0" prefHeight="30.0" prefWidth="180.0" stylesheets="@../Design/combobox.css" />
                                                 <Label layoutX="14.0" layoutY="186.0" prefHeight="30.0" prefWidth="80.0" styleClass="text-gradient" stylesheets="@../Design/ReceptionDesign.css" text="Gender">
                                                     <font>
                                                         <Font name="System Bold Italic" size="20.0" />
@@ -448,7 +481,11 @@
                                                     </font>
                                                 </Label>
                                                 <TextField fx:id="PhoneTextField" layoutX="520.0" layoutY="121.0" prefHeight="30.0" prefWidth="180.0" styleClass="box" />
-                                                <Button fx:id="BookAppointmentFromPateint" layoutX="520.0" layoutY="257.0" mnemonicParsing="false" prefHeight="30.0" prefWidth="180.0" styleClass="btn-2" stylesheets="@../Design/ReceptionDesign.css" text="Book an appointment" AnchorPane.bottomAnchor="19.0" />
+                                                <Button fx:id="BookAppointmentFromPateint" layoutX="520.0" layoutY="253.0" mnemonicParsing="false" prefHeight="30.0" prefWidth="180.0" styleClass="btn-2" text="Book an appointment" AnchorPane.bottomAnchor="23.0">
+                                       <stylesheets>
+                                          <URL value="@../Design/ButtonsStyles.css" />
+                                          <URL value="@../Design/ReceptionDesign.css" />
+                                       </stylesheets></Button>
                                             </children>
                                             <styleClass>
                                                 <String fx:value="radius" />
@@ -460,7 +497,7 @@
                                 </AnchorPane>
 
                                 <!-- ===== Appointments Pane ===== -->
-                                <AnchorPane fx:id="AppointmentsAnchorPane" layoutY="1.0" prefHeight="558.0" prefWidth="890.0" style="-fx-background-color: #ededed;" stylesheets="@../Design/ReceptionDesign.css" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="1.0">
+                                <AnchorPane fx:id="AppointmentsAnchorPane" layoutY="1.0" prefHeight="558.0" prefWidth="890.0" style="-fx-background-color: #ededed;" stylesheets="@../Design/ReceptionDesign.css" visible="false" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="1.0">
                                     <children>
                                         <AnchorPane layoutX="16.0" layoutY="14.0" prefHeight="110.0" prefWidth="850.0" style="-fx-background-color: #ffffff; -fx-background-radius: 5;" styleClass="shadow" AnchorPane.leftAnchor="19.0" AnchorPane.rightAnchor="21.0">
                                             <children>
@@ -477,37 +514,55 @@
                                                 <Label fx:id="AppointmentDateDetailes" layoutX="469.0" layoutY="6.0" prefHeight="44.0" prefWidth="367.0" text="." AnchorPane.rightAnchor="14.0" />
                                             </children>
                                         </AnchorPane>
-                                        <AnchorPane layoutX="18.0" layoutY="134.0" prefHeight="412.0" prefWidth="852.0" AnchorPane.bottomAnchor="12.0" AnchorPane.leftAnchor="18.0" AnchorPane.rightAnchor="20.0" AnchorPane.topAnchor="134.0">
+                                        <AnchorPane layoutX="18.0" layoutY="134.0" prefHeight="420.0" prefWidth="850.0" AnchorPane.bottomAnchor="12.0" AnchorPane.leftAnchor="18.0" AnchorPane.rightAnchor="20.0" AnchorPane.topAnchor="134.0">
                                             <children>
                                                 <Label layoutX="14.0" layoutY="17.0" prefHeight="20.0" prefWidth="200.0" styleClass="header-top" stylesheets="@../Design/ReceptionDesign.css" text="Appointments  Information" AnchorPane.leftAnchor="14.0" AnchorPane.rightAnchor="655.3333333333334" AnchorPane.topAnchor="17.0">
                                                     <font>
                                                         <Font size="14.0" />
                                                     </font>
                                                 </Label>
-                                                <TableView fx:id="TableINAppointment" layoutX="20.0" layoutY="51.0" prefHeight="233.0" prefWidth="813.0" style="-fx-background-color: #ededed;" stylesheets="@../Design/ReceptionDesign.css" AnchorPane.bottomAnchor="87.0" AnchorPane.leftAnchor="20.0" AnchorPane.rightAnchor="19.0" AnchorPane.topAnchor="51.0">
+                                                <TableView fx:id="TableINAppointment" layoutX="15.0" layoutY="55.0" prefHeight="305.0" prefWidth="822.0" style="-fx-background-color: #ededed;" stylesheets="@../Design/ReceptionDesign.css" AnchorPane.bottomAnchor="55.0" AnchorPane.leftAnchor="15.0" AnchorPane.rightAnchor="15.0" AnchorPane.topAnchor="55.0">
                                                     <columns>
-                                                        <TableColumn fx:id="colAppointmentSerialNUm" maxWidth="1500.0" prefWidth="150.0" text="#" />
-                                                        <TableColumn fx:id="colPatientNameAppointment" prefWidth="78.0" text="Patient Name" />
-                                                        <TableColumn fx:id="colSpecialty" prefWidth="162.0" text="Specialty" />
-                                                        <TableColumn fx:id="colDoctorNameAppointment" maxWidth="3500.0" prefWidth="100.0" text="Doctor Name" />
-                                                        <TableColumn fx:id="colDateAppointment" maxWidth="4000.0" prefWidth="100.0" text="Date" />
-                                                        <TableColumn fx:id="colSessionTime" maxWidth="4000.0" prefWidth="90.0" text="Session Time" />
-                                                        <TableColumn fx:id="colStartTime" maxWidth="4000.0" prefWidth="90.0" text="Start Time" />
-                                                        <TableColumn fx:id="colRoomNumber" prefWidth="129.0" text="Room Number" />
-                                                        <TableColumn fx:id="colStatusAppointment" prefWidth="86.0" text="Status" />
+                                                        <TableColumn fx:id="colAppointmentSerialNUm" maxWidth="50.0" prefWidth="30.0" resizable="false" text="#" />
+                                                        <TableColumn fx:id="colPatientNameAppointment" minWidth="-1.0" prefWidth="100.0" text="Patient Name" />
+                                                        <TableColumn fx:id="colSpecialty" minWidth="-1.0" prefWidth="90.0" text="Specialty" />
+                                                        <TableColumn fx:id="colDoctorNameAppointment" minWidth="-1.0" prefWidth="100.0" text="Doctor Name" />
+                                                        <TableColumn fx:id="colDateAppointment" minWidth="-1.0" prefWidth="90.0" text="Date" />
+                                                        <TableColumn fx:id="colSessionTime" minWidth="-1.0" prefWidth="100.0" text="Session Time" />
+                                                        <TableColumn fx:id="colStartTime" minWidth="-1.0" prefWidth="100.0" text="Start Time" />
+                                                        <TableColumn fx:id="colRoomNumber" minWidth="-1.0" prefWidth="110.0" text="Room Number" />
+                                                        <TableColumn fx:id="colStatusAppointment" minWidth="-1.0" prefWidth="90.0" text="Status" />
                                                     </columns>
-                                                    <columnResizePolicy>
-                                                        <TableView fx:constant="CONSTRAINED_RESIZE_POLICY" />
-                                                    </columnResizePolicy>
+                                       <columnResizePolicy>
+                                          <TableView fx:constant="CONSTRAINED_RESIZE_POLICY" />
+                                       </columnResizePolicy>
                                                 </TableView>
-                                                <Button fx:id="addNewRow" layoutX="806.0" layoutY="13.0" mnemonicParsing="false" prefHeight="7.0" prefWidth="16.0" styleClass="btn-2" stylesheets="@../Design/ReceptionDesign.css" text="+" AnchorPane.rightAnchor="19.33333333333337" />
-                                                <Button fx:id="insertAppointments" layoutX="391.0" layoutY="366.0" mnemonicParsing="false" prefHeight="30.0" prefWidth="100.0" styleClass="btn-2" stylesheets="@../Design/ReceptionDesign.css" text="Insert" AnchorPane.bottomAnchor="14.0" AnchorPane.rightAnchor="361.0" />
-                                                <Button fx:id="updateAppointments" layoutX="507.0" layoutY="366.0" mnemonicParsing="false" prefHeight="30.0" prefWidth="100.0" styleClass="btn-2" stylesheets="@../Design/ReceptionDesign.css" text="Update" AnchorPane.bottomAnchor="14.0" AnchorPane.rightAnchor="245.0" />
-                                                <Button fx:id="clear_Appointments" layoutX="619.0" layoutY="366.0" mnemonicParsing="false" prefHeight="30.0" prefWidth="100.0" styleClass="btn-2" stylesheets="@../Design/ReceptionDesign.css" text="Clear" AnchorPane.bottomAnchor="14.0" AnchorPane.rightAnchor="133.0" />
-                                                <Button fx:id="deleteAppointments" layoutX="762.0" layoutY="327.0" mnemonicParsing="false" prefHeight="30.0" prefWidth="100.0" styleClass="btn-2" stylesheets="@../Design/ReceptionDesign.css" text="Delete" AnchorPane.bottomAnchor="14.0" AnchorPane.rightAnchor="20.0" />
-                                                <Button fx:id="deleteRowApptTable" layoutX="769.0" layoutY="13.0" mnemonicParsing="false" prefHeight="25.0" prefWidth="25.0" styleClass="btn-2" stylesheets="@../Design/ReceptionDesign.css" text="-" AnchorPane.rightAnchor="57.66666666666663" />
-                                                <DatePicker fx:id="dataPickerAppointment" cache="true" layoutX="627.0" layoutY="12.0" minHeight="-Infinity" prefHeight="30.0" prefWidth="130.0" styleClass="boxDataPickar" AnchorPane.rightAnchor="95.0" />
-                                    <ComboBox fx:id="statusFilter" layoutX="494.0" layoutY="14.0" prefHeight="27.0" prefWidth="123.0" promptText="filter" stylesheets="@../Design/combobox.css" />
+                                                <Button fx:id="insertAppointments" layoutX="498.0" layoutY="370.0" mnemonicParsing="false" prefHeight="30.0" prefWidth="100.0" styleClass="btn-2" text="Insert" AnchorPane.bottomAnchor="10.800000000000068" AnchorPane.rightAnchor="253.20000000000005">
+                                       <stylesheets>
+                                          <URL value="@../Design/ButtonsStyles.css" />
+                                          <URL value="@../Design/ReceptionDesign.css" />
+                                       </stylesheets></Button>
+                                                <Button fx:id="updateAppointments" layoutX="614.0" layoutY="370.0" mnemonicParsing="false" prefHeight="30.0" prefWidth="100.0" styleClass="btn-2" text="Update" AnchorPane.bottomAnchor="10.800000000000068" AnchorPane.rightAnchor="137.20000000000005">
+                                       <stylesheets>
+                                          <URL value="@../Design/ButtonsStyles.css" />
+                                          <URL value="@../Design/ReceptionDesign.css" />
+                                       </stylesheets></Button>
+                                                <Button fx:id="clear_Appointments" layoutX="737.0" layoutY="12.0" mnemonicParsing="false" prefHeight="30.0" prefWidth="60.0" styleClass="btn-2" text="Clear" AnchorPane.rightAnchor="14.200000000000045">
+                                       <stylesheets>
+                                          <URL value="@../Design/ButtonsStyles.css" />
+                                          <URL value="@../Design/ReceptionDesign.css" />
+                                       </stylesheets></Button>
+                                                <Button fx:id="deleteAppointments" layoutX="730.0" layoutY="371.0" mnemonicParsing="false" prefHeight="30.0" prefWidth="100.0" styleClass="btn-2" text="Delete" AnchorPane.bottomAnchor="10.0" AnchorPane.rightAnchor="22.0">
+                                       <stylesheets>
+                                          <URL value="@../Design/ButtonsStyles.css" />
+                                          <URL value="@../Design/ReceptionDesign.css" />
+                                       </stylesheets></Button>
+                                                <DatePicker fx:id="dataPickerAppointment" cache="true" layoutX="498.0" layoutY="12.0" minHeight="-Infinity" prefHeight="30.0" prefWidth="130.0" AnchorPane.rightAnchor="222.80000000000007">
+                                       <styleClass>
+                                          <String fx:value="boxDataPickar" />
+                                          <String fx:value="box" />
+                                       </styleClass></DatePicker>
+                                    <ComboBox fx:id="statusFilter" layoutX="638.0" layoutY="12.0" prefHeight="30.0" prefWidth="130.0" promptText="filter" stylesheets="@../Design/combobox.css" AnchorPane.rightAnchor="82.80000000000007" />
                                             </children>
                                             <styleClass>
                                                 <String fx:value="white-bg" />
@@ -530,5 +585,9 @@
             </children>
         </AnchorPane>
     </children>
+   <stylesheets>
+      <URL value="@../Design/ReceptionDesign.css" />
+      <URL value="@../Design/ButtonsStyles.css" />
+   </stylesheets>
 
 </StackPane>
