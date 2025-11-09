@@ -496,8 +496,13 @@ public class DoctorController {
         }
 
         // When doctor finishes composing the draft and wants to send to pharmacy:
+//        if (sendToPharmacy != null) {
+//            sendToPharmacy.setOnAction(e -> sendToPharmacy());
+//        }
+        // When doctor finishes composing the draft and wants to send to pharmacy:
         if (sendToPharmacy != null) {
-            sendToPharmacy.setOnAction(e -> sendToPharmacy());
+            // لا تعِد إنشاء وصفة؛ فقط ارفع الـ status عبر handleSendToPharmacy()
+            sendToPharmacy.setOnAction(e -> handleSendToPharmacy());
         }
 
         try {
@@ -1130,31 +1135,6 @@ public class DoctorController {
                 : java.time.ZonedDateTime.now(APP_TZ).toLocalDate();
         loadAppointmentsForDateAsync(date);
     }
-    // Coalesced UI refresh when DB notifies about appointments/patients changes
-//    private void onDbEventRefreshDoctor(String payload) {
-//        javafx.application.Platform.runLater(() -> {
-//            try {
-//                // 1)Appointments: إعادة تحميل لليوم الحالي/المختار
-//                loadTodayAppointmentsAsync();
-//            } catch (Throwable t) {
-//                System.err.println("[DoctorController] loadTodayAppointmentsAsync error: " + t);
-//            }
-//            try {
-//                // 2) إحصائيات/رسم اليوم
-//                java.time.LocalDate day = (datePickerPatientsWithDoctorDash != null &&
-//                        datePickerPatientsWithDoctorDash.getValue() != null)
-//                        ? datePickerPatientsWithDoctorDash.getValue()
-//                        : java.time.ZonedDateTime.now(APP_TZ).toLocalDate();
-//                loadStatsForDateAsync(day);
-//            } catch (Throwable t) {
-//                System.err.println("[DoctorController] loadStatsForDateAsync error: " + t);
-//            }
-//            try {
-//                if (AppointmentsTable != null) AppointmentsTable.refresh();
-//                if (patientTable != null) patientTable.refresh();
-//            } catch (Throwable ignore) { }
-//        });
-//    }
 
     private void onDbEventRefreshDoctor(String payload) {
         scheduleDoctorRefresh();
@@ -1506,28 +1486,6 @@ private void loadAppointmentsForDateAsync(LocalDate date) {
                     btnCancel.setDisable(true);
                 });
 
-//                btnPresc.setOnAction(e -> {
-//                    playPressAnim(btnPresc);
-//                    AppointmentRow r = getItem();
-//                    if (r == null) return;
-//
-//                    // لا تنشئ وصفة في الداتابيز هنا
-//                    currentPrescriptionId = null;                              // مسودة فقط
-//
-//                    // احفظ سياق المريض من سطر الموعد
-//                    selectedPatientUserId      = (r.getPatientUserId() > 0) ? r.getPatientUserId() : null;
-//                    selectedPatientName        = r.getPatientName();
-//                    selectedPatientNationalId  = r.getNationalId();
-//
-//                    // نظافة لمسودة العناصر
-//                    if (prescItemsEditable != null) prescItemsEditable.clear();
-//
-//                    // افتح واجهة الوصفة (بدون تحميل عناصر من DB لأنها مسودة)
-//                    showPrescriptionPane();
-//
-//                    // حدِّث الهيدر
-//                    Platform.runLater(() -> setPatientHeader(r.getPatientName(), r.getNationalId(), false));
-//                });
                 btnPresc.setOnAction(e -> {
                     playPressAnim(btnPresc);
                     AppointmentRow row = getItem();
@@ -2886,105 +2844,63 @@ private void reloadPrescriptionItemsFromDb() {
     }
 
     /**
-     * Send current draft prescription to Pharmacy:
+     * Send current prescription to Pharmacy (PENDING).
      * - saves Diagnosis (from DiagnosisTF) into prescriptions.diagnosis
      * - moves status from DRAFT -> PENDING
+     * - validates items and does not touch appointment_id
      */
     @FXML
     private void sendToPharmacy() {
-//        try {
-//            Long prescId = ensureDraftPrescription(); // make sure DB row exists and currentPrescriptionId set
-//            String diagnosisText = (DiagnosisTF != null && DiagnosisTF.getText() != null)
-//                    ? DiagnosisTF.getText().trim() : null;
-//
-//            try (java.sql.Connection c = Database.get()) {
-//                c.setAutoCommit(true);
-//                try (java.sql.PreparedStatement ps = c.prepareStatement(
-//                        "UPDATE prescriptions " +
-//                                "SET diagnosis = ?, status = 'PENDING' " +
-//                                "WHERE id = ?")) {
-//                    if (diagnosisText == null || diagnosisText.isBlank()) {
-//                        ps.setNull(1, java.sql.Types.VARCHAR);
-//                    } else {
-//                        ps.setString(1, diagnosisText);
-//                    }
-//                    ps.setLong(2, prescId);
-//                    ps.executeUpdate();
-//                }
-//            }
-//
-//            toast("Prescription #" + prescId + " sent to Pharmacy (status: PENDING).", "ok");
-//            // اختياري: أعد تحميل عناصر الوصفة بعد الإرسال
-//            try { loadPrescriptionItemsFromDb(prescId); } catch (Throwable ignore) {}
-//        } catch (Exception ex) {
-//            showError("Send to Pharmacy", ex);
-//        }
+        // 1) لازم تكون فاتح وصفة
+        if (currentPrescriptionId == null) {
+            showWarn("Send to Pharmacy", "No open prescription. Create or open a draft, then try again.");
+            return;
+        }
 
-        try {
-            var u = com.example.healthflow.service.AuthService.Session.get();
-            if (u == null) { showWarn("Prescription", "No logged-in user."); return; }
-
-            // 1) استخرج doctor_id
-            Long doctorId;
-            try (java.sql.Connection c0 = com.example.healthflow.db.Database.get()) {
-                doctorId = doctorDAO.findDoctorIdByUserId(c0, u.getId());
-                if (doctorId == null) {
-                    doctorDAO.ensureProfileForUser(c0, u.getId());
-                    doctorId = doctorDAO.findDoctorIdByUserId(c0, u.getId());
-                }
-            }
-            if (doctorId == null) { showWarn("Prescription", "Doctor profile missing."); return; }
-
-            // 2) استنتج سياق المريض
-            Long patientUserId = this.selectedPatientUserId;
-            if (patientUserId == null && selectedPatientNationalId != null && !selectedPatientNationalId.isBlank()) {
-                try (java.sql.Connection c1 = com.example.healthflow.db.Database.get()) {
-                    patientUserId = doctorDAO.findPatientUserIdByNationalId(c1, selectedPatientNationalId);
-                }
-            }
-            if (patientUserId == null) { showWarn("Prescription", "Select a patient first."); return; }
-
-            Long patientId;
-            try (java.sql.Connection c2 = com.example.healthflow.db.Database.get()) {
-                patientId = doctorDAO.findPatientIdByUserId(c2, patientUserId);
-            }
-            if (patientId == null) { showWarn("Prescription", "Patient profile not found."); return; }
-
-            // 3) لو في Appointment محدد حاليًا اربطه، وإلا خليه NULL
-            Long appointmentId = null;
-            if (AppointmentsTable != null) {
-                var sel = AppointmentsTable.getSelectionModel().getSelectedItem();
-                if (sel != null) appointmentId = sel.getId();
-            }
-
-            // 4) تأكد من وجود Prescription (DRAFT) ولا تشترط COMPLETED
-            Long prescId = ensureDraftPrescriptionFor(appointmentId, doctorId, patientId);
-            if (prescId == null) { showWarn("Prescription", "Could not create/find draft."); return; }
-
-            // 5) تحقّق أن فيها عناصر
+        try (java.sql.Connection c = com.example.healthflow.db.Database.get()) {
+            // 2) تأكد أن فيها عناصر
             int itemCount = 0;
-            try {
-                if (TablePrescriptionItems != null && TablePrescriptionItems.getItems() != null) {
-                    itemCount = TablePrescriptionItems.getItems().size();
-                } else if (prescItemsEditable != null) {
-                    itemCount = prescItemsEditable.size();
+            try (java.sql.PreparedStatement ps = c.prepareStatement(
+                    "SELECT COUNT(*) FROM prescription_items WHERE prescription_id = ?")) {
+                ps.setLong(1, currentPrescriptionId);
+                try (java.sql.ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) itemCount = rs.getInt(1);
                 }
-            } catch (Throwable ignore) {}
-            if (itemCount <= 0) { showWarn("Prescription", "Add at least one item before sending."); return; }
-
-            // 6) غيّر الحالة إلى SUBMITTED (أو SENT) فورًا
-            try (java.sql.Connection c = com.example.healthflow.db.Database.get();
-                 java.sql.PreparedStatement ps = c.prepareStatement(
-                         "UPDATE prescriptions SET status = 'SUBMITTED', updated_at = NOW() WHERE id = ?")) {
-                ps.setLong(1, prescId);
-                ps.executeUpdate();
+            }
+            if (itemCount <= 0) {
+                showWarn("Send to Pharmacy", "No medicines in this prescription. Add at least one item.");
+                return;
             }
 
-            toast("Prescription sent to Pharmacy.", "ok");
+            // 3) (اختياري) احفظ التشخيص قبل الإرسال
+            String diagnosisText = (DiagnosisTF != null && DiagnosisTF.getText() != null)
+                    ? DiagnosisTF.getText().trim() : null;
 
-            // مزامنة محلية بسيطة
-            try { if (currentPrescriptionId == null) currentPrescriptionId = prescId; } catch (Throwable ignore) {}
+            // 4) ارفع الحالة إلى PENDING بدون إعادة إنشاء/ربط موعد
+            int updated;
+            try (java.sql.PreparedStatement ps = c.prepareStatement(
+                    "UPDATE prescriptions \n" +
+                    "   SET diagnosis = ?, status = 'PENDING', updated_at = NOW()\n" +
+                    " WHERE id = ? AND status IN ('DRAFT','PENDING')")) {
+                if (diagnosisText == null || diagnosisText.isBlank()) {
+                    ps.setNull(1, java.sql.Types.VARCHAR);
+                } else {
+                    ps.setString(1, diagnosisText);
+                }
+                ps.setLong(2, currentPrescriptionId);
+                updated = ps.executeUpdate();
+            }
+
+            if (updated > 0) {
+                toast("Prescription sent to Pharmacy (status: PENDING).", "ok");
+            } else {
+                // لم يتغيّر شيء غالبًا لأنها PENDING مسبقًا
+                toast("Prescription already sent and visible to Pharmacy.", "info");
+            }
+
+            // 5) تحديثات واجهة خفيفة
             try { reloadPrescriptionItemsFromDb(); } catch (Throwable ignore) {}
+            try { showDashboardPane(); } catch (Throwable ignore) {}
 
         } catch (Exception ex) {
             showError("Send to Pharmacy", ex);

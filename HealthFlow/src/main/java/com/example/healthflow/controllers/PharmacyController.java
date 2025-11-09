@@ -904,82 +904,82 @@ public class PharmacyController {
         return InventoryAnchorPane != null && InventoryAnchorPane.isVisible();
     }
 
-    /**
-     * Returns a timestamp fingerprint (max of created/updated_at) for prescriptions of the selected date.
-     * Any change will advance the fingerprint and trigger a UI reload.
-     */
-    private java.time.Instant fetchDashboardFingerprint(java.time.LocalDate day) {
-        try (java.sql.Connection c = com.example.healthflow.db.Database.get();
-             java.sql.PreparedStatement ps = c.prepareStatement(
-                     "SELECT MAX(COALESCE(p.dispensed_at, p.approved_at, p.decision_at, p.created_at))\n" +
-                             "FROM prescriptions p\n" +
-                             "WHERE (p.created_at::date = ? OR p.decision_at::date = ? OR p.approved_at::date = ? OR p.dispensed_at::date = ?)")) {
-            ps.setDate(1, java.sql.Date.valueOf(day));
-            ps.setDate(2, java.sql.Date.valueOf(day));
-            ps.setDate(3, java.sql.Date.valueOf(day));
-            ps.setDate(4, java.sql.Date.valueOf(day));
-            try (java.sql.ResultSet rs = ps.executeQuery()) {
-                if (rs.next()) {
-                    java.sql.Timestamp ts = rs.getTimestamp(1);
-                    return ts == null ? null : ts.toInstant();
-                }
-            }
-        } catch (Exception e) {
-            System.err.println("[PharmacyController] fetchDashboardFingerprint: " + e);
-        }
-        return null;
-    }
+//    /**
+//     * Returns a timestamp fingerprint (max of created/updated_at) for prescriptions of the selected date.
+//     * Any change will advance the fingerprint and trigger a UI reload.
+//     */
+//    private java.time.Instant fetchDashboardFingerprint(java.time.LocalDate day) {
+//        try (java.sql.Connection c = com.example.healthflow.db.Database.get();
+//             java.sql.PreparedStatement ps = c.prepareStatement(
+//                     "SELECT MAX(COALESCE(p.dispensed_at, p.approved_at, p.decision_at, p.created_at))\n" +
+//                             "FROM prescriptions p\n" +
+//                             "WHERE (p.created_at::date = ? OR p.decision_at::date = ? OR p.approved_at::date = ? OR p.dispensed_at::date = ?)")) {
+//            ps.setDate(1, java.sql.Date.valueOf(day));
+//            ps.setDate(2, java.sql.Date.valueOf(day));
+//            ps.setDate(3, java.sql.Date.valueOf(day));
+//            ps.setDate(4, java.sql.Date.valueOf(day));
+//            try (java.sql.ResultSet rs = ps.executeQuery()) {
+//                if (rs.next()) {
+//                    java.sql.Timestamp ts = rs.getTimestamp(1);
+//                    return ts == null ? null : ts.toInstant();
+//                }
+//            }
+//        } catch (Exception e) {
+//            System.err.println("[PharmacyController] fetchDashboardFingerprint: " + e);
+//        }
+//        return null;
+//    }
     /** Fingerprint لعناصر الوصفة المفتوحة: أكبر (approved_at/dispensed_at/decision_at/created_at/items.count/qty_dispensed) */
-    private java.time.Instant fetchCurrentPrescriptionFingerprint() {
-        if (selectedRow == null || selectedRow.prescriptionId <= 0) return null;
-        long pid = selectedRow.prescriptionId;
-        try (java.sql.Connection c = com.example.healthflow.db.Database.get();
-             java.sql.PreparedStatement ps = c.prepareStatement(
-                     // أي تعديل على حالة الوصفة أو على عناصرها سيغيّر هذه البصمة
-                     "SELECT MAX(v) FROM ( " +
-                             "  SELECT COALESCE(p.dispensed_at, p.approved_at, p.decision_at, p.created_at) AS v " +
-                             "  FROM prescriptions p WHERE p.id = ? " +
-                             "  UNION ALL " +
-                             "  SELECT NOW() - make_interval(secs => (SELECT COUNT(*) FROM prescription_items i WHERE i.prescription_id = ?)) " +
-                             "  UNION ALL " +
-                             "  SELECT NOW() - make_interval(secs => (SELECT COALESCE(SUM(i.qty_dispensed),0) FROM prescription_items i WHERE i.prescription_id = ?)) " +
-                             ") t"
-             )) {
-            ps.setLong(1, pid);
-            ps.setLong(2, pid);
-            ps.setLong(3, pid);
-            try (java.sql.ResultSet rs = ps.executeQuery()) {
-                if (rs.next()) {
-                    java.sql.Timestamp ts = rs.getTimestamp(1);
-                    return ts == null ? null : ts.toInstant();
-                }
-            }
-        } catch (Exception e) {
-            System.err.println("[PharmacyController] fetchCurrentPrescriptionFingerprint: " + e);
-        }
-        return null;
-    }
-
-    /** Fingerprint لواجهة الجرد: أي تغيير في inventory_transactions أو تحديث available_quantity للأدوية */
-    private java.time.Instant fetchInventoryFingerprint() {
-        try (java.sql.Connection c = com.example.healthflow.db.Database.get();
-             java.sql.PreparedStatement ps = c.prepareStatement(
-                     "SELECT GREATEST( " +
-                             "  COALESCE((SELECT MAX(created_at) FROM inventory_transactions), 'epoch'), " +
-                             "  COALESCE((SELECT MAX(updated_at) FROM medicines), 'epoch') " +
-                             ")"
-             )) {
-            try (java.sql.ResultSet rs = ps.executeQuery()) {
-                if (rs.next()) {
-                    java.sql.Timestamp ts = rs.getTimestamp(1);
-                    return ts == null ? null : ts.toInstant();
-                }
-            }
-        } catch (Exception e) {
-            System.err.println("[PharmacyController] fetchInventoryFingerprint: " + e);
-        }
-        return null;
-    }
+//    private java.time.Instant fetchCurrentPrescriptionFingerprint() {
+//        if (selectedRow == null || selectedRow.prescriptionId <= 0) return null;
+//        long pid = selectedRow.prescriptionId;
+//        try (java.sql.Connection c = com.example.healthflow.db.Database.get();
+//             java.sql.PreparedStatement ps = c.prepareStatement(
+//                     // أي تعديل على حالة الوصفة أو على عناصرها سيغيّر هذه البصمة
+//                     "SELECT MAX(v) FROM ( " +
+//                             "  SELECT COALESCE(p.dispensed_at, p.approved_at, p.decision_at, p.created_at) AS v " +
+//                             "  FROM prescriptions p WHERE p.id = ? " +
+//                             "  UNION ALL " +
+//                             "  SELECT NOW() - make_interval(secs => (SELECT COUNT(*) FROM prescription_items i WHERE i.prescription_id = ?)) " +
+//                             "  UNION ALL " +
+//                             "  SELECT NOW() - make_interval(secs => (SELECT COALESCE(SUM(i.qty_dispensed),0) FROM prescription_items i WHERE i.prescription_id = ?)) " +
+//                             ") t"
+//             )) {
+//            ps.setLong(1, pid);
+//            ps.setLong(2, pid);
+//            ps.setLong(3, pid);
+//            try (java.sql.ResultSet rs = ps.executeQuery()) {
+//                if (rs.next()) {
+//                    java.sql.Timestamp ts = rs.getTimestamp(1);
+//                    return ts == null ? null : ts.toInstant();
+//                }
+//            }
+//        } catch (Exception e) {
+//            System.err.println("[PharmacyController] fetchCurrentPrescriptionFingerprint: " + e);
+//        }
+//        return null;
+//    }
+//
+//    /** Fingerprint لواجهة الجرد: أي تغيير في inventory_transactions أو تحديث available_quantity للأدوية */
+//    private java.time.Instant fetchInventoryFingerprint() {
+//        try (java.sql.Connection c = com.example.healthflow.db.Database.get();
+//             java.sql.PreparedStatement ps = c.prepareStatement(
+//                     "SELECT GREATEST( " +
+//                             "  COALESCE((SELECT MAX(created_at) FROM inventory_transactions), 'epoch'), " +
+//                             "  COALESCE((SELECT MAX(updated_at) FROM medicines), 'epoch') " +
+//                             ")"
+//             )) {
+//            try (java.sql.ResultSet rs = ps.executeQuery()) {
+//                if (rs.next()) {
+//                    java.sql.Timestamp ts = rs.getTimestamp(1);
+//                    return ts == null ? null : ts.toInstant();
+//                }
+//            }
+//        } catch (Exception e) {
+//            System.err.println("[PharmacyController] fetchInventoryFingerprint: " + e);
+//        }
+//        return null;
+//    }
     /** يعيد تحميل عناصر الوصفة المفتوحة (إن وُجدت). */
     private void reloadCurrentPrescriptionItems() {
         if (selectedRow != null && selectedRow.prescriptionId > 0) {
