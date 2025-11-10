@@ -27,11 +27,8 @@ import javafx.scene.layout.StackPane;
 import javafx.stage.Stage;
 import javafx.util.Duration;
 import org.mindrot.jbcrypt.BCrypt;
-import javafx.concurrent.Task;
-
 import java.sql.Connection;
-import java.util.Objects;
-import com.example.healthflow.controllers.ReceptionController;
+
 
 
 public class LoginController {
@@ -45,6 +42,7 @@ public class LoginController {
     @FXML private AnchorPane rootPane;
     @FXML private Button LoginButton;
     @FXML private Label AlertLabel;
+
     private boolean rebindDisableAfterLock;
     // لإظهار/إخفاء كلمة السر
     private final TextField visiblePasswordField = new TextField();
@@ -77,6 +75,9 @@ public class LoginController {
     // overlay chip عند الرجوع أونلاين
     private StackPane overlay;
 
+    // Connectivity banner instance for login header
+    private ConnectivityBanner loginBanner;
+
     public LoginController(ConnectivityMonitor monitor) {
         this.monitor = monitor;
     }
@@ -85,7 +86,35 @@ public class LoginController {
     private void initialize() {
         // --- show/hide password (UI فقط) ---
         if (rootPane != null) {
-            rootPane.getChildren().add(0, new ConnectivityBanner(monitor));
+            loginBanner = new ConnectivityBanner(monitor);
+            // ثبت البنير أعلى الواجهة وبعرض كامل
+            rootPane.getChildren().add(0, loginBanner);
+            AnchorPane.setTopAnchor(loginBanner, 0.0);
+            AnchorPane.setLeftAnchor(loginBanner, 0.0);
+            AnchorPane.setRightAnchor(loginBanner, 0.0);
+            // تأكد أنه في المقدمة
+            loginBanner.toFront();
+        }
+        // فحص اتصال ابتدائي بمجرد فتح الشاشة
+        initialConnectivityProbe();
+
+        // راقب تغيّر حالة الاتصال لتحديث الرسالة وإظهار إشعار الرجوع أونلاين
+        if (monitor != null) {
+            // حالة البدء
+            if (!monitor.isOnline() && AlertLabel != null) {
+                AlertLabel.setText("No internet connection. Please check your network.");
+            }
+            monitor.onlineProperty().addListener((obs, wasOnline, isOnline) -> {
+                if (isOnline) {
+                    // أظهر إشعار "رجعنا أونلاين" ثم أخفِ التنبيه
+                    showBackOnlineNotice();
+                    if (AlertLabel != null) AlertLabel.setText("");
+                } else {
+                    if (AlertLabel != null) {
+                        AlertLabel.setText("No internet connection. Please check your network.");
+                    }
+                }
+            });
         }
 
         visiblePasswordField.setLayoutX(PasswordTextField.getLayoutX());
@@ -639,4 +668,78 @@ public class LoginController {
     }
 
 
+    /** يقوم بفحص اتصال سريع عند تشغيل البرنامج لعرض حالة الاتصال فوراً على البنير */
+    private void initialConnectivityProbe() {
+        new Thread(() -> {
+            boolean online = false;
+            try (Connection c = Database.get()) {
+                online = (c != null && !c.isClosed());
+            } catch (Exception ex) {
+                online = false;
+            }
+            final boolean finalOnline = online;
+            Platform.runLater(() -> {
+                // لو في مشكلة اتصال، أعطِ ملاحظة سريعة.
+                if (!finalOnline) {
+                    if (AlertLabel != null) {
+                        AlertLabel.setText("No internet connection. Please check your network.");
+                    }
+                    // تأكد من ظهور البنير أعلى الشاشة كحل فوري عند الإقلاع الأوفلاين
+                    if (loginBanner != null) {
+                        loginBanner.setVisible(true);
+                        loginBanner.toFront();
+                    }
+                }
+            });
+        }, "login-initial-connectivity-probe").start();
+    }
+
+    /** إشعار قصير عند الرجوع أونلاين في شاشة الدخول */
+    private void showBackOnlineNotice() {
+        if (rootPane == null) return;
+
+        // استخدم نفس آلية الـ overlay الخفيفة
+        if (overlay != null && rootPane.getChildren().contains(overlay)) {
+            // لو فيه Overlay قديم، احذفه أولًا
+            rootPane.getChildren().remove(overlay);
+            overlay = null;
+        }
+
+        ProgressIndicator pi = new ProgressIndicator();
+        pi.setPrefSize(16, 16);
+
+        Label text = new Label("Back online — reconnected");
+        text.setStyle("-fx-font-weight: 600; -fx-text-fill: #155724;");
+
+        HBox chip = new HBox(10, pi, text);
+        chip.setPadding(new Insets(8, 12, 8, 12));
+        chip.setStyle("-fx-background-color: #d4edda; -fx-border-color:#c3e6cb; -fx-border-radius:10; -fx-background-radius:10;");
+
+        overlay = new StackPane(chip);
+        overlay.setPickOnBounds(false);
+        overlay.setMouseTransparent(true);
+        StackPane.setMargin(chip, new Insets(16, 0, 0, 0));
+        overlay.setTranslateY(-220);
+
+        rootPane.getChildren().add(overlay);
+        overlay.toFront();
+
+        overlay.setOpacity(0);
+        FadeTransition ftIn = new FadeTransition(Duration.millis(180), overlay);
+        ftIn.setToValue(1.0);
+        ftIn.play();
+
+        // اتركه زمن مناسب للقراءة ثم أخفهِ تلقائيًا
+        javafx.animation.PauseTransition stay = new javafx.animation.PauseTransition(Duration.seconds(2.8));
+        stay.setOnFinished(ev -> {
+            FadeTransition ftOut = new FadeTransition(Duration.millis(180), overlay);
+            ftOut.setToValue(0);
+            ftOut.setOnFinished(e2 -> {
+                rootPane.getChildren().remove(overlay);
+                overlay = null;
+            });
+            ftOut.play();
+        });
+        stay.play();
+    }
 }

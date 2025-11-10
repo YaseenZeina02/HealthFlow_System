@@ -43,7 +43,10 @@ public class PrescriptionDAO {
 
     /** Count all prescriptions created on a specific calendar date (by created_at range). */
     public int countTotalOnDate(Connection c, LocalDate day) throws SQLException {
-        final String sql = "SELECT COUNT(*) FROM prescriptions WHERE created_at >= ? AND created_at < ?";
+        final String sql =
+                "SELECT COUNT(*) FROM prescriptions " +
+                        "WHERE created_at >= ? AND created_at < ? " +
+                        "AND status IN ('PENDING','APPROVED','REJECTED','DISPENSED')";
         try (PreparedStatement ps = c.prepareStatement(sql)) {
             ps.setObject(1, day.atStartOfDay());
             ps.setObject(2, day.plusDays(1).atStartOfDay());
@@ -79,28 +82,6 @@ public class PrescriptionDAO {
     }
 
 
-    /** Create a prescription (optionally without appointment) and insert items in one transaction. */
-    public Prescription createAndItems(Connection c,
-                                       Long appointmentId, Long doctorId, Long patientId, String notes,
-                                       List<PrescriptionItem> items,
-                                       PrescriptionItemDAO itemDao) throws SQLException {
-        boolean oldAuto = c.getAutoCommit();
-        c.setAutoCommit(false);
-        try {
-            Prescription p = create(c, appointmentId, doctorId, patientId, notes);
-            if (items != null && !items.isEmpty()) {
-                itemDao.addItems(c, p.getId(), items);
-
-            }
-            c.commit();
-            return p;
-        } catch (SQLException ex) {
-            c.rollback();
-            throw ex;
-        } finally {
-            c.setAutoCommit(oldAuto);
-        }
-    }
 
     /**
      * Rows for Pharmacy Dashboard table for a given calendar date (by prescriptions.created_at::date).

@@ -74,6 +74,15 @@
                      </styleClass>
                   </Label>
                   <Button fx:id="ForgotButton" layoutX="185.0" layoutY="415.0" mnemonicParsing="false" prefHeight="37.0" prefWidth="129.0" styleClass="hf-btn-ghost" stylesheets="@../Design/ButtonsStyles.css" text="Forgot Password?" />
+                  <Label fx:id="InterNetLabel" layoutX="246.0" layoutY="512.0" prefHeight="54.0" prefWidth="194.0" stylesheets="@../Design/LoginDesign.css" textFill="#4a90e2">
+                     <font>
+                        <Font name="System Bold Italic" size="12.0" />
+                     </font>
+                     <styleClass>
+                        <String fx:value="label-color-1" />
+                        <String fx:value="label-line" />
+                     </styleClass>
+                  </Label>
 
                     </children>
                 </AnchorPane>

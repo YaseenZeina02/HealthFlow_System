@@ -722,7 +722,7 @@ public class PharmacyController {
         try (Connection c = Database.get();
              PreparedStatement ps = c.prepareStatement("""
              SELECT
-                 COUNT(*) AS total,
+                 COUNT(*)  AS total,
                  COUNT(*) FILTER (WHERE status = 'PENDING') AS waiting,
                  COUNT(*) FILTER (WHERE status IN ('APPROVED','DISPENSED')) AS completed
              FROM prescriptions

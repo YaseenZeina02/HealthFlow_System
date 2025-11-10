@@ -77,3 +77,42 @@
     -fx-underline: false;
     -fx-padding: 6 4 0 4;
 }
+
+#InterNetLabel {
+    -fx-font-size: 12px;
+    -fx-text-fill: #555;
+    -fx-alignment: CENTER;
+    -fx-padding: 6 0 6 0;
+}
+
+.offline {
+    -fx-text-fill: #c0392b; /* أحمر */
+}
+
+.online {
+    -fx-text-fill: #27ae60; /* أخضر */
+}
+
+#InterNetLabel.net-label { -fx-font-size: 12px; -fx-alignment: CENTER; -fx-padding: 6 0; }
+#InterNetLabel.online     { -fx-text-fill: #27ae60; }
+#InterNetLabel.offline    { -fx-text-fill: #c0392b; }
+
+
+
+.offline {
+    -fx-text-fill: white;
+    -fx-background-color: #d32f2f;
+    -fx-background-radius: 6;
+    -fx-padding: 4 10;
+    -fx-font-weight: bold;
+    -fx-font-size: 12px;
+}
+
+.online {
+    -fx-text-fill: white;
+    -fx-background-color: #388e3c;
+    -fx-background-radius: 6;
+    -fx-padding: 4 10;
+    -fx-font-weight: bold;
+    -fx-font-size: 12px;
+}

@@ -40,13 +40,13 @@ public class PharmacyQueries {
     public CountSummary getCountsForDate(LocalDate day) throws SQLException {
         try (Connection c = Database.get();
              PreparedStatement ps = c.prepareStatement("""
-                 SELECT
-                     COUNT(*) AS total,
-                     COUNT(*) FILTER (WHERE status = 'PENDING') AS waiting,
-                     COUNT(*) FILTER (WHERE status IN ('APPROVED','DISPENSED')) AS completed
-                 FROM prescriptions
-                 WHERE created_at::date = ?
-             """)) {
+             SELECT
+                 COUNT(*) FILTER (WHERE status IN ('PENDING','APPROVED','DISPENSED')) AS total,
+                 COUNT(*) FILTER (WHERE status = 'PENDING')                          AS waiting,
+                 COUNT(*) FILTER (WHERE status IN ('APPROVED','DISPENSED'))          AS completed
+             FROM prescriptions
+             WHERE created_at::date = ?
+         """)) {
             ps.setDate(1, Date.valueOf(day));
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
