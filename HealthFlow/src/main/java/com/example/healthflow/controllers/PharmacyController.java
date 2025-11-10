@@ -23,6 +23,7 @@ import javafx.application.Platform;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.concurrent.Task;
 import javafx.animation.PauseTransition;
+import javafx.event.ActionEvent;
 import javafx.geometry.Pos;
 import javafx.scene.Cursor;
 import com.example.healthflow.core.packaging.PackagingSupport;
@@ -340,6 +341,7 @@ public class PharmacyController {
     private final ObservableList<MedicineSuggestion> medSuggestions = FXCollections.observableArrayList();
     private Long selectedMedicineId = null;
     private final PauseTransition medDebounce = new PauseTransition(Duration.millis(200));
+    private boolean sidebarGuardWired = false;
 
     @FXML
     private Label time;
@@ -766,6 +768,8 @@ public class PharmacyController {
 
     /* ====== Section switching (Dashboard / Prescriptions / Inventory) ====== */
     private void showDashboardPane() {
+        setPrescriptionSidebarState(false, false);
+        wireSidebarGuardsIfNeeded();
         setVisibleManaged(pharmacyDashboardAnchorPane, true);
         setVisibleManaged(PrescriptionAnchorPane, false);
         setVisibleManaged(InventoryAnchorPane, false);
@@ -1303,7 +1307,7 @@ public class PharmacyController {
         // Action column (View)
         if (colActionPhDashbord != null) {
             colActionPhDashbord.setCellFactory(col -> new javafx.scene.control.TableCell<>() {
-                private final Button btn = new Button("View");
+                private final Button btn = new Button("View Prescription");
                 {
                     btn.getStyleClass().addAll("btn", "btn-primary", "btn--deep", "btn--compact");
                     btn.setOnAction(e -> {
@@ -1326,6 +1330,9 @@ public class PharmacyController {
 
         // Switch to prescription pane
         showPrescriptionsPane();
+
+        setPrescriptionSidebarState(true, true);
+        wireSidebarGuardsIfNeeded();
 
         // Enable/disable Finish button based on prescription status
         // === Finish_Prescription ===
@@ -1739,6 +1746,9 @@ public class PharmacyController {
             System.err.println("[PharmacyController] finish prescription error: " + ex);
             showError("Finish Prescription", "Failed to complete prescription:\n" + ex.getMessage());
         }
+
+        setPrescriptionSidebarState(false, false);
+        showDashboardPane();
     }
     // --- Unified alerts (same look across app) ---
     private static void showOk(String title, String message) {
@@ -1770,6 +1780,7 @@ public class PharmacyController {
     }
 
     private void showInventoryPane() {
+        setPrescriptionSidebarState(false, false);
         setVisibleManaged(pharmacyDashboardAnchorPane, false);
         setVisibleManaged(PrescriptionAnchorPane, false);
         setVisibleManaged(InventoryAnchorPane, true);
@@ -1980,7 +1991,7 @@ public class PharmacyController {
         }
 
         // Disable actions when offline (if OnlineBindings present)
-        try { OnlineBindings.disableWhenOffline(monitor, DashboardButton, PrescriptionsButton, InventoryButton, saveBtnReceive, saveBtnDeduct); } catch (Throwable ignored) {}
+        try { OnlineBindings.disableWhenOffline(monitor, DashboardButton, InventoryButton, saveBtnReceive, saveBtnDeduct); } catch (Throwable ignored) {}
         // Prevent multiple async loads via rapid clicks (if button stays enabled from bindings)
         if (DashboardButton != null) {
             DashboardButton.setOnAction(e -> {
@@ -3573,4 +3584,46 @@ public class PharmacyController {
         } catch (Throwable ignored) {}
     }
 
+
+    /** Enable/disable and visually mark the sidebar Prescriptions button */
+    private void setPrescriptionSidebarState(boolean enabled, boolean active) {
+        if (PrescriptionsButton == null) return;
+
+        // فك أي binding موجود لتجنّب: "A bound value cannot be set"
+        try { PrescriptionsButton.disableProperty().unbind(); } catch (Throwable ignored) {}
+
+        PrescriptionsButton.setDisable(!enabled);
+
+        var css = PrescriptionsButton.getStyleClass();
+        css.remove("active");
+        css.remove("nav-active");
+        if (active) {
+            if (!css.contains("active")) css.add("active");
+            if (!css.contains("nav-active")) css.add("nav-active");
+        }
+    }
+
+    /** مرّة واحدة: اربط أزرار الشريط الجانبي لتُعطّل زر الوصفات عند استخدامها */
+    private void wireSidebarGuardsIfNeeded() {
+        if (sidebarGuardWired) return;
+        sidebarGuardWired = true;
+
+        if (DashboardButton != null) {
+            DashboardButton.addEventHandler(ActionEvent.ACTION,
+                    e -> setPrescriptionSidebarState(false, false));
+        }
+        if (InventoryButton != null) {
+            InventoryButton.addEventHandler(ActionEvent.ACTION,
+                    e -> setPrescriptionSidebarState(false, false));
+        }
+        if (ReportsButton != null) {
+            ReportsButton.addEventHandler(ActionEvent.ACTION,
+                    e -> setPrescriptionSidebarState(false, false));
+        }
+        // لو عندك زر Back داخل واجهة الوصفة
+        if (BackButton != null) {
+            BackButton.addEventHandler(ActionEvent.ACTION,
+                    e -> setPrescriptionSidebarState(false, false));
+        }
+    }
 }

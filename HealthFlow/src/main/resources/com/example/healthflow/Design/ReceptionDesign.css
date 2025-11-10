@@ -833,3 +833,9 @@
     -fx-alignment: CENTER-LEFT;
 }
 
+.btn-primary:hover {
+    -fx-background-color: #0f5ccc; /* درجة أغمق قليلاً */
+    -fx-cursor: hand;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.3), 8, 0, 0, 2);
+    -fx-padding: 4 10;
+}
