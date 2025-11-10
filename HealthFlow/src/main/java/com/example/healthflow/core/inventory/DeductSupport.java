@@ -488,4 +488,9 @@ public class DeductSupport {
     public void setOnSaveCallback(Runnable cb) {
         this.onSaveCallback = cb;
     }
+
+    // Allow controller to trigger save programmatically (used by PharmacyController spinner wrapper)
+    public void triggerSave() {
+        save();
+    }
 }

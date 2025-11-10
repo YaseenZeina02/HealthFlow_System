@@ -3337,14 +3337,34 @@ public class ReceptionController {
         wireSearchDoctors();
         setupDoctorFilters();
 
-        InsertButton.setOnAction(e -> {
-            if (ensureOnlineOrAlert()) doInsertPatient();
+        if (InsertButton != null) InsertButton.setOnAction(e -> {
+            startBtnBusy(InsertButton, "Saving…");
+            javafx.animation.PauseTransition pt = new javafx.animation.PauseTransition(javafx.util.Duration.millis(120));
+            pt.setOnFinished(ev -> javafx.application.Platform.runLater(() -> {
+                try { doInsertPatient(); }
+                finally { stopBtnBusy(InsertButton); }
+            }));
+            pt.play();
         });
-        UpdateButton.setOnAction(e -> {
-            if (ensureOnlineOrAlert()) doUpdatePatient();
+
+        if (UpdateButton != null) UpdateButton.setOnAction(e -> {
+            startBtnBusy(UpdateButton, "Updating…");
+            javafx.animation.PauseTransition pt = new javafx.animation.PauseTransition(javafx.util.Duration.millis(120));
+            pt.setOnFinished(ev -> javafx.application.Platform.runLater(() -> {
+                try { doUpdatePatient(); }
+                finally { stopBtnBusy(UpdateButton); }
+            }));
+            pt.play();
         });
-        deleteButton.setOnAction(e -> {
-            if (ensureOnlineOrAlert()) doDeletePatient();
+
+        if (deleteButton != null) deleteButton.setOnAction(e -> {
+            startBtnBusy(deleteButton, "Deleting…");
+            javafx.animation.PauseTransition pt = new javafx.animation.PauseTransition(javafx.util.Duration.millis(120));
+            pt.setOnFinished(ev -> javafx.application.Platform.runLater(() -> {
+                try { doDeletePatient(); }
+                finally { stopBtnBusy(deleteButton); }
+            }));
+            pt.play();
         });
         clearBtn.setOnAction(e -> {
             selectedPatient = null;
@@ -3577,10 +3597,35 @@ public class ReceptionController {
             });
         }
 
-        // CRUD buttons
-        if (insertAppointments != null) insertAppointments.setOnAction(e -> doInsertAppointment());
-        if (updateAppointments != null) updateAppointments.setOnAction(e -> doUpdateAppointment());
-        if (deleteAppointments != null) deleteAppointments.setOnAction(e -> doDeleteAppointment());
+        // CRUD buttons (with login-like spinner)
+        if (insertAppointments != null) insertAppointments.setOnAction(e -> {
+            startBtnBusy(insertAppointments, "Inserting…");
+            javafx.animation.PauseTransition pt = new javafx.animation.PauseTransition(javafx.util.Duration.millis(120));
+            pt.setOnFinished(ev -> javafx.application.Platform.runLater(() -> {
+                try { doInsertAppointment(); }
+                finally { stopBtnBusy(insertAppointments); }
+            }));
+            pt.play();
+        });
+        if (updateAppointments != null) updateAppointments.setOnAction(e -> {
+            startBtnBusy(updateAppointments, "Updating…");
+            javafx.animation.PauseTransition pt = new javafx.animation.PauseTransition(javafx.util.Duration.millis(120));
+            pt.setOnFinished(ev -> javafx.application.Platform.runLater(() -> {
+                try { doUpdateAppointment(); }
+                finally { stopBtnBusy(updateAppointments); }
+            }));
+            pt.play();
+        });
+        if (deleteAppointments != null) deleteAppointments.setOnAction(e -> {
+            startBtnBusy(deleteAppointments, "Deleting…");
+            javafx.animation.PauseTransition pt = new javafx.animation.PauseTransition(javafx.util.Duration.millis(120));
+            pt.setOnFinished(ev -> javafx.application.Platform.runLater(() -> {
+                try { doDeleteAppointment(); }
+                finally { stopBtnBusy(deleteAppointments); }
+            }));
+            pt.play();
+        });
+
         if (clear_Appointments != null) clear_Appointments.setOnAction(e -> doClearAppointmentForm());
         if (AppointmentDate != null)
             AppointmentDate.valueProperty().addListener((o, a, b) -> {
@@ -3976,6 +4021,47 @@ public class ReceptionController {
                 autoRefreshExec.shutdownNow();
             }
         } catch (Throwable ignore) {}
+    }
+
+    /** Login-like busy state for any Button: spinner on the left + text swap. */
+    private void startBtnBusy(javafx.scene.control.Button b, String busyText) {
+        if (b == null) return;
+        try {
+            if (!b.getProperties().containsKey("orig-text")) {
+                b.getProperties().put("orig-text", b.getText());
+            }
+            // لا نعطّل الزر بالكامل حتى ما يخفت شكله؛ فقط امنع النقرات
+            b.setMouseTransparent(true);
+
+            javafx.scene.control.ProgressIndicator pi = new javafx.scene.control.ProgressIndicator();
+            pi.setPrefSize(16, 16);
+            pi.setMaxSize(16, 16);
+            pi.setProgress(javafx.scene.control.ProgressIndicator.INDETERMINATE_PROGRESS);
+            pi.setVisible(true);
+            pi.setManaged(true);
+
+            // لو أزرارك داكنة، خلّي المؤشر أبيض ليوضح (احذف السطر لو الخلفية فاتحة)
+            pi.setStyle("-fx-progress-color: white;");
+
+            b.setContentDisplay(javafx.scene.control.ContentDisplay.LEFT);
+            b.setGraphicTextGap(8);
+            b.setGraphic(pi);
+
+            if (busyText != null && !busyText.isBlank()) {
+                b.setText(busyText);
+            }
+        } catch (Throwable ignored) {}
+    }
+
+    private void stopBtnBusy(javafx.scene.control.Button b) {
+        if (b == null) return;
+        try {
+            Object prev = b.getProperties().get("orig-text");
+            if (prev instanceof String) b.setText((String) prev);
+            b.getProperties().remove("orig-text");
+            b.setGraphic(null);
+            b.setMouseTransparent(false);
+        } catch (Throwable ignored) {}
     }
 
 }

@@ -229,6 +229,8 @@ public class DoctorController {
     // Tracks whether we're editing an existing row from the table
     private PrescItemRow editingRow = null;
     private Long currentPrescriptionId = null;
+
+
     // Current patient/doctor context for prescription
     private Long selectedPatientUserId = null;
     private String selectedPatientName = null;
@@ -328,6 +330,13 @@ public class DoctorController {
     /* ====== Nav highlight ====== */
     private static final String ACTIVE_CLASS = "current";
 
+    /** Enable/disable the nav PrescriptionButton in one place. */
+    private void setPrescriptionNavEnabled(boolean enabled) {
+        if (PrescriptionButton != null) {
+            PrescriptionButton.setDisable(!enabled);
+        }
+    }
+
     private void markNavActive(Button active) {
         Button[] all = {DachboardButton, PatientsButton, PrescriptionButton};
         for (Button b : all) {
@@ -344,6 +353,8 @@ public class DoctorController {
     private void initialize() {
         monitor.start();
         showDashboardPane();
+        // Disable Prescription nav by default; it becomes enabled only via btnPresc
+        setPrescriptionNavEnabled(false);
 
         if (rootPane != null) {
             ConnectivityBanner banner = new ConnectivityBanner(monitor);
@@ -355,8 +366,8 @@ public class DoctorController {
 
         startClock();
 
-        DachboardButton.setOnAction(e -> showDashboardPane());
-        PatientsButton.setOnAction(e -> showPatientsPane());
+        DachboardButton.setOnAction(e -> navigateWithGuard(this::showDashboardPane));
+        PatientsButton.setOnAction(e -> navigateWithGuard(this::showPatientsPane));
         PrescriptionButton.setOnAction(e -> {
             // Reset context for "prescription without appointment"
             selectedPatientUserId = null;
@@ -368,6 +379,18 @@ public class DoctorController {
             // Make PatientNameTF editable with placeholder so user can type "name • NID"
             setPatientHeader("", null, true);
         });
+        if (LogOutBtn != null) {
+            LogOutBtn.setOnAction(e -> navigateWithGuard(() -> {
+                try {
+                    shutdown();
+                } catch (Exception ignored) {}
+                // Close the stage
+                if (rootPane != null) {
+                    Stage st = (Stage) rootPane.getScene().getWindow();
+                    if (st != null) st.close();
+                }
+            }));
+        }
 //        Add_Medication.setOnAction(e -> showPrescriptionPaneToAddMedication());
 
         Add_Medication.setOnAction(e -> {
@@ -376,7 +399,10 @@ public class DoctorController {
                     + ", NID=" + selectedPatientNationalId);
             showPrescriptionPaneToAddMedication();
         });
-        cancelAddMedication.setOnAction(e -> showPrescriptionPane());
+        cancelAddMedication.setOnAction(e -> {
+            if (!guardLeaveAddMedicineForm()) return;
+            showPrescriptionPane();
+        });
 
 
         if (searchDB != null) {
@@ -505,25 +531,55 @@ public class DoctorController {
             if (Update_Medication != null) Update_Medication.setDisable(true);
         }
 
-        // Add / Save in the Add-Medicine pane
+        // InsertMedicine
         if (InsertMedicine != null) {
             InsertMedicine.setOnAction(e -> {
-
-                addMedicineFromDialog();
+                playPressAnim(InsertMedicine);
+                startBtnBusy(InsertMedicine, "Adding…");
+                javafx.animation.PauseTransition pt = new javafx.animation.PauseTransition(javafx.util.Duration.millis(80));
+                pt.setOnFinished(ev -> {
+                    try {
+                        addMedicineFromDialog();
+                    } finally {
+                        stopBtnBusy(InsertMedicine);
+                    }
+                });
+                pt.play();
             });
         }
+
+        // Update_Medication
         if (Update_Medication != null) {
-            Update_Medication.setOnAction(e -> openEditSelectedItem());
+            Update_Medication.setOnAction(e -> {
+                playPressAnim(Update_Medication);
+                startBtnBusy(Update_Medication, "Updating…");
+                javafx.animation.PauseTransition pt = new javafx.animation.PauseTransition(javafx.util.Duration.millis(80));
+                pt.setOnFinished(ev -> {
+                    try {
+                        openEditSelectedItem();
+                    } finally {
+                        stopBtnBusy(Update_Medication);
+                    }
+                });
+                pt.play();
+            });
         }
 
-        // When doctor finishes composing the draft and wants to send to pharmacy:
-//        if (sendToPharmacy != null) {
-//            sendToPharmacy.setOnAction(e -> sendToPharmacy());
-//        }
-        // When doctor finishes composing the draft and wants to send to pharmacy:
+        // sendToPharmacy
         if (sendToPharmacy != null) {
-            // لا تعِد إنشاء وصفة؛ فقط ارفع الـ status عبر handleSendToPharmacy()
-            sendToPharmacy.setOnAction(e -> handleSendToPharmacy());
+            sendToPharmacy.setOnAction(e -> {
+                playPressAnim(sendToPharmacy);
+                startBtnBusy(sendToPharmacy, "Sending…");
+                javafx.animation.PauseTransition pt = new javafx.animation.PauseTransition(javafx.util.Duration.millis(80));
+                pt.setOnFinished(ev -> {
+                    try {
+                        handleSendToPharmacy();
+                    } finally {
+                        stopBtnBusy(sendToPharmacy);
+                    }
+                });
+                pt.play();
+            });
         }
 
         try {
@@ -640,6 +696,7 @@ public class DoctorController {
         PrescriptionAnchorPane.setVisible(false);
 
         markNavActive(DachboardButton);
+        setPrescriptionNavEnabled(false);
         refitAppointmentsColumnsLater();
     }
 
@@ -653,6 +710,7 @@ public class DoctorController {
         PatientAnchorPane.setVisible(true);
         PrescriptionAnchorPane.setVisible(false);
         markNavActive(PatientsButton);
+        setPrescriptionNavEnabled(false);
     }
 
     private void showPrescriptionPane() {
@@ -661,6 +719,9 @@ public class DoctorController {
         PrescriptionAnchorPane.setVisible(true);
         PrescriptionMedicationAnchorPane.setVisible(true);
         AddMedicationAnchorPane.setVisible(false);
+        // When entering the prescription screen (via btnPresc), enable the nav button and mark it active
+        setPrescriptionNavEnabled(true);
+        markNavActive(PrescriptionButton);
 //        markNavActive(InsertButton2);     //
     }
 
@@ -673,7 +734,98 @@ public class DoctorController {
 //        markNavActive(InsertButton2);     //
     }
 
+    /** Returns true if there are draft/unsent items in UI or DB for the current draft prescription. */
+    private boolean hasUnsentDraftMeds() {
+        // 1) Check in-memory table (fast path)
+        if (prescItemsEditable != null && !prescItemsEditable.isEmpty()) return true;
 
+        // 2) Check DB for current draft prescription
+        if (currentPrescriptionId == null) return false;
+        try (Connection c = Database.get();
+             java.sql.PreparedStatement ps = c.prepareStatement(
+                     "SELECT EXISTS (" +
+                             " SELECT 1 FROM prescription_items i" +
+                             " JOIN prescriptions p ON p.id = i.prescription_id" +
+                             " WHERE i.prescription_id = ? AND p.status = 'DRAFT' AND i.status = 'PENDING'" +
+                             ")")) {
+            ps.setLong(1, currentPrescriptionId);
+            try (java.sql.ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) return rs.getBoolean(1);
+            }
+        } catch (Exception ignored) {}
+        return false;
+    }
+
+    /**
+     * Ask the user if they want to leave and discard unsent meds.
+     * @return true if it's OK to leave (either no unsent meds, or user confirmed discard and purge succeeded).
+     */
+    private boolean guardLeavePrescriptionWithConfirm() {
+        if (!hasUnsentDraftMeds()) return true;
+
+        Alert a = new Alert(Alert.AlertType.CONFIRMATION);
+        a.setTitle("Unsent Medicines");
+        a.setHeaderText("You have unsent medicines.");
+        a.setContentText("There are medicines written but not sent to the pharmacy.\nAre you sure you want to leave?");
+        ButtonType leaveBtn = new ButtonType("Leave without saving", ButtonBar.ButtonData.OK_DONE);
+        ButtonType cancelBtn = new ButtonType("Cancel", ButtonBar.ButtonData.CANCEL_CLOSE);
+        a.getButtonTypes().setAll(leaveBtn, cancelBtn);
+        java.util.Optional<ButtonType> res = a.showAndWait();
+        if (res.isEmpty() || res.get() == cancelBtn) {
+            return false; // stay
+        }
+
+        // User confirmed discard -> purge draft rows
+        purgeDraftPrescriptionSafely();
+        return true;
+    }
+
+    /** Delete PENDING items for current DRAFT prescription and clean up state/UI. */
+    private void purgeDraftPrescriptionSafely() {
+        try (Connection c = Database.get()) {
+            c.setAutoCommit(false);
+            try {
+                if (currentPrescriptionId != null) {
+                    try (java.sql.PreparedStatement delItems = c.prepareStatement(
+                            "DELETE FROM prescription_items" +
+                                    " WHERE prescription_id = ? AND status = 'PENDING'")) {
+                        delItems.setLong(1, currentPrescriptionId);
+                        delItems.executeUpdate();
+                    }
+                    // If prescription is DRAFT and now empty -> delete it as well (optional cleanup)
+                    try (java.sql.PreparedStatement mayDeletePresc = c.prepareStatement(
+                            "DELETE FROM prescriptions p" +
+                                    " WHERE p.id = ?" +
+                                    "   AND p.status = 'DRAFT'" +
+                                    "   AND NOT EXISTS (SELECT 1 FROM prescription_items i WHERE i.prescription_id = p.id)")) {
+                        mayDeletePresc.setLong(1, currentPrescriptionId);
+                        mayDeletePresc.executeUpdate();
+                    }
+                }
+                c.commit();
+            } catch (Exception ex) {
+                c.rollback();
+            } finally {
+                c.setAutoCommit(true);
+            }
+        } catch (Exception ignore) {}
+
+        // Clear in-memory state
+        if (prescItemsEditable != null) prescItemsEditable.clear();
+        currentPrescriptionId = null;
+    }
+
+    private void navigateWithGuard(Runnable action) {
+        // 1) لو شاشة "Add Medicine" ظاهرة: افحص أولًا ضياع المدخلات
+        if (AddMedicationAnchorPane != null && AddMedicationAnchorPane.isVisible()) {
+            if (!guardLeaveAddMedicineForm()) return;
+        }
+        // 2) غير ذلك: لو نحن في شاشة الوصفة، طبّق حارس العناصر غير المرسلة
+        else if (PrescriptionAnchorPane != null && PrescriptionAnchorPane.isVisible()) {
+            if (!guardLeavePrescriptionWithConfirm()) return;
+        }
+        action.run();
+    }
     /**
       عند الإرسال للصيدلية: ننشئ الوصفة فعليًا (status=PENDING) ونحفظ عناصرها.
      */
@@ -701,21 +853,33 @@ public class DoctorController {
             int updated;
             try (var ps = c.prepareStatement(
                     "UPDATE prescriptions " +
-                            "   SET status = 'PENDING' " +
-                            " WHERE id = ? AND status = 'DRAFT'")) {
-                ps.setLong(1, currentPrescriptionId);
+                    "   SET status = 'PENDING', " +
+                    "       diagnosis = COALESCE(NULLIF(?, ''), diagnosis) " +
+                    " WHERE id = ? AND status = 'DRAFT'")) {
+                String diag = (DiagnosisTF == null) ? null : DiagnosisTF.getText();
+                ps.setString(1, (diag == null ? null : diag.trim()));
+                ps.setLong(2, currentPrescriptionId);
                 updated = ps.executeUpdate();
             }
 
             if (updated > 0) {
                 toast("Prescription is now PENDING and visible to Pharmacy.", "ok");
+                // Return to dashboard and disable Prescription nav after successful send
+                showDashboardPane();
+                setPrescriptionNavEnabled(false);
+                currentPrescriptionId = null;
+                if (prescItemsEditable != null) prescItemsEditable.clear();
+                return;
             } else {
                 // غالبًا كانت PENDING أصلًا
                 toast("Prescription already sent (PENDING).", "info");
             }
 
-            // تنظيف واجهة (اختياري)
+            // تنظيف واجهة + إطفاء زر الوصفة بعد الإرسال/التأكيد
             showDashboardPane();
+            setPrescriptionNavEnabled(false);
+            currentPrescriptionId = null;
+            if (prescItemsEditable != null) prescItemsEditable.clear();
 
         } catch (Exception ex) {
             showWarn("Prescription", "Failed to send: " + ex.getMessage());
@@ -1194,111 +1358,111 @@ public class DoctorController {
         }
     }
 
-private void loadAppointmentsForDateAsync(LocalDate date) {
-    var u = Session.get();
-    if (u == null || date == null) return;
+    private void loadAppointmentsForDateAsync(LocalDate date) {
+        var u = Session.get();
+        if (u == null || date == null) return;
 
-    // احضر مواعيد اليوم المحدد بالخلفية ثم حدّث الواجهة بأمان
-    Thread t = new Thread(() -> {
-        List<Appt> list = null;
-        Exception lastErr = null;
+        // احضر مواعيد اليوم المحدد بالخلفية ثم حدّث الواجهة بأمان
+        Thread t = new Thread(() -> {
+            List<Appt> list = null;
+            Exception lastErr = null;
 
-        // 1) النداء المفضّل للخدمة (يمرَّر التاريخ صراحة)
-        try {
-            list = svc.listTodayAppointments(u.getId(), date);
-        } catch (Exception ex) {
-            lastErr = ex;
-            System.out.println("[Appointments] service call failed: " + ex.getMessage());
-        }
-
-        // 2) بديل آمن: استعلام بالايميل + التاريخ المحدد
-        if (list == null || list.isEmpty()) {
-            String email = (u.getEmail() == null) ? "" : u.getEmail().trim().toLowerCase();
-            try (Connection c = Database.get()) {
-                String sql = """
-                        SELECT a.id,
-                               pu.full_name       AS patient_name,
-                               pu.national_id     AS patient_nid,
-                               a.appointment_date AS ts,
-                               a.status,
-                               p.user_id          AS patient_user_id,
-                               p.medical_history  AS medical_history
-                        FROM appointments a
-                        JOIN doctors d  ON d.id = a.doctor_id
-                        JOIN users   du ON du.id = d.user_id        -- doctor user
-                        JOIN patients p ON p.id = a.patient_id
-                        JOIN users   pu ON pu.id = p.user_id        -- patient user
-                        WHERE lower(du.email) = ? AND a.appointment_date::date = ?
-                        ORDER BY a.appointment_date
-                        """;
-                try (var ps = c.prepareStatement(sql)) {
-                    ps.setString(1, email);
-                    ps.setDate(2, java.sql.Date.valueOf(date));
-                    try (var rs = ps.executeQuery()) {
-                        java.util.ArrayList<Appt> fb = new java.util.ArrayList<>();
-                        while (rs.next()) {
-                            Appt a = new Appt();
-                            a.id = rs.getLong("id");
-                            a.patientName = rs.getString("patient_name");
-                            a.patientNationalId = rs.getString("patient_nid");
-                            java.sql.Timestamp ts = rs.getTimestamp("ts");
-                            if (ts != null) {
-                                var zdt = ts.toInstant().atZone(APP_TZ);
-                                a.date = zdt.toLocalDate();
-                                a.time = zdt.toLocalTime();
-                            }
-                            a.status = rs.getString("status");
-                            a.patientUserId = rs.getLong("patient_user_id");
-                            a.medicalHistory = rs.getString("medical_history");
-                            fb.add(a);
-                        }
-                        list = fb;
-                        System.out.println("[Appointments] email fallback succeeded using appointment_date casts.");
-                    }
-                }
-            } catch (SQLException e) {
-                lastErr = (lastErr == null) ? e : lastErr;
-            }
-        }
-
-        // 3) حدّث واجهة المستخدم على خيط JavaFX
-        final List<Appt> finalList = list;
-        final Exception finalErr = lastErr;
-        Platform.runLater(() -> {
-            // امسح القائمة الحالية دائمًا ثم املأ
-            apptData.clear();
-
-            if (finalList != null && !finalList.isEmpty()) {
-                for (Appt a : finalList) {
-                    apptData.add(AppointmentRow.of(a));
-                }
-            } else if (finalErr != null) {
-                String msg = "Failed to load appointments for the selected date.";
-                if (finalErr.getMessage() != null && !finalErr.getMessage().isBlank()) {
-                    msg += " (" + finalErr.getMessage() + ")";
-                }
-                showWarn("Appointments", msg);
-            }
-
+            // 1) النداء المفضّل للخدمة (يمرَّر التاريخ صراحة)
             try {
-                TextField fld = apptSearchField();
-                String q = (fld == null) ? "" : fld.getText();
-                if (q != null && !q.trim().isEmpty()) {
-                    applyAppointmentsFilter(q);
-                } else {
-                    if (apptFiltered != null) apptFiltered.setPredicate(r -> true);
+                list = svc.listTodayAppointments(u.getId(), date);
+            } catch (Exception ex) {
+                lastErr = ex;
+                System.out.println("[Appointments] service call failed: " + ex.getMessage());
+            }
+
+            // 2) بديل آمن: استعلام بالايميل + التاريخ المحدد
+            if (list == null || list.isEmpty()) {
+                String email = (u.getEmail() == null) ? "" : u.getEmail().trim().toLowerCase();
+                try (Connection c = Database.get()) {
+                    String sql = """
+                            SELECT a.id,
+                                   pu.full_name       AS patient_name,
+                                   pu.national_id     AS patient_nid,
+                                   a.appointment_date AS ts,
+                                   a.status,
+                                   p.user_id          AS patient_user_id,
+                                   p.medical_history  AS medical_history
+                            FROM appointments a
+                            JOIN doctors d  ON d.id = a.doctor_id
+                            JOIN users   du ON du.id = d.user_id        -- doctor user
+                            JOIN patients p ON p.id = a.patient_id
+                            JOIN users   pu ON pu.id = p.user_id        -- patient user
+                            WHERE lower(du.email) = ? AND a.appointment_date::date = ?
+                            ORDER BY a.appointment_date
+                            """;
+                    try (var ps = c.prepareStatement(sql)) {
+                        ps.setString(1, email);
+                        ps.setDate(2, java.sql.Date.valueOf(date));
+                        try (var rs = ps.executeQuery()) {
+                            java.util.ArrayList<Appt> fb = new java.util.ArrayList<>();
+                            while (rs.next()) {
+                                Appt a = new Appt();
+                                a.id = rs.getLong("id");
+                                a.patientName = rs.getString("patient_name");
+                                a.patientNationalId = rs.getString("patient_nid");
+                                java.sql.Timestamp ts = rs.getTimestamp("ts");
+                                if (ts != null) {
+                                    var zdt = ts.toInstant().atZone(APP_TZ);
+                                    a.date = zdt.toLocalDate();
+                                    a.time = zdt.toLocalTime();
+                                }
+                                a.status = rs.getString("status");
+                                a.patientUserId = rs.getLong("patient_user_id");
+                                a.medicalHistory = rs.getString("medical_history");
+                                fb.add(a);
+                            }
+                            list = fb;
+                            System.out.println("[Appointments] email fallback succeeded using appointment_date casts.");
+                        }
+                    }
+                } catch (SQLException e) {
+                    lastErr = (lastErr == null) ? e : lastErr;
                 }
-            } catch (Throwable ignore) { }
+            }
 
-            refitAppointmentsColumnsLater();
-            try { if (AppointmentsTable != null) AppointmentsTable.refresh(); } catch (Throwable ignore) { }
-        });
-    }, "doc-appts-by-date");
+            // 3) حدّث واجهة المستخدم على خيط JavaFX
+            final List<Appt> finalList = list;
+            final Exception finalErr = lastErr;
+            Platform.runLater(() -> {
+                // امسح القائمة الحالية دائمًا ثم املأ
+                apptData.clear();
 
-    // خيط خفيف Daemon حتى لا يمنع إغلاق التطبيق
-    t.setDaemon(true);
-    t.start();
-}
+                if (finalList != null && !finalList.isEmpty()) {
+                    for (Appt a : finalList) {
+                        apptData.add(AppointmentRow.of(a));
+                    }
+                } else if (finalErr != null) {
+                    String msg = "Failed to load appointments for the selected date.";
+                    if (finalErr.getMessage() != null && !finalErr.getMessage().isBlank()) {
+                        msg += " (" + finalErr.getMessage() + ")";
+                    }
+                    showWarn("Appointments", msg);
+                }
+
+                try {
+                    TextField fld = apptSearchField();
+                    String q = (fld == null) ? "" : fld.getText();
+                    if (q != null && !q.trim().isEmpty()) {
+                        applyAppointmentsFilter(q);
+                    } else {
+                        if (apptFiltered != null) apptFiltered.setPredicate(r -> true);
+                    }
+                } catch (Throwable ignore) { }
+
+                refitAppointmentsColumnsLater();
+                try { if (AppointmentsTable != null) AppointmentsTable.refresh(); } catch (Throwable ignore) { }
+            });
+        }, "doc-appts-by-date");
+
+        // خيط خفيف Daemon حتى لا يمنع إغلاق التطبيق
+        t.setDaemon(true);
+        t.start();
+    }
 
     private void wireAppointmentsTable() {
         if (AppointmentsTable == null) return;
@@ -2131,183 +2295,183 @@ private void loadAppointmentsForDateAsync(LocalDate date) {
     }
 
     /* ================= Prescription Items table wiring ================= */
-private void wirePrescriptionItemsTable() {
-    if (TablePrescriptionItems == null) return;
+    private void wirePrescriptionItemsTable() {
+        if (TablePrescriptionItems == null) return;
 
-    TablePrescriptionItems.setItems(prescItemsEditable);
-    //TablePrescriptionItems.setColumnResizePolicy(TableView.UNCONSTRAINED_RESIZE_POLICY);
+        TablePrescriptionItems.setItems(prescItemsEditable);
+        //TablePrescriptionItems.setColumnResizePolicy(TableView.UNCONSTRAINED_RESIZE_POLICY);
 
-    final double actionBase = (colPresesAction == null) ? 0 : Math.max(180, colPresesAction.getPrefWidth());
-    final double actionMax  = 240; // cap expansion so we don't kill H-scroll
+        final double actionBase = (colPresesAction == null) ? 0 : Math.max(180, colPresesAction.getPrefWidth());
+        final double actionMax  = 240; // cap expansion so we don't kill H-scroll
 
-    java.util.function.ToDoubleFunction<TableColumn<?, ?>> cw = (tc) -> {
-        if (tc == null) return 0.0;
-        double w = tc.getWidth();
-        return (w > 0.0 ? w : Math.max(tc.getPrefWidth(), tc.getMinWidth()));
-    };
+        java.util.function.ToDoubleFunction<TableColumn<?, ?>> cw = (tc) -> {
+            if (tc == null) return 0.0;
+            double w = tc.getWidth();
+            return (w > 0.0 ? w : Math.max(tc.getPrefWidth(), tc.getMinWidth()));
+        };
 
-    Runnable fitLastColumn = () -> {
-        if (TablePrescriptionItems == null || colPresesAction == null) return;
-        double used = 0;
-        used += cw.applyAsDouble(colIdx);
-        used += cw.applyAsDouble(colMedicineName);
-        used += cw.applyAsDouble(colStrength);
-        used += cw.applyAsDouble(colForm);
-        used += cw.applyAsDouble(colDose);
-        used += cw.applyAsDouble(colDosage);
-        used += cw.applyAsDouble(colFreqPerDay);
-        used += cw.applyAsDouble(colDuration);
-        used += cw.applyAsDouble(colRoute);
-        used += cw.applyAsDouble(colQuantity);
-        used += cw.applyAsDouble(colPresesStatus);
+        Runnable fitLastColumn = () -> {
+            if (TablePrescriptionItems == null || colPresesAction == null) return;
+            double used = 0;
+            used += cw.applyAsDouble(colIdx);
+            used += cw.applyAsDouble(colMedicineName);
+            used += cw.applyAsDouble(colStrength);
+            used += cw.applyAsDouble(colForm);
+            used += cw.applyAsDouble(colDose);
+            used += cw.applyAsDouble(colDosage);
+            used += cw.applyAsDouble(colFreqPerDay);
+            used += cw.applyAsDouble(colDuration);
+            used += cw.applyAsDouble(colRoute);
+            used += cw.applyAsDouble(colQuantity);
+            used += cw.applyAsDouble(colPresesStatus);
 
-        double total = TablePrescriptionItems.getWidth();
-        double padding = 14;
-        double remaining = total - used - padding;
-        double newW = Math.max(actionBase, Math.min(remaining, actionMax));
-        colPresesAction.prefWidthProperty().unbind();
-        colPresesAction.setPrefWidth(newW);
-    };
+            double total = TablePrescriptionItems.getWidth();
+            double padding = 14;
+            double remaining = total - used - padding;
+            double newW = Math.max(actionBase, Math.min(remaining, actionMax));
+            colPresesAction.prefWidthProperty().unbind();
+            colPresesAction.setPrefWidth(newW);
+        };
 
-    if (colIdx != null) {
-        colIdx.setSortable(false);
-        colIdx.setCellValueFactory(cd -> new ReadOnlyObjectWrapper<>(
-                TablePrescriptionItems.getItems().indexOf(cd.getValue()) + 1));
-    }
-    if (colMedicineName != null) colMedicineName.setCellValueFactory(cd -> cd.getValue().medicineNameProperty());
-    if (colDosage != null)       colDosage.setCellValueFactory(new PropertyValueFactory<>("dosageText"));
-    if (colDuration != null)     colDuration.setCellValueFactory(cd -> cd.getValue().durationDaysProperty().asObject());
+        if (colIdx != null) {
+            colIdx.setSortable(false);
+            colIdx.setCellValueFactory(cd -> new ReadOnlyObjectWrapper<>(
+                    TablePrescriptionItems.getItems().indexOf(cd.getValue()) + 1));
+        }
+        if (colMedicineName != null) colMedicineName.setCellValueFactory(cd -> cd.getValue().medicineNameProperty());
+        if (colDosage != null)       colDosage.setCellValueFactory(new PropertyValueFactory<>("dosageText"));
+        if (colDuration != null)     colDuration.setCellValueFactory(cd -> cd.getValue().durationDaysProperty().asObject());
 
-    if (colQuantity != null) {
-        colQuantity.setCellValueFactory(cd -> {
-            var it = cd.getValue();
-            Integer u = it.getQtyUnitsRequested();
-            int d = Math.max(0, it.getDose());
-            int f = Math.max(0, it.getFreqPerDay());
-            int g = Math.max(0, it.getDurationDays());
-            if ((u == null || u <= 0) && d > 0 && f > 0 && g > 0) u = d * f * g;
+        if (colQuantity != null) {
+            colQuantity.setCellValueFactory(cd -> {
+                var it = cd.getValue();
+                Integer u = it.getQtyUnitsRequested();
+                int d = Math.max(0, it.getDose());
+                int f = Math.max(0, it.getFreqPerDay());
+                int g = Math.max(0, it.getDurationDays());
+                if ((u == null || u <= 0) && d > 0 && f > 0 && g > 0) u = d * f * g;
 
-            String form = it.getForm();
-            String unitShort = (form != null && form.equalsIgnoreCase("Tablet")) ? "tabs"
-                                : (form != null && form.equalsIgnoreCase("Capsule")) ? "caps"
-                                : "units";
-            String text = (u != null && u > 0) ? (u + " " + unitShort) : "—";
-            return new ReadOnlyStringWrapper(text);
-        });
+                String form = it.getForm();
+                String unitShort = (form != null && form.equalsIgnoreCase("Tablet")) ? "tabs"
+                                    : (form != null && form.equalsIgnoreCase("Capsule")) ? "caps"
+                                    : "units";
+                String text = (u != null && u > 0) ? (u + " " + unitShort) : "—";
+                return new ReadOnlyStringWrapper(text);
+            });
 
-        colQuantity.setCellFactory(col -> new TableCell<PrescItemRow, String>() {
-            @Override protected void updateItem(String text, boolean empty) {
-                super.updateItem(text, empty);
-                if (empty || text == null) {
-                    setText(null);
-                    setTooltip(null);
-                } else {
-                    setText(text);
-                    PrescItemRow row = (getTableRow() == null) ? null : (PrescItemRow) getTableRow().getItem();
-                    if (row != null) {
-                        int d = row.getDose(), f = row.getFreqPerDay(), days = row.getDurationDays();
-                        String tt = "Qty = Dose × Freq/day × Duration\n= "
-                                + (d == 0 ? "?" : d) + " × "
-                                + (f == 0 ? "?" : f) + " × "
-                                + (days == 0 ? "?" : days);
-                        if (row.getSuggestedUnit() != null && row.getSuggestedCount() != null && row.getSuggestedUnitsTotal() != null) {
-                            tt += "\nSuggested: " + row.getSuggestedCount() + " " + row.getSuggestedUnit() + " (" + row.getSuggestedUnitsTotal() + ")";
-                        }
-                        setTooltip(new Tooltip(tt));
-                    } else {
+            colQuantity.setCellFactory(col -> new TableCell<PrescItemRow, String>() {
+                @Override protected void updateItem(String text, boolean empty) {
+                    super.updateItem(text, empty);
+                    if (empty || text == null) {
+                        setText(null);
                         setTooltip(null);
+                    } else {
+                        setText(text);
+                        PrescItemRow row = (getTableRow() == null) ? null : (PrescItemRow) getTableRow().getItem();
+                        if (row != null) {
+                            int d = row.getDose(), f = row.getFreqPerDay(), days = row.getDurationDays();
+                            String tt = "Qty = Dose × Freq/day × Duration\n= "
+                                    + (d == 0 ? "?" : d) + " × "
+                                    + (f == 0 ? "?" : f) + " × "
+                                    + (days == 0 ? "?" : days);
+                            if (row.getSuggestedUnit() != null && row.getSuggestedCount() != null && row.getSuggestedUnitsTotal() != null) {
+                                tt += "\nSuggested: " + row.getSuggestedCount() + " " + row.getSuggestedUnit() + " (" + row.getSuggestedUnitsTotal() + ")";
+                            }
+                            setTooltip(new Tooltip(tt));
+                        } else {
+                            setTooltip(null);
+                        }
                     }
                 }
-            }
-        });
+            });
+        }
+
+        // === Pack column (single binding) ===
+        if (colPack != null) {
+            colPack.setText("Pack");
+            colPack.setPrefWidth(160);
+            colPack.setCellValueFactory(cd -> cd.getValue().packProperty());        colPack.setCellFactory(col -> new TableCell<PrescItemRow, String>() {
+                @Override protected void updateItem(String text, boolean empty) {
+                    super.updateItem(text, empty);
+                    if (empty) { setText(null); setTooltip(null); return; }
+                    setText((text == null || text.isBlank()) ? "—" : text);
+                    setTooltip((text == null || text.isBlank()) ? null : new Tooltip(text));
+                }
+            });
+        }
+
+        if (colPresesStatus != null) colPresesStatus.setCellValueFactory(cd -> cd.getValue().statusProperty());
+        if (colFreqPerDay != null)   { colFreqPerDay.setCellValueFactory(new PropertyValueFactory<>("freqPerDay")); colFreqPerDay.setPrefWidth(120); }
+        if (colStrength  != null)    { colStrength.setCellValueFactory(new PropertyValueFactory<>("strength"));   colStrength.setPrefWidth(80); }
+        if (colForm      != null)    { colForm.setCellValueFactory(new PropertyValueFactory<>("form"));           colForm.setPrefWidth(100); }
+        if (colDose      != null)    { colDose.setCellValueFactory(new PropertyValueFactory<>("dose"));           colDose.setPrefWidth(90); }
+        if (colRoute     != null)    { colRoute.setCellValueFactory(new PropertyValueFactory<>("route"));         colRoute.setPrefWidth(100); }
+
+        if (colMedicineName != null) colMedicineName.setPrefWidth(100);
+        if (colDosage != null)       colDosage.setPrefWidth(310);
+        if (colStrength != null)     colStrength.setPrefWidth(80);
+        if (colForm != null)         colForm.setPrefWidth(80);
+        if (colDose != null)         colDose.setPrefWidth(60);
+        if (colFreqPerDay != null)   colFreqPerDay.setPrefWidth(70);
+        if (colDuration != null)     colDuration.setPrefWidth(70);
+        if (colRoute != null)        colRoute.setPrefWidth(100);
+        if (colQuantity != null)     colQuantity.setPrefWidth(80);
+
+
+        ChangeListener<Number> _refit = (obs, ov, nv) -> fitLastColumn.run();
+        TablePrescriptionItems.widthProperty().addListener(_refit);
+        if (colIdx != null)           colIdx.widthProperty().addListener(_refit);
+        if (colMedicineName != null)  colMedicineName.widthProperty().addListener(_refit);
+        if (colStrength != null)      colStrength.widthProperty().addListener(_refit);
+        if (colForm != null)          colForm.widthProperty().addListener(_refit);
+        if (colDosage != null)        colDosage.widthProperty().addListener(_refit);
+        if (colFreqPerDay != null)    colFreqPerDay.widthProperty().addListener(_refit);
+        if (colDuration != null)      colDuration.widthProperty().addListener(_refit);
+        if (colRoute != null)         colRoute.widthProperty().addListener(_refit);
+        if (colQuantity != null)      colQuantity.widthProperty().addListener(_refit);
+        if (colPresesStatus != null)  colPresesStatus.widthProperty().addListener(_refit);
+        if (colPresesAction != null)  colPresesAction.widthProperty().addListener(_refit);
+
+        Platform.runLater(fitLastColumn);
+
+        if (colPresesAction != null) {
+            colPresesAction.setCellValueFactory(param -> new ReadOnlyObjectWrapper<>(param.getValue()));
+            colPresesAction.setSortable(false);
+            colPresesAction.setResizable(false);
+            colPresesAction.setCellFactory(tc -> new TableCell<PrescItemRow, PrescItemRow>() {
+                private final Button btnDel = new Button("Delete");
+                private final HBox box = new HBox(8, btnDel);
+                {
+                    btnDel.getStyleClass().addAll("btn", "btn-danger");
+                    box.setAlignment(Pos.CENTER_LEFT);
+                    btnDel.setOnAction(e -> {
+                        PrescItemRow row = getItem();
+                        if (row == null) return;
+                        if (row.getId() > 0) {
+                            btnDel.setDisable(true);
+                            new Thread(() -> {
+                                try (Connection c = Database.get()) {
+                                    c.setAutoCommit(true);
+                                    new PrescriptionItemDAO().deleteById(c, row.getId());
+                                    Platform.runLater(() -> { prescItemsEditable.remove(row); toast("Delete medication.", "ok"); btnDel.setDisable(false); });
+                                } catch (Exception ex) {
+                                    Platform.runLater(() -> { toast("DB delete failed. Row kept.", "warn"); btnDel.setDisable(false); });
+                                }
+                            }, "delete-presc-item").start();
+                        } else {
+                            if (prescItemsEditable.remove(row)) toast("Row removed (not saved in DB).", "ok");
+                            else toast("Could not remove the row.", "warn");
+                        }
+                    });
+                }
+                @Override protected void updateItem(PrescItemRow row, boolean empty) {
+                    super.updateItem(row, empty);
+                    setText(null);
+                    setGraphic(empty ? null : box);
+                }
+            });
+        }
     }
-
-    // === Pack column (single binding) ===
-    if (colPack != null) {
-        colPack.setText("Pack");
-        colPack.setPrefWidth(160);
-        colPack.setCellValueFactory(cd -> cd.getValue().packProperty());        colPack.setCellFactory(col -> new TableCell<PrescItemRow, String>() {
-            @Override protected void updateItem(String text, boolean empty) {
-                super.updateItem(text, empty);
-                if (empty) { setText(null); setTooltip(null); return; }
-                setText((text == null || text.isBlank()) ? "—" : text);
-                setTooltip((text == null || text.isBlank()) ? null : new Tooltip(text));
-            }
-        });
-    }
-
-    if (colPresesStatus != null) colPresesStatus.setCellValueFactory(cd -> cd.getValue().statusProperty());
-    if (colFreqPerDay != null)   { colFreqPerDay.setCellValueFactory(new PropertyValueFactory<>("freqPerDay")); colFreqPerDay.setPrefWidth(120); }
-    if (colStrength  != null)    { colStrength.setCellValueFactory(new PropertyValueFactory<>("strength"));   colStrength.setPrefWidth(80); }
-    if (colForm      != null)    { colForm.setCellValueFactory(new PropertyValueFactory<>("form"));           colForm.setPrefWidth(100); }
-    if (colDose      != null)    { colDose.setCellValueFactory(new PropertyValueFactory<>("dose"));           colDose.setPrefWidth(90); }
-    if (colRoute     != null)    { colRoute.setCellValueFactory(new PropertyValueFactory<>("route"));         colRoute.setPrefWidth(100); }
-
-    if (colMedicineName != null) colMedicineName.setPrefWidth(100);
-    if (colDosage != null)       colDosage.setPrefWidth(310);
-    if (colStrength != null)     colStrength.setPrefWidth(80);
-    if (colForm != null)         colForm.setPrefWidth(80);
-    if (colDose != null)         colDose.setPrefWidth(60);
-    if (colFreqPerDay != null)   colFreqPerDay.setPrefWidth(70);
-    if (colDuration != null)     colDuration.setPrefWidth(70);
-    if (colRoute != null)        colRoute.setPrefWidth(100);
-    if (colQuantity != null)     colQuantity.setPrefWidth(80);
-
-
-    ChangeListener<Number> _refit = (obs, ov, nv) -> fitLastColumn.run();
-    TablePrescriptionItems.widthProperty().addListener(_refit);
-    if (colIdx != null)           colIdx.widthProperty().addListener(_refit);
-    if (colMedicineName != null)  colMedicineName.widthProperty().addListener(_refit);
-    if (colStrength != null)      colStrength.widthProperty().addListener(_refit);
-    if (colForm != null)          colForm.widthProperty().addListener(_refit);
-    if (colDosage != null)        colDosage.widthProperty().addListener(_refit);
-    if (colFreqPerDay != null)    colFreqPerDay.widthProperty().addListener(_refit);
-    if (colDuration != null)      colDuration.widthProperty().addListener(_refit);
-    if (colRoute != null)         colRoute.widthProperty().addListener(_refit);
-    if (colQuantity != null)      colQuantity.widthProperty().addListener(_refit);
-    if (colPresesStatus != null)  colPresesStatus.widthProperty().addListener(_refit);
-    if (colPresesAction != null)  colPresesAction.widthProperty().addListener(_refit);
-
-    Platform.runLater(fitLastColumn);
-
-    if (colPresesAction != null) {
-        colPresesAction.setCellValueFactory(param -> new ReadOnlyObjectWrapper<>(param.getValue()));
-        colPresesAction.setSortable(false);
-        colPresesAction.setResizable(false);
-        colPresesAction.setCellFactory(tc -> new TableCell<PrescItemRow, PrescItemRow>() {
-            private final Button btnDel = new Button("Delete");
-            private final HBox box = new HBox(8, btnDel);
-            {
-                btnDel.getStyleClass().addAll("btn", "btn-danger");
-                box.setAlignment(Pos.CENTER_LEFT);
-                btnDel.setOnAction(e -> {
-                    PrescItemRow row = getItem();
-                    if (row == null) return;
-                    if (row.getId() > 0) {
-                        btnDel.setDisable(true);
-                        new Thread(() -> {
-                            try (Connection c = Database.get()) {
-                                c.setAutoCommit(true);
-                                new PrescriptionItemDAO().deleteById(c, row.getId());
-                                Platform.runLater(() -> { prescItemsEditable.remove(row); toast("Delete medication.", "ok"); btnDel.setDisable(false); });
-                            } catch (Exception ex) {
-                                Platform.runLater(() -> { toast("DB delete failed. Row kept.", "warn"); btnDel.setDisable(false); });
-                            }
-                        }, "delete-presc-item").start();
-                    } else {
-                        if (prescItemsEditable.remove(row)) toast("Row removed (not saved in DB).", "ok");
-                        else toast("Could not remove the row.", "warn");
-                    }
-                });
-            }
-            @Override protected void updateItem(PrescItemRow row, boolean empty) {
-                super.updateItem(row, empty);
-                setText(null);
-                setGraphic(empty ? null : box);
-            }
-        });
-    }
-}
 
     /**
      * Resolve patient id for the current prescription context.
@@ -2486,75 +2650,75 @@ private void wirePrescriptionItemsTable() {
         return r;
     }
 
-private void reloadPrescriptionItemsFromDb() {
-    if (currentPrescriptionId == null || currentPrescriptionId <= 0) return;
+    private void reloadPrescriptionItemsFromDb() {
+        if (currentPrescriptionId == null || currentPrescriptionId <= 0) return;
 
-    // Capture current selection to restore it later
-    final Long selId = (TablePrescriptionItems != null && TablePrescriptionItems.getSelectionModel().getSelectedItem() != null)
-            ? TablePrescriptionItems.getSelectionModel().getSelectedItem().getId()
-            : null;
-    final int selIndex = (TablePrescriptionItems != null)
-            ? TablePrescriptionItems.getSelectionModel().getSelectedIndex()
-            : -1;
+        // Capture current selection to restore it later
+        final Long selId = (TablePrescriptionItems != null && TablePrescriptionItems.getSelectionModel().getSelectedItem() != null)
+                ? TablePrescriptionItems.getSelectionModel().getSelectedItem().getId()
+                : null;
+        final int selIndex = (TablePrescriptionItems != null)
+                ? TablePrescriptionItems.getSelectionModel().getSelectedIndex()
+                : -1;
 
-    // Load on background thread to keep UI responsive
-    new Thread(() -> {
-        try (java.sql.Connection conn = Database.get()) {
-            conn.setAutoCommit(true);
-            try {
-                // Ensure packaging suggestions are populated
-                new com.example.healthflow.dao.PrescriptionItemDAO().backfillSuggestions(conn, currentPrescriptionId);
-            } catch (Throwable ignore) { /* non-fatal */ }
+        // Load on background thread to keep UI responsive
+        new Thread(() -> {
+            try (java.sql.Connection conn = Database.get()) {
+                conn.setAutoCommit(true);
+                try {
+                    // Ensure packaging suggestions are populated
+                    new com.example.healthflow.dao.PrescriptionItemDAO().backfillSuggestions(conn, currentPrescriptionId);
+                } catch (Throwable ignore) { /* non-fatal */ }
 
-            java.util.List<com.example.healthflow.model.PrescriptionItem> fresh =
-                    new com.example.healthflow.dao.PrescriptionItemDAO().listByPrescription(conn, currentPrescriptionId);
+                java.util.List<com.example.healthflow.model.PrescriptionItem> fresh =
+                        new com.example.healthflow.dao.PrescriptionItemDAO().listByPrescription(conn, currentPrescriptionId);
 
-            // Map to UI rows
-            java.util.List<PrescItemRow> mapped = new java.util.ArrayList<>();
-            for (var it : fresh) {
-                mapped.add(toRow(it));
-            }
-
-            javafx.application.Platform.runLater(() -> {
-                // Ensure backing list exists
-                if (prescItemsEditable == null) {
-                    prescItemsEditable = javafx.collections.FXCollections.observableArrayList();
+                // Map to UI rows
+                java.util.List<PrescItemRow> mapped = new java.util.ArrayList<>();
+                for (var it : fresh) {
+                    mapped.add(toRow(it));
                 }
 
-                // In-place update to preserve bindings/listeners
-                prescItemsEditable.setAll(mapped);
+                javafx.application.Platform.runLater(() -> {
+                    // Ensure backing list exists
+                    if (prescItemsEditable == null) {
+                        prescItemsEditable = javafx.collections.FXCollections.observableArrayList();
+                    }
 
-                // Keep the table bound to the canonical backing list
-                if (TablePrescriptionItems != null && TablePrescriptionItems.getItems() != prescItemsEditable) {
-                    TablePrescriptionItems.setItems(prescItemsEditable);
-                }
+                    // In-place update to preserve bindings/listeners
+                    prescItemsEditable.setAll(mapped);
 
-                if (TablePrescriptionItems != null) {
-                    // Try restore selection by id first, then by previous index
-                    boolean restored = false;
-                    if (selId != null) {
-                        for (int i = 0; i < prescItemsEditable.size(); i++) {
-                            if (prescItemsEditable.get(i) != null && prescItemsEditable.get(i).getId() == selId) {
-                                TablePrescriptionItems.getSelectionModel().select(i);
-                                TablePrescriptionItems.scrollTo(i);
-                                restored = true;
-                                break;
+                    // Keep the table bound to the canonical backing list
+                    if (TablePrescriptionItems != null && TablePrescriptionItems.getItems() != prescItemsEditable) {
+                        TablePrescriptionItems.setItems(prescItemsEditable);
+                    }
+
+                    if (TablePrescriptionItems != null) {
+                        // Try restore selection by id first, then by previous index
+                        boolean restored = false;
+                        if (selId != null) {
+                            for (int i = 0; i < prescItemsEditable.size(); i++) {
+                                if (prescItemsEditable.get(i) != null && prescItemsEditable.get(i).getId() == selId) {
+                                    TablePrescriptionItems.getSelectionModel().select(i);
+                                    TablePrescriptionItems.scrollTo(i);
+                                    restored = true;
+                                    break;
+                                }
                             }
                         }
-                    }
-                    if (!restored && selIndex >= 0 && selIndex < prescItemsEditable.size()) {
-                        TablePrescriptionItems.getSelectionModel().select(selIndex);
-                        TablePrescriptionItems.scrollTo(selIndex);
-                    }
+                        if (!restored && selIndex >= 0 && selIndex < prescItemsEditable.size()) {
+                            TablePrescriptionItems.getSelectionModel().select(selIndex);
+                            TablePrescriptionItems.scrollTo(selIndex);
+                        }
 
-                    TablePrescriptionItems.refresh();
-                }
-            });
-        } catch (Exception ex) {
-            javafx.application.Platform.runLater(() -> toast("Failed to reload items: " + ex.getMessage(), "warn"));
-        }
-    }, "reload-presc-items").start();
-}
+                        TablePrescriptionItems.refresh();
+                    }
+                });
+            } catch (Exception ex) {
+                javafx.application.Platform.runLater(() -> toast("Failed to reload items: " + ex.getMessage(), "warn"));
+            }
+        }, "reload-presc-items").start();
+    }
 
 
     private Long ensurePatientFromHeaderIfPossible(Connection c) {
@@ -2720,69 +2884,6 @@ private void reloadPrescriptionItemsFromDb() {
         }
     }
 
-    /**
-     * Send current prescription to Pharmacy (PENDING).
-     * - saves Diagnosis (from DiagnosisTF) into prescriptions.diagnosis
-     * - moves status from DRAFT -> PENDING
-     * - validates items and does not touch appointment_id
-     */
-    @FXML
-    private void sendToPharmacy() {
-        // 1) لازم تكون فاتح وصفة
-        if (currentPrescriptionId == null) {
-            showWarn("Send to Pharmacy", "No open prescription. Create or open a draft, then try again.");
-            return;
-        }
-
-        try (java.sql.Connection c = com.example.healthflow.db.Database.get()) {
-            // 2) تأكد أن فيها عناصر
-            int itemCount = 0;
-            try (java.sql.PreparedStatement ps = c.prepareStatement(
-                    "SELECT COUNT(*) FROM prescription_items WHERE prescription_id = ?")) {
-                ps.setLong(1, currentPrescriptionId);
-                try (java.sql.ResultSet rs = ps.executeQuery()) {
-                    if (rs.next()) itemCount = rs.getInt(1);
-                }
-            }
-            if (itemCount <= 0) {
-                showWarn("Send to Pharmacy", "No medicines in this prescription. Add at least one item.");
-                return;
-            }
-
-            // 3) (اختياري) احفظ التشخيص قبل الإرسال
-            String diagnosisText = (DiagnosisTF != null && DiagnosisTF.getText() != null)
-                    ? DiagnosisTF.getText().trim() : null;
-
-            // 4) ارفع الحالة إلى PENDING بدون إعادة إنشاء/ربط موعد
-            int updated;
-            try (java.sql.PreparedStatement ps = c.prepareStatement(
-                    "UPDATE prescriptions \n" +
-                    "   SET diagnosis = ?, status = 'PENDING', updated_at = NOW()\n" +
-                    " WHERE id = ? AND status IN ('DRAFT','PENDING')")) {
-                if (diagnosisText == null || diagnosisText.isBlank()) {
-                    ps.setNull(1, java.sql.Types.VARCHAR);
-                } else {
-                    ps.setString(1, diagnosisText);
-                }
-                ps.setLong(2, currentPrescriptionId);
-                updated = ps.executeUpdate();
-            }
-
-            if (updated > 0) {
-                toast("Prescription sent to Pharmacy (status: PENDING).", "ok");
-            } else {
-                // لم يتغيّر شيء غالبًا لأنها PENDING مسبقًا
-                toast("Prescription already sent and visible to Pharmacy.", "info");
-            }
-
-            // 5) تحديثات واجهة خفيفة
-            try { reloadPrescriptionItemsFromDb(); } catch (Throwable ignore) {}
-            try { showDashboardPane(); } catch (Throwable ignore) {}
-
-        } catch (Exception ex) {
-            showError("Send to Pharmacy", ex);
-        }
-    }
 
     /**
      * Lookup medicines.id by name (case-insensitive, trimmed). Returns null if not found.
@@ -3005,55 +3106,70 @@ private void reloadPrescriptionItemsFromDb() {
         if (medicineName_combo != null) medicineName_combo.requestFocus();
     }
 
-    /**
-     * Delete selected row from the UI table and database, regardless of which list backs the table.
-     */
-    private void deleteSelectedItem() {
-        PrescItemRow sel = (TablePrescriptionItems == null)
-                ? null : TablePrescriptionItems.getSelectionModel().getSelectedItem();
-        if (sel == null) {
-            toast("Select a row to delete.", "warn");
-            return;
-        }
+    /** Returns true if any Add-Medicine field has user input (dirty form). */
+    private boolean isAddMedicineFormDirty() {
+        if (doseText != null && !doseText.getText().trim().isEmpty()) return true;
+        if (duration != null && !duration.getText().trim().isEmpty()) return true;
+        if (freq_day != null && !freq_day.getText().trim().isEmpty()) return true;
+        if (nots_Pre != null && !nots_Pre.getText().trim().isEmpty()) return true;
 
-        // 1) Remove from the table's backing list (fallback to prescItemsEditable if needed)
-        boolean removed = false;
-        try {
-            if (TablePrescriptionItems != null && TablePrescriptionItems.getItems() != null) {
-                removed = TablePrescriptionItems.getItems().remove(sel);
-            }
-            if (!removed && prescItemsEditable != null) {
-                removed = prescItemsEditable.remove(sel);
-            }
-        } catch (Throwable ignore) { /* keep going */ }
-
-        if (!removed) {
-            // If not removed from a local list, still continue with DB delete (source of truth)
-            toast("Removing from table failed; proceeding to delete from database...", "warn");
+        if (medicineName_combo != null) {
+            var v = (medicineName_combo.getEditor() != null) ? medicineName_combo.getEditor().getText() : null;
+            if (v != null && !v.trim().isEmpty()) return true;
+            if (medicineName_combo.getValue() != null && !medicineName_combo.getValue().trim().isEmpty()) return true;
         }
-
-        // 2) Delete from DB if the row exists there
-        final long idToDelete = sel.getId();
-        if (idToDelete > 0) {
-            new Thread(() -> {
-                try (Connection c = Database.get()) {
-                    c.setAutoCommit(true);
-                    new com.example.healthflow.dao.PrescriptionItemDAO().deleteById(c, idToDelete);
-                    Platform.runLater(() -> {
-                        toast("Row deleted from database.", "ok");
-                        // Reload authoritative data from DB to keep UI consistent
-                        reloadPrescriptionItemsFromDb();
-                    });
-                } catch (Exception ex) {
-                    Platform.runLater(() -> toast("DB delete failed: " + ex.getMessage(), "err"));
-                }
-            }, "delete-presc-item").start();
-        } else {
-            // Local-only row; just refresh UI
-            if (TablePrescriptionItems != null) TablePrescriptionItems.refresh();
-            toast("Row removed.", "ok");
+        if (strength_combo != null) {
+            var v = (strength_combo.getEditor() != null) ? strength_combo.getEditor().getText() : null;
+            if (v != null && !v.trim().isEmpty()) return true;
+            if (strength_combo.getValue() != null && !strength_combo.getValue().trim().isEmpty()) return true;
         }
+        if (formCombo != null) {
+            var v = (formCombo.getEditor() != null) ? formCombo.getEditor().getText() : null;
+            if (v != null && !v.trim().isEmpty()) return true;
+            if (formCombo.getValue() != null && !formCombo.getValue().trim().isEmpty()) return true;
+        }
+        if (routeCombo != null) {
+            var v = (routeCombo.getEditor() != null) ? routeCombo.getEditor().getText() : null;
+            if (v != null && !v.trim().isEmpty()) return true;
+            if (routeCombo.getValue() != null && !routeCombo.getValue().trim().isEmpty()) return true;
+        }
+        return false;
     }
+
+    /** Clears all Add-Medicine fields. */
+    private void clearAddMedicineForm() {
+        if (doseText != null) doseText.clear();
+        if (duration != null) duration.clear();
+        if (freq_day != null) freq_day.clear();
+        if (nots_Pre != null) nots_Pre.clear();
+
+        if (medicineName_combo != null) { medicineName_combo.setValue(null); if (medicineName_combo.getEditor()!=null) medicineName_combo.getEditor().clear(); }
+        if (strength_combo != null)  { strength_combo.setValue(null); if (strength_combo.getEditor()!=null) strength_combo.getEditor().clear(); }
+        if (formCombo != null)       { formCombo.setValue(null);       if (formCombo.getEditor()!=null)       formCombo.getEditor().clear(); }
+        if (routeCombo != null)      { routeCombo.setValue(null);      if (routeCombo.getEditor()!=null)      routeCombo.getEditor().clear(); }
+    }
+
+    /** Guard when leaving the Add-Medicine form. */
+    private boolean guardLeaveAddMedicineForm() {
+        if (AddMedicationAnchorPane == null || !AddMedicationAnchorPane.isVisible()) return true;
+        if (!isAddMedicineFormDirty()) return true;
+
+        Alert a = new Alert(Alert.AlertType.CONFIRMATION);
+        a.setTitle("Unsaved Entry");
+        a.setHeaderText("You have unsaved medicine details.");
+        a.setContentText("You’ve entered some medicine details.\nIf Leaving now will discard your input.\nAre you sure you want to leave?");
+        ButtonType leaveBtn = new ButtonType("Leave", ButtonBar.ButtonData.OK_DONE);
+        ButtonType stayBtn  = new ButtonType("Stay",  ButtonBar.ButtonData.CANCEL_CLOSE);
+        a.getButtonTypes().setAll(leaveBtn, stayBtn);
+
+        var res = a.showAndWait();
+        if (res.isEmpty() || res.get() == stayBtn) return false; // stay on form
+
+        // User chose to leave -> clear (we didn't persist yet)
+        clearAddMedicineForm();
+        return true;
+    }
+
 
     /**
      * Clear Add-Medicine form fields.
@@ -3241,6 +3357,64 @@ private void reloadPrescriptionItemsFromDb() {
         st.play();
     }
 
+    /** Login-like busy state for any Button: spinner on the left + text swap. */
+    private void startBtnBusy(javafx.scene.control.Button b, String busyText) {
+        if (b == null) return;
+        try {
+            // Keep original text to restore later
+            if (!b.getProperties().containsKey("orig-text")) {
+                b.getProperties().put("orig-text", b.getText());
+            }
+            b.setMouseTransparent(true);
+            b.setDisable(true);
+
+            javafx.scene.control.ProgressIndicator pi = new javafx.scene.control.ProgressIndicator();
+            pi.setPrefSize(16, 16);
+            pi.setMaxSize(16, 16);
+            pi.setProgress(javafx.scene.control.ProgressIndicator.INDETERMINATE_PROGRESS);
+
+            b.setContentDisplay(javafx.scene.control.ContentDisplay.LEFT);
+            b.setGraphic(pi);
+
+            if (busyText != null && !busyText.isBlank()) {
+                b.setText(busyText);
+            }
+        } catch (Throwable ignored) {}
+    }
+
+    private void stopBtnBusy(javafx.scene.control.Button b) {
+        if (b == null) return;
+        try {
+            Object prev = b.getProperties().get("orig-text");
+            if (prev instanceof String) b.setText((String) prev);
+            b.getProperties().remove("orig-text");
+            b.setGraphic(null);
+            b.setMouseTransparent(false);
+            b.setDisable(false);
+        } catch (Throwable ignored) {}
+    }
+
+    /** Reusable mini-loading for buttons (like Login spinner). */
+    private void startBtnLoading(javafx.scene.control.Button b) {
+        if (b == null) return;
+        try {
+            b.setDisable(true);
+            javafx.scene.control.ProgressIndicator pi = new javafx.scene.control.ProgressIndicator();
+            pi.setPrefSize(16, 16);
+            pi.setMaxSize(16, 16);
+            pi.setProgress(javafx.scene.control.ProgressIndicator.INDETERMINATE_PROGRESS);
+            b.setGraphic(pi);
+        } catch (Throwable ignored) {}
+    }
+
+    private void stopBtnLoading(javafx.scene.control.Button b) {
+        if (b == null) return;
+        try {
+            b.setGraphic(null);
+            b.setDisable(false);
+        } catch (Throwable ignored) {}
+    }
+
     private String getSelectedMedicineName() {
         String v = (medicineName_combo == null) ? null : medicineName_combo.getValue();
         return (v == null) ? "" : v.trim();
@@ -3255,6 +3429,8 @@ private void reloadPrescriptionItemsFromDb() {
     }
 
     /* ================= Actions ================= */
+
+
 
     private void showPatientDetails(AppointmentRow row) {
         showInfo("Patient details",

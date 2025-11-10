@@ -905,82 +905,6 @@ public class PharmacyController {
         return InventoryAnchorPane != null && InventoryAnchorPane.isVisible();
     }
 
-//    /**
-//     * Returns a timestamp fingerprint (max of created/updated_at) for prescriptions of the selected date.
-//     * Any change will advance the fingerprint and trigger a UI reload.
-//     */
-//    private java.time.Instant fetchDashboardFingerprint(java.time.LocalDate day) {
-//        try (java.sql.Connection c = com.example.healthflow.db.Database.get();
-//             java.sql.PreparedStatement ps = c.prepareStatement(
-//                     "SELECT MAX(COALESCE(p.dispensed_at, p.approved_at, p.decision_at, p.created_at))\n" +
-//                             "FROM prescriptions p\n" +
-//                             "WHERE (p.created_at::date = ? OR p.decision_at::date = ? OR p.approved_at::date = ? OR p.dispensed_at::date = ?)")) {
-//            ps.setDate(1, java.sql.Date.valueOf(day));
-//            ps.setDate(2, java.sql.Date.valueOf(day));
-//            ps.setDate(3, java.sql.Date.valueOf(day));
-//            ps.setDate(4, java.sql.Date.valueOf(day));
-//            try (java.sql.ResultSet rs = ps.executeQuery()) {
-//                if (rs.next()) {
-//                    java.sql.Timestamp ts = rs.getTimestamp(1);
-//                    return ts == null ? null : ts.toInstant();
-//                }
-//            }
-//        } catch (Exception e) {
-//            System.err.println("[PharmacyController] fetchDashboardFingerprint: " + e);
-//        }
-//        return null;
-//    }
-    /** Fingerprint لعناصر الوصفة المفتوحة: أكبر (approved_at/dispensed_at/decision_at/created_at/items.count/qty_dispensed) */
-//    private java.time.Instant fetchCurrentPrescriptionFingerprint() {
-//        if (selectedRow == null || selectedRow.prescriptionId <= 0) return null;
-//        long pid = selectedRow.prescriptionId;
-//        try (java.sql.Connection c = com.example.healthflow.db.Database.get();
-//             java.sql.PreparedStatement ps = c.prepareStatement(
-//                     // أي تعديل على حالة الوصفة أو على عناصرها سيغيّر هذه البصمة
-//                     "SELECT MAX(v) FROM ( " +
-//                             "  SELECT COALESCE(p.dispensed_at, p.approved_at, p.decision_at, p.created_at) AS v " +
-//                             "  FROM prescriptions p WHERE p.id = ? " +
-//                             "  UNION ALL " +
-//                             "  SELECT NOW() - make_interval(secs => (SELECT COUNT(*) FROM prescription_items i WHERE i.prescription_id = ?)) " +
-//                             "  UNION ALL " +
-//                             "  SELECT NOW() - make_interval(secs => (SELECT COALESCE(SUM(i.qty_dispensed),0) FROM prescription_items i WHERE i.prescription_id = ?)) " +
-//                             ") t"
-//             )) {
-//            ps.setLong(1, pid);
-//            ps.setLong(2, pid);
-//            ps.setLong(3, pid);
-//            try (java.sql.ResultSet rs = ps.executeQuery()) {
-//                if (rs.next()) {
-//                    java.sql.Timestamp ts = rs.getTimestamp(1);
-//                    return ts == null ? null : ts.toInstant();
-//                }
-//            }
-//        } catch (Exception e) {
-//            System.err.println("[PharmacyController] fetchCurrentPrescriptionFingerprint: " + e);
-//        }
-//        return null;
-//    }
-//
-//    /** Fingerprint لواجهة الجرد: أي تغيير في inventory_transactions أو تحديث available_quantity للأدوية */
-//    private java.time.Instant fetchInventoryFingerprint() {
-//        try (java.sql.Connection c = com.example.healthflow.db.Database.get();
-//             java.sql.PreparedStatement ps = c.prepareStatement(
-//                     "SELECT GREATEST( " +
-//                             "  COALESCE((SELECT MAX(created_at) FROM inventory_transactions), 'epoch'), " +
-//                             "  COALESCE((SELECT MAX(updated_at) FROM medicines), 'epoch') " +
-//                             ")"
-//             )) {
-//            try (java.sql.ResultSet rs = ps.executeQuery()) {
-//                if (rs.next()) {
-//                    java.sql.Timestamp ts = rs.getTimestamp(1);
-//                    return ts == null ? null : ts.toInstant();
-//                }
-//            }
-//        } catch (Exception e) {
-//            System.err.println("[PharmacyController] fetchInventoryFingerprint: " + e);
-//        }
-//        return null;
-//    }
     /** يعيد تحميل عناصر الوصفة المفتوحة (إن وُجدت). */
     private void reloadCurrentPrescriptionItems() {
         if (selectedRow != null && selectedRow.prescriptionId > 0) {
@@ -1381,7 +1305,6 @@ public class PharmacyController {
             colActionPhDashbord.setCellFactory(col -> new javafx.scene.control.TableCell<>() {
                 private final Button btn = new Button("View");
                 {
-//                    btn.getStyleClass().add("btn-primary");
                     btn.getStyleClass().addAll("btn", "btn-primary", "btn--deep", "btn--compact");
                     btn.setOnAction(e -> {
                         DashboardRow row = getTableView().getItems().get(getIndex());
@@ -1405,9 +1328,21 @@ public class PharmacyController {
         showPrescriptionsPane();
 
         // Enable/disable Finish button based on prescription status
+        // === Finish_Prescription ===
         if (Finish_Prescription != null) {
-            boolean ro = row.status != null && "DISPENSED".equalsIgnoreCase(row.status.name());
-            Finish_Prescription.setDisable(ro);
+            Finish_Prescription.setOnAction(e -> {
+                startBtnBusy(Finish_Prescription, "Finishing …");
+                javafx.animation.PauseTransition pt =
+                        new javafx.animation.PauseTransition(javafx.util.Duration.millis(140));
+                pt.setOnFinished(ev -> javafx.application.Platform.runLater(() -> {
+                    try {
+                        onFinishPrescription(); // الدالة الموجودة أصلاً لإنهاء الوصفة
+                    } finally {
+                        stopBtnBusy(Finish_Prescription);
+                    }
+                }));
+                pt.play();
+            });
         }
 
         // Patient name + NID (read-only)
@@ -2038,9 +1973,7 @@ public class PharmacyController {
         }
 
         // Back button: keep it simple for now — return to Dashboard
-        if (BackButton != null) {
-            BackButton.setOnAction(e -> showDashboardPane());
-        }
+
 
         if (missing) {
             System.out.println("[PharmacyController] Some fx:id are missing. Verify FXML ids match controller fields.");
@@ -2199,9 +2132,23 @@ public class PharmacyController {
 
 
 
+        // === saveBtnReceive ===
         if (saveBtnReceive != null) {
-            saveBtnReceive.setOnAction(e -> onSaveReceive());
+            saveBtnReceive.setOnAction(e -> {
+                startBtnBusy(saveBtnReceive, "Receiving …");
+                javafx.animation.PauseTransition pt =
+                        new javafx.animation.PauseTransition(javafx.util.Duration.millis(140));
+                pt.setOnFinished(ev -> javafx.application.Platform.runLater(() -> {
+                    try {
+                        onSaveReceive();
+                    } finally {
+                        stopBtnBusy(saveBtnReceive);
+                    }
+                }));
+                pt.play();
+            });
         }
+
         deductSupport = new DeductSupport(
                 cmboTypeOfDeduct,
                 TableToShowMedicineByBatchNumber,
@@ -2220,7 +2167,28 @@ public class PharmacyController {
         deductSupport.setOnSaveCallback(this::reloadInventoryTable);
         deductSupport.init();
 
-        applyInventoryNullPlaceholders();
+
+        // === saveBtnDeduct ===
+        if (saveBtnDeduct != null) {
+            saveBtnDeduct.setOnAction(e -> {
+                startBtnBusy(saveBtnDeduct, "Deducting …");
+                javafx.animation.PauseTransition pt =
+                        new javafx.animation.PauseTransition(javafx.util.Duration.millis(140));
+                pt.setOnFinished(ev -> javafx.application.Platform.runLater(() -> {
+                    try {
+                        applyInventoryNullPlaceholders();
+                        if (deductSupport != null) {
+                            deductSupport.triggerSave();   // <-- نفّذ الحفظ بدل إعادة الإنشاء
+                        }
+                    } finally {
+                        stopBtnBusy(saveBtnDeduct);
+                    }
+                }));
+                pt.play();
+            });
+        }
+
+
     }
     private void startPharmacyDbNotifications() {
         if (dbn != null) return; // already started
@@ -3485,28 +3453,6 @@ public class PharmacyController {
         onSaveReceive();
     }
 
-    // شغالة تمام
-//    @FXML
-//    private void onSaveReceiveBtn() {
-//        LocalDate exp = null;
-//        if (ExpiryDate != null && ExpiryDate.getValue() != null) {
-//            exp = ExpiryDate.getValue();
-//        } else if (ExpiryDate != null && ExpiryDate.getEditor() != null) {
-//            // خُذ النص المكتوب يدويًا
-//            String txt = ExpiryDate.getEditor().getText();
-//            exp = parseFlexibleDate(txt);
-//        }
-//
-//        if (exp == null) {
-//            showWarn("Receive", "Expiry date is required or invalid format (try yyyy-MM-dd).");
-//            return;
-//        }
-//
-//    }
-
-
-
-
     // --- Make inventory table rows open the details dialog with editable threshold ---
     {
         javafx.application.Platform.runLater(() -> {
@@ -3586,6 +3532,45 @@ public class PharmacyController {
         }
     }
 
+    /** Login-like busy state for any Button: spinner on the left + text swap. */
+    private void startBtnBusy(javafx.scene.control.Button b, String busyText) {
+        if (b == null) return;
+        try {
+            if (!b.getProperties().containsKey("orig-text")) {
+                b.getProperties().put("orig-text", b.getText());
+            }
+            // لا نعطّل الزر بالكامل حتى ما يخفت شكله؛ فقط امنع النقرات
+            b.setMouseTransparent(true);
 
+            javafx.scene.control.ProgressIndicator pi = new javafx.scene.control.ProgressIndicator();
+            pi.setPrefSize(16, 16);
+            pi.setMaxSize(16, 16);
+            pi.setProgress(javafx.scene.control.ProgressIndicator.INDETERMINATE_PROGRESS);
+            pi.setVisible(true);
+            pi.setManaged(true);
+
+            // لو أزرارك داكنة، خلّي المؤشر أبيض ليوضح (احذف السطر لو الخلفية فاتحة)
+            pi.setStyle("-fx-progress-color: white;");
+
+            b.setContentDisplay(javafx.scene.control.ContentDisplay.LEFT);
+            b.setGraphicTextGap(8);
+            b.setGraphic(pi);
+
+            if (busyText != null && !busyText.isBlank()) {
+                b.setText(busyText);
+            }
+        } catch (Throwable ignored) {}
+    }
+
+    private void stopBtnBusy(javafx.scene.control.Button b) {
+        if (b == null) return;
+        try {
+            Object prev = b.getProperties().get("orig-text");
+            if (prev instanceof String) b.setText((String) prev);
+            b.getProperties().remove("orig-text");
+            b.setGraphic(null);
+            b.setMouseTransparent(false);
+        } catch (Throwable ignored) {}
+    }
 
 }
