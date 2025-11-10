@@ -27,7 +27,13 @@ public final class ExcelInventoryIO {
         QUANTITY(4, "Quantity*"),
         BATCH_NO(5, "Batch Number (optional)"),
         EXPIRY(6, "Expiry Date* (YYYY-MM-DD)"),
-        DESCRIPTION(7, "Description (optional)");
+        DESCRIPTION(7, "Description (optional)"),
+        TABLETS_PER_BLISTER(8, "Tablets/Blister (optional)"),
+        BLISTERS_PER_BOX(9, "Blisters/Box (optional)"),
+        ML_PER_BOTTLE(10, "mL/Bottle (optional)"),
+        GRAMS_PER_TUBE(11, "g/Tube (optional)"),
+        SPLIT_ALLOWED(12, "Split Allowed (true/false)"),
+        REORDER_THRESHOLD(13, "Reorder Threshold (optional)");
 
         public final int idx;
         public final String header;
@@ -44,12 +50,20 @@ public final class ExcelInventoryIO {
         private final String batchNo;
         private final LocalDate expiry;       // نحتفظ به كما هو
         private final String description;
+        private final Integer tabletsPerBlister;
+        private final Integer blistersPerBox;
+        private final Integer mlPerBottle;
+        private final Integer gramsPerTube;
+        private final Boolean splitAllowed;
+        private final Integer reorderThreshold;
 
         // يُملأ لاحقاً أثناء الـ commit لو قدرنا نحلّه
         private Long medicineId;              // اختياري
 
         public ReceiveRow(String medicineName, String strength, String form, String baseUnit,
-                          Integer quantity, String batchNo, LocalDate expiry, String description) {
+                          Integer quantity, String batchNo, LocalDate expiry, String description,
+                          Integer tabletsPerBlister, Integer blistersPerBox, Integer mlPerBottle,
+                          Integer gramsPerTube, Boolean splitAllowed, Integer reorderThreshold) {
             this.medicineName = medicineName;
             this.strength = strength;
             this.form = form;
@@ -58,6 +72,12 @@ public final class ExcelInventoryIO {
             this.batchNo = batchNo;
             this.expiry = expiry;
             this.description = description;
+            this.tabletsPerBlister = tabletsPerBlister;
+            this.blistersPerBox = blistersPerBox;
+            this.mlPerBottle = mlPerBottle;
+            this.gramsPerTube = gramsPerTube;
+            this.splitAllowed = splitAllowed;
+            this.reorderThreshold = reorderThreshold;
         }
 
         public String getMedicineName()   { return medicineName; }
@@ -73,6 +93,13 @@ public final class ExcelInventoryIO {
         public Long  getMedicineId()      { return medicineId; }
         public void  setMedicineId(Long v){ this.medicineId = v; }
 
+        public Integer getTabletsPerBlister() { return tabletsPerBlister; }
+        public Integer getBlistersPerBox()    { return blistersPerBox; }
+        public Integer getMlPerBottle()       { return mlPerBottle; }
+        public Integer getGramsPerTube()      { return gramsPerTube; }
+        public Boolean getSplitAllowed()      { return splitAllowed; }
+        public Integer getReorderThreshold()  { return reorderThreshold; }
+
         @Override
         public String toString() {
             return "ReceiveRow{" +
@@ -87,6 +114,9 @@ public final class ExcelInventoryIO {
                     ", medicineId=" + medicineId +
                     '}';
         }
+
+
+
     }
 
 
@@ -127,6 +157,12 @@ public final class ExcelInventoryIO {
             ex.createCell(Col.BATCH_NO.idx).setCellValue("AUTO-20250101-1");
             ex.createCell(Col.EXPIRY.idx).setCellValue("2026-12-31");
             ex.createCell(Col.DESCRIPTION.idx).setCellValue("donation");
+            ex.createCell(Col.TABLETS_PER_BLISTER.idx).setCellValue(10);
+            ex.createCell(Col.BLISTERS_PER_BOX.idx).setCellValue(2);
+            ex.createCell(Col.ML_PER_BOTTLE.idx).setCellValue(0);
+            ex.createCell(Col.GRAMS_PER_TUBE.idx).setCellValue(0);
+            ex.createCell(Col.SPLIT_ALLOWED.idx).setCellValue(true);
+            ex.createCell(Col.REORDER_THRESHOLD.idx).setCellValue(20);
 
             try (OutputStream os = Files.newOutputStream(out)) {
                 wb.write(os);
@@ -159,6 +195,12 @@ public final class ExcelInventoryIO {
                 String base     = getString(row, Col.BASE_UNIT.idx);
                 Integer qty     = getInteger(row, Col.QUANTITY.idx);
                 String batch    = getString(row, Col.BATCH_NO.idx);
+                Integer tpb  = getInteger(row, Col.TABLETS_PER_BLISTER.idx);
+                Integer bpb  = getInteger(row, Col.BLISTERS_PER_BOX.idx);
+                Integer mlb  = getInteger(row, Col.ML_PER_BOTTLE.idx);
+                Integer gpt  = getInteger(row, Col.GRAMS_PER_TUBE.idx);
+                Boolean split= getBoolean(row, Col.SPLIT_ALLOWED.idx);
+                Integer thr  = getInteger(row, Col.REORDER_THRESHOLD.idx);
 
                 // ✅ معالجة التاريخ بمرونة عالية
                 LocalDate expiry = null;
@@ -182,7 +224,8 @@ public final class ExcelInventoryIO {
 
                 // تخطي الصفوف الفارغة كليّاً
                 boolean allBlank = (isBlank(medicine) && qty == null && isBlank(batch) && expiry == null
-                        && isBlank(strength) && isBlank(form) && isBlank(base) && isBlank(desc));
+                        && isBlank(strength) && isBlank(form) && isBlank(base) && isBlank(desc)
+                        && tpb == null && bpb == null && mlb == null && gpt == null && split == null && thr == null);
                 if (allBlank) continue;
 
                 // تحقق من الحقول المطلوبة
@@ -196,8 +239,8 @@ public final class ExcelInventoryIO {
                     continue;
                 }
 
-                rows.add(new ReceiveRow(medicine, strength, form, base, qty, batch, expiry, desc));
-            }
+                rows.add(new ReceiveRow(medicine, strength, form, base, qty, batch, expiry, desc,
+                        tpb, bpb, mlb, gpt, split, thr));            }
         }
 
         return new Result(rows, errors);
@@ -236,6 +279,21 @@ public final class ExcelInventoryIO {
         if (c.getCellType() == CellType.NUMERIC) return (int)Math.round(c.getNumericCellValue());
         if (c.getCellType() == CellType.STRING) {
             try { return Integer.parseInt(c.getStringCellValue().trim()); } catch (Exception ignore) {}
+        }
+        return null;
+    }
+
+    private static Boolean getBoolean(Row r, int idx){
+        Cell c = r.getCell(idx); if (c == null) return null;
+        if (c.getCellType() == CellType.BOOLEAN) return c.getBooleanCellValue();
+        if (c.getCellType() == CellType.STRING) {
+            String s = c.getStringCellValue().trim().toLowerCase(Locale.ROOT);
+            if (s.isEmpty()) return null;
+            if (s.equals("true") || s.equals("yes") || s.equals("1")) return true;
+            if (s.equals("false") || s.equals("no") || s.equals("0")) return false;
+        }
+        if (c.getCellType() == CellType.NUMERIC) {
+            return Math.round(c.getNumericCellValue()) != 0;
         }
         return null;
     }
@@ -305,34 +363,6 @@ public final class ExcelInventoryIO {
         }
         return null;
     }
-
-//    private static java.time.LocalDate readExpiry(org.apache.poi.ss.usermodel.Cell c) {
-//        if (c == null) return null;
-//        switch (c.getCellType()) {
-//            case NUMERIC:
-//                if (org.apache.poi.ss.usermodel.DateUtil.isCellDateFormatted(c)) {
-//                    return c.getLocalDateTimeCellValue().toLocalDate();
-//                } else {
-//                    // أحيانًا يكون التاريخ رقم Serial من إكسل بدون formatting
-//                    double dv = c.getNumericCellValue();
-//                    java.util.Date d = org.apache.poi.ss.usermodel.DateUtil.getJavaDate(dv);
-//                    return d.toInstant().atZone(java.time.ZoneId.systemDefault()).toLocalDate();
-//                }
-//            case STRING:
-//                String s = c.getStringCellValue();
-//                if (s != null) {
-//                    s = s.trim();
-//                    if (!s.isEmpty()) {
-//                        for (var fmt : DATE_PATTERNS) {
-//                            try { return java.time.LocalDate.parse(s, fmt); } catch (Exception ignore) {}
-//                        }
-//                    }
-//                }
-//                return null;
-//            default:
-//                return null;
-//        }
-//    }
 
     private static LocalDate readExpiry(Cell cell) {
         if (cell == null) return null;

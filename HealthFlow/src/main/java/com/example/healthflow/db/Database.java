@@ -81,6 +81,7 @@ public final class Database {
 
             // 2) بناء الـpool بإعدادات محافظة وثابتة
             HikariConfig cfg = new HikariConfig();
+
             cfg.setJdbcUrl(url);
             cfg.setUsername(user);
             cfg.setPassword(pass);

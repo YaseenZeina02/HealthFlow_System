@@ -3,20 +3,77 @@ package com.example.healthflow.core.packaging;
 public final class PackagingSupport {
 
     /** معلومات التغليف القادمة من جدول medicines */
-    public static final class PackagingInfo {
-        public final String  baseUnit;           // TABLET/CAPSULE/SYRUP/...
-        public final Integer tabletsPerBlister;  // قد تكون NULL
-        public final Integer blistersPerBox;     // قد تكون NULL
-        public final Integer mlPerBottle;        // قد تكون NULL
-        public final Integer gramsPerTube;       // قد تكون NULL
-        public final Boolean splitAllowed;       // NULL => true للوحدات الصلبة
-        public PackagingInfo(String baseUnit, Integer tpb, Integer bpb, Integer ml, Integer g, Boolean split) {
+//    public static final class PackagingInfo {
+//        public String  baseUnit;           // TABLET/CAPSULE/SYRUP/...
+//        public Integer tabletsPerBlister;  // قد تكون NULL
+//        public Integer blistersPerBox;     // قد تكون NULL
+//        public Integer mlPerBottle;        // قد تكون NULL
+//        public Integer gramsPerTube;       // قد تكون NULL
+//        public Boolean splitAllowed;       // NULL => true للوحدات الصلبة
+//        public Integer reorderThreshold;   // الحد الأدنى لإعادة الطلب
+//        public PackagingInfo(String baseUnit,
+//                             Integer tabletsPerBlister,
+//                             Integer blistersPerBox,
+//                             Integer mlPerBottle,
+//                             Integer gramsPerTube,
+//                             Boolean splitAllowed,
+//                             Integer reorderThreshold) {
+//            this.baseUnit = baseUnit;
+//            this.tabletsPerBlister = tabletsPerBlister;
+//            this.blistersPerBox = blistersPerBox;
+//            this.mlPerBottle = mlPerBottle;
+//            this.gramsPerTube = gramsPerTube;
+//            this.splitAllowed = splitAllowed;
+//            this.reorderThreshold = reorderThreshold;
+//        }
+//
+//        // Backward compatible (calls that still pass 6 args)
+//        public PackagingInfo(String baseUnit,
+//                             Integer tabletsPerBlister,
+//                             Integer blistersPerBox,
+//                             Integer mlPerBottle,
+//                             Integer gramsPerTube,
+//                             Boolean splitAllowed) {
+//            this(baseUnit, tabletsPerBlister, blistersPerBox, mlPerBottle, gramsPerTube, splitAllowed, null);
+//        }
+//    }
+    public static class PackagingInfo {
+        public String  baseUnit;             // TABLET/CAPSULE/SYRUP/... إلخ
+        public Integer tabletsPerBlister;
+        public Integer blistersPerBox;
+        public Integer mlPerBottle;
+        public Integer gramsPerTube;
+        public Boolean splitAllowed;
+        public Integer reorderThreshold;     // <— الحقل الجديد
+
+        // 0-arg: نحتاجه عندما ننشئ الكائن ثم نملأ الحقول يدويًا من الـDialog
+        public PackagingInfo() { }
+
+        // 6-arg: توافقًا مع الاستدعاءات القديمة (قبل إضافة reorderThreshold)
+        public PackagingInfo(String baseUnit,
+                             Integer tabletsPerBlister,
+                             Integer blistersPerBox,
+                             Integer mlPerBottle,
+                             Integer gramsPerTube,
+                             Boolean splitAllowed) {
+            this(baseUnit, tabletsPerBlister, blistersPerBox, mlPerBottle, gramsPerTube, splitAllowed, null);
+        }
+
+        // 7-arg: التوقيع الكامل بعد إضافة reorderThreshold
+        public PackagingInfo(String baseUnit,
+                             Integer tabletsPerBlister,
+                             Integer blistersPerBox,
+                             Integer mlPerBottle,
+                             Integer gramsPerTube,
+                             Boolean splitAllowed,
+                             Integer reorderThreshold) {
             this.baseUnit = baseUnit;
-            this.tabletsPerBlister = tpb;
-            this.blistersPerBox = bpb;
-            this.mlPerBottle = ml;
-            this.gramsPerTube = g;
-            this.splitAllowed = split;
+            this.tabletsPerBlister = tabletsPerBlister;
+            this.blistersPerBox = blistersPerBox;
+            this.mlPerBottle = mlPerBottle;
+            this.gramsPerTube = gramsPerTube;
+            this.splitAllowed = splitAllowed;
+            this.reorderThreshold = reorderThreshold;
         }
     }
 

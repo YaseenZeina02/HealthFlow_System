@@ -227,6 +227,9 @@ public class PharmacyController {
     @FXML
     private ToggleButton btnReceive;
 
+    @FXML private Button btnMoreDetails;
+    @FXML Label MedicineDetails;
+
     @FXML
     private TableColumn<DashboardRow, Void> colActionPhDashbord;
 
@@ -376,7 +379,6 @@ public class PharmacyController {
     private volatile java.time.Instant lastPrescItemsFp = null;   // fingerprint لعناصر الوصفة المفتوحة
     private volatile java.time.Instant lastInventoryFp  = null;   // fingerprint للمخزون
 
-
     private com.example.healthflow.db.notify.DbNotifications dbn;
     private final javafx.animation.PauseTransition dashCoalesce  = new javafx.animation.PauseTransition(javafx.util.Duration.millis(200));
     private final javafx.animation.PauseTransition itemsCoalesce = new javafx.animation.PauseTransition(javafx.util.Duration.millis(200));
@@ -396,6 +398,10 @@ public class PharmacyController {
             node.setManaged(value);
         }
     }
+
+
+
+
 
     private void markNavActive(Button active) {
         Button[] all = {DashboardButton, PrescriptionsButton, InventoryButton};
@@ -1192,21 +1198,49 @@ public class PharmacyController {
     }
 
     /** Query packaging for a given medicine id. Safe to call per-row; tiny select. */
+//    private PackagingInfo fetchPackaging(long medId) {
+//        try (java.sql.Connection c = com.example.healthflow.db.Database.get();
+//             java.sql.PreparedStatement ps = c.prepareStatement(
+//                     "SELECT base_unit::text, tablets_per_blister, blisters_per_box, ml_per_bottle, grams_per_tube, split_allowed " +
+//                             "FROM medicines WHERE id = ?")) {
+//            ps.setLong(1, medId);
+//            try (java.sql.ResultSet rs = ps.executeQuery()) {
+//                if (rs.next()) {
+//                    return new PackagingInfo(
+//                            rs.getString(1),
+//                            (Integer)rs.getObject(2),
+//                            (Integer)rs.getObject(3),
+//                            (Integer)rs.getObject(4),
+//                            (Integer)rs.getObject(5),
+//                            (Boolean)rs.getObject(6)
+//                    );
+//                }
+//            }
+//        } catch (Exception ignore) {}
+//        return null;
+//    }
     private PackagingInfo fetchPackaging(long medId) {
         try (java.sql.Connection c = com.example.healthflow.db.Database.get();
              java.sql.PreparedStatement ps = c.prepareStatement(
-                     "SELECT base_unit::text, tablets_per_blister, blisters_per_box, ml_per_bottle, grams_per_tube, split_allowed " +
+                     "SELECT base_unit::text, " +
+                             "       tablets_per_blister, " +
+                             "       blisters_per_box, " +
+                             "       ml_per_bottle, " +
+                             "       grams_per_tube, " +
+                             "       split_allowed, " +
+                             "       reorder_threshold " +          // <— العمود الجديد
                              "FROM medicines WHERE id = ?")) {
             ps.setLong(1, medId);
             try (java.sql.ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
                     return new PackagingInfo(
                             rs.getString(1),
-                            (Integer)rs.getObject(2),
-                            (Integer)rs.getObject(3),
-                            (Integer)rs.getObject(4),
-                            (Integer)rs.getObject(5),
-                            (Boolean)rs.getObject(6)
+                            (Integer) rs.getObject(2),
+                            (Integer) rs.getObject(3),
+                            (Integer) rs.getObject(4),
+                            (Integer) rs.getObject(5),
+                            (Boolean) rs.getObject(6),
+                            (Integer) rs.getObject(7)         // <— البراميتر السابع
                     );
                 }
             }
@@ -1983,6 +2017,10 @@ public class PharmacyController {
             Finish_Prescription.setOnAction(e -> onFinishPrescription());
         }
 
+        if (btnMoreDetails != null) {
+            btnMoreDetails.setOnAction(e -> onMoreMedicineDetails());
+        }
+
         // Back button: keep it simple for now — return to Dashboard
 
 
@@ -2566,6 +2604,12 @@ public class PharmacyController {
 // ادفع النص للّيبِل الخارجي
         if (MedicineLabelDt != null) {
             MedicineLabelDt.setText(details.toString());
+            MedicineLabelDt.setStyle(
+                    "-fx-background-color:#F6F8FA; -fx-padding:10; " +
+                            "-fx-border-color:#D0D7DE; -fx-border-radius:8; -fx-background-radius:8; " +
+                            "-fx-font-size:13px;"
+            );
+
         }
 
         if (descriptionTf != null) {
@@ -3108,6 +3152,11 @@ public class PharmacyController {
 
             if (labelFileDetails != null) {
                 labelFileDetails.setText("Template saved: " + out.toAbsolutePath());
+                labelFileDetails.setStyle(
+                        "-fx-background-color:#F6F8FA; -fx-padding:10; " +
+                                "-fx-border-color:#D0D7DE; -fx-border-radius:8; -fx-background-radius:8; " +
+                                "-fx-font-size:13px;"
+                );
             }
             showInfo("Template created:\n" + out.toAbsolutePath());
         } catch (Throwable ex) {
@@ -3119,9 +3168,6 @@ public class PharmacyController {
     // ===== Excel: Import (.xlsx) =====
     @FXML
     private void onImportExcelFile() {
-
-
-
         try {
             javafx.stage.FileChooser fc = new javafx.stage.FileChooser();
             fc.setTitle("Select Receive Excel (.xlsx)");
@@ -3267,13 +3313,17 @@ public class PharmacyController {
         """;
 
             final String createMedSql = """
-            INSERT INTO medicines
-              (name, strength, form, base_unit, description)
-            VALUES
-              (?, NULLIF(?,''), NULLIF(?,''), NULLIF(?, '')::med_unit, NULLIF(?, ''))
-            ON CONFLICT DO NOTHING
-            RETURNING id
-        """;
+                INSERT INTO medicines
+                  (name, strength, form, base_unit,
+                   tablets_per_blister, blisters_per_box,
+                   ml_per_bottle, grams_per_tube, split_allowed,
+                   reorder_threshold, description)
+                VALUES
+                  (?, NULLIF(?,''), NULLIF(?,''), NULLIF(?, '')::med_unit,
+                   ?, ?, ?, ?, ?, COALESCE(?, 20), NULLIF(?, ''))
+                ON CONFLICT DO NOTHING
+                RETURNING id
+            """;
 
             int ok = 0;
 
@@ -3313,11 +3363,20 @@ public class PharmacyController {
                         // أنشئ الدواء إذا ما لقيناه وكان عندنا اسم
                         if (medId == null && name != null && !name.isBlank()) {
                             psMed.clearParameters();
-                            psMed.setString(1, name);
-                            psMed.setString(2, strength);
-                            psMed.setString(3, form);
-                            psMed.setString(4, baseUnit);
-                            psMed.setString(5, desc);
+                            psMed.setString(1,  name);
+                            psMed.setString(2,  strength);
+                            psMed.setString(3,  form);
+                            psMed.setString(4,  baseUnit);
+
+                            psMed.setObject(5,  row.getTabletsPerBlister(), java.sql.Types.INTEGER);
+                            psMed.setObject(6,  row.getBlistersPerBox(),    java.sql.Types.INTEGER);
+                            psMed.setObject(7,  row.getMlPerBottle(),       java.sql.Types.INTEGER);
+                            psMed.setObject(8,  row.getGramsPerTube(),      java.sql.Types.INTEGER);
+                            if (row.getSplitAllowed() == null) psMed.setNull(9, java.sql.Types.BOOLEAN);
+                            else                               psMed.setBoolean(9, row.getSplitAllowed());
+                            psMed.setObject(10, row.getReorderThreshold(),  java.sql.Types.INTEGER);
+                            psMed.setString(11, desc);
+
                             try (ResultSet rs = psMed.executeQuery()) {
                                 if (rs.next()) medId = rs.getLong(1);
                             }
@@ -3624,6 +3683,236 @@ public class PharmacyController {
         if (BackButton != null) {
             BackButton.addEventHandler(ActionEvent.ACTION,
                     e -> setPrescriptionSidebarState(false, false));
+        }
+    }
+
+
+    /** يفتح حوار تفاصيل التغليف وحدّ إعادة الطلب لدواء محدّد ويحفظها في جدول medicines. */
+    private void onMoreMedicineDetails() {
+        final Long medId = this.selectedMedicineId;
+        if (medId == null || medId <= 0) {
+            new Alert(Alert.AlertType.INFORMATION,
+                    "Please select a medicine first from the suggestions (left list).").showAndWait();
+            return;
+        }
+
+        // 1) قراءة القيم الحالية (لدينا fetchPackaging() مُستخدمة سابقًا في صرف الأدوية)
+        PackagingSupport.PackagingInfo init = null;
+        try { init = fetchPackaging(medId); } catch (Throwable ignored) {}
+
+        // 2) بناء الحوار
+        Dialog<PackagingSupport.PackagingInfo> dlg = new Dialog<>();
+        dlg.setTitle("Medicine details");
+        dlg.setHeaderText("Packaging & stock configuration");
+
+        ButtonType saveType = new ButtonType("Save", ButtonBar.ButtonData.OK_DONE);
+        dlg.getDialogPane().getButtonTypes().addAll(ButtonType.CANCEL, saveType);
+
+        // عناصر الإدخال
+        ChoiceBox<String> baseUnit = new ChoiceBox<>();
+        baseUnit.getItems().setAll("TABLET","CAPSULE","SYRUP","SUSPENSION","INJECTION","CREAM","OINTMENT","DROPS","SPRAY");
+
+        TextField tabletsPerBlister = new TextField();
+        TextField blistersPerBox    = new TextField();
+        TextField mlPerBottle       = new TextField();
+        TextField gramsPerTube      = new TextField();
+        CheckBox  splitAllowed      = new CheckBox("Allow splitting (units)");
+        TextField reorderThreshold  = new TextField();
+
+        // تعبئة مبدئية
+        if (init != null) {
+            if (init.baseUnit != null) baseUnit.getSelectionModel().select(init.baseUnit);
+            if (init.tabletsPerBlister != null) tabletsPerBlister.setText(String.valueOf(init.tabletsPerBlister));
+            if (init.blistersPerBox    != null) blistersPerBox.setText(String.valueOf(init.blistersPerBox));
+            if (init.mlPerBottle       != null) mlPerBottle.setText(String.valueOf(init.mlPerBottle));
+            if (init.gramsPerTube      != null) gramsPerTube.setText(String.valueOf(init.gramsPerTube));
+            if (init.splitAllowed      != null) splitAllowed.setSelected(Boolean.TRUE.equals(init.splitAllowed));
+            if (init.reorderThreshold  != null) reorderThreshold.setText(String.valueOf(init.reorderThreshold));
+        }
+
+        GridPane gp = new GridPane();
+        gp.setHgap(10); gp.setVgap(8);
+        int r = 0;
+        gp.addRow(r++, new Label("Base unit:"), baseUnit);
+        gp.addRow(r++, new Label("Tablets per blister:"), tabletsPerBlister);
+        gp.addRow(r++, new Label("Blisters per box:"),    blistersPerBox);
+        gp.addRow(r++, new Label("mL per bottle:"),       mlPerBottle);
+        gp.addRow(r++, new Label("Grams per tube:"),      gramsPerTube);
+        gp.add(splitAllowed, 1, r++);
+        gp.addRow(r++, new Label("Reorder threshold:"),   reorderThreshold);
+
+        Label hint = new Label("Only relevant fields per unit need values; others can stay empty.");
+        gp.add(hint, 0, r, 2, 1);
+        dlg.getDialogPane().setContent(gp);
+
+        // تفعيل/تعطيل الحقول حسب نوع الـbase_unit
+        Runnable toggleByUnit = () -> {
+            String u = baseUnit.getSelectionModel().getSelectedItem();
+            boolean pills   = "TABLET".equals(u) || "CAPSULE".equals(u);
+            boolean liquid  = "SYRUP".equals(u)  || "SUSPENSION".equals(u) || "DROPS".equals(u) || "SPRAY".equals(u);
+            boolean topical = "CREAM".equals(u)  || "OINTMENT".equals(u);
+            tabletsPerBlister.setDisable(!pills);
+            blistersPerBox.setDisable(!pills);
+            mlPerBottle.setDisable(!liquid);
+            gramsPerTube.setDisable(!topical);
+        };
+        baseUnit.getSelectionModel().selectedItemProperty().addListener((o,a,b)->toggleByUnit.run());
+        if (baseUnit.getSelectionModel().isEmpty()) baseUnit.getSelectionModel().selectFirst();
+        toggleByUnit.run();
+
+        // فحص الأرقام قبل الحفظ
+        final Button saveBtn = (Button) dlg.getDialogPane().lookupButton(saveType);
+        saveBtn.addEventFilter(ActionEvent.ACTION, ev -> {
+            try {
+                String tpb = tabletsPerBlister.getText().trim();
+                String bpb = blistersPerBox.getText().trim();
+                String ml  = mlPerBottle.getText().trim();
+                String gr  = gramsPerTube.getText().trim();
+                String reo = reorderThreshold.getText().trim();
+
+                if (!tpb.isEmpty() && Integer.parseInt(tpb) <= 0) throw new IllegalArgumentException("tablets/blister must be > 0");
+                if (!bpb.isEmpty() && Integer.parseInt(bpb) <= 0) throw new IllegalArgumentException("blisters/box must be > 0");
+                if (!ml.isEmpty()  && Integer.parseInt(ml)  <= 0) throw new IllegalArgumentException("mL/bottle must be > 0");
+                if (!gr.isEmpty()  && Integer.parseInt(gr)  <= 0) throw new IllegalArgumentException("g/tube must be > 0");
+                if (!reo.isEmpty() && Integer.parseInt(reo) <  0) throw new IllegalArgumentException("reorder threshold must be ≥ 0");
+            } catch (Exception ex) {
+                ev.consume();
+                new Alert(Alert.AlertType.ERROR, "Please check your numbers: " + ex.getMessage()).showAndWait();
+            }
+        });
+
+        dlg.setResultConverter(btn -> {
+            if (btn != saveType) return null;
+            PackagingSupport.PackagingInfo out = new PackagingSupport.PackagingInfo();
+            out.baseUnit          = baseUnit.getSelectionModel().getSelectedItem();
+            out.tabletsPerBlister = parseIntOrNull(tabletsPerBlister.getText());
+            out.blistersPerBox    = parseIntOrNull(blistersPerBox.getText());
+            out.mlPerBottle       = parseIntOrNull(mlPerBottle.getText());
+            out.gramsPerTube      = parseIntOrNull(gramsPerTube.getText());
+            out.splitAllowed      = splitAllowed.isSelected();
+            out.reorderThreshold  = parseIntOrNull(reorderThreshold.getText());
+
+            // إلغاء الحقول غير ذات الصلة
+            boolean pills   = "TABLET".equals(out.baseUnit) || "CAPSULE".equals(out.baseUnit);
+            boolean liquid  = "SYRUP".equals(out.baseUnit)  || "SUSPENSION".equals(out.baseUnit) || "DROPS".equals(out.baseUnit) || "SPRAY".equals(out.baseUnit);
+            boolean topical = "CREAM".equals(out.baseUnit)  || "OINTMENT".equals(out.baseUnit);
+            if (!pills)   { out.tabletsPerBlister = null; out.blistersPerBox = null; }
+            if (!liquid)  { out.mlPerBottle = null; }
+            if (!topical) { out.gramsPerTube = null; }
+            return out;
+        });
+
+        var result = dlg.showAndWait();
+        if (result.isEmpty()) return;
+
+        // 3) حفظ في الداتابيز
+//        try {
+//            savePackagingToDb(medId, result.get());
+//            new Alert(Alert.AlertType.INFORMATION, "Saved successfully.").showAndWait();
+//
+//            if (MedicineDetails != null) {
+//                MedicineDetails.setWrapText(true);
+//                MedicineDetails.setText(formatPackagingDetails(p, name, strength, form));
+//                MedicineDetails.setVisible(true);
+//                MedicineDetails.setManaged(true);
+//                // Chip-like inline style (يمكنك لاحقًا تنقله لـ CSS class)
+//                MedicineDetails.setStyle(
+//                        "-fx-background-color:#F6F8FA; -fx-padding:10; " +
+//                                "-fx-border-color:#D0D7DE; -fx-border-radius:8; -fx-background-radius:8; " +
+//                                "-fx-font-size:13px;"
+//                );
+//                }
+//            // ممكن تحديث الـInventory أو بطاقة الدواء إذا أردت…
+//            // reloadInventoryTable();
+//        } catch (Exception ex) {
+//            new Alert(Alert.AlertType.ERROR, "Failed to save: " + ex.getMessage()).showAndWait();
+//        }
+
+        // 3) حفظ في الداتابيز
+        try {
+            // احفظ القيم التي رجعت من الديالوج ثم اعرضها
+            PackagingSupport.PackagingInfo saved = result.get();
+            savePackagingToDb(medId, saved);
+            new Alert(Alert.AlertType.INFORMATION, "Saved successfully.").showAndWait();
+
+            if (MedicineDetails != null) {
+                MedicineDetails.setWrapText(true);
+                // نعرض التفاصيل مباشرة من الكائن المحفوظ؛ العناوين اختيارية ويمكن تمريرها null
+                MedicineDetails.setText(formatPackagingDetails(saved, null, null, null));
+                MedicineDetails.setVisible(true);
+                MedicineDetails.setManaged(true);
+                // Chip-like inline style (يمكنك لاحقًا نقلها إلى CSS class)
+                MedicineDetails.setStyle(
+                        "-fx-background-color:#F6F8FA; -fx-padding:10; " +
+                                "-fx-border-color:#D0D7DE; -fx-border-radius:8; -fx-background-radius:8; " +
+                                "-fx-font-size:13px;"
+                );
+            }
+            // reloadInventoryTable(); // إذا حاب تحدث الجدول
+        } catch (Exception ex) {
+            new Alert(Alert.AlertType.ERROR, "Failed to save: " + ex.getMessage()).showAndWait();
+        }
+
+    }
+
+    /** Pretty, compact text for packaging details shown in the MedicineDetails label. */
+    private String formatPackagingDetails(PackagingSupport.PackagingInfo p,
+                                          String name, String strength, String form) {
+        if (p == null) return "No saved details for this medicine.";
+        StringBuilder sb = new StringBuilder();
+
+        // Header
+        if (name != null && !name.isBlank()) sb.append(name.trim());
+        if (strength != null && !strength.isBlank()) sb.append(" ").append(strength.trim());
+        if (form != null && !form.isBlank()) sb.append(" ").append(form.trim());
+        if (sb.length() > 0) sb.append('\n');
+
+        // Body (only present fields)
+        sb.append("• Base unit: ").append(p.baseUnit == null ? "—" : p.baseUnit).append('\n');
+        if (p.tabletsPerBlister != null) sb.append("• Tablets/Blister: ").append(p.tabletsPerBlister).append('\n');
+        if (p.blistersPerBox   != null)  sb.append("• Blisters/Box: ").append(p.blistersPerBox).append('\n');
+        if (p.mlPerBottle      != null)  sb.append("• mL/Bottle: ").append(p.mlPerBottle).append('\n');
+        if (p.gramsPerTube     != null)  sb.append("• g/Tube: ").append(p.gramsPerTube).append('\n');
+        if (p.splitAllowed     != null)  sb.append("• Split allowed: ").append(Boolean.TRUE.equals(p.splitAllowed) ? "Yes" : "No").append('\n');
+        if (p.reorderThreshold != null)  sb.append("• Reorder threshold: ").append(p.reorderThreshold).append('\n');
+
+        int n = sb.length();
+        if (n > 0 && sb.charAt(n - 1) == '\n') sb.setLength(n - 1);
+        return sb.toString();
+    }
+
+    private Integer parseIntOrNull(String s) {
+        if (s == null) return null;
+        s = s.trim();
+        if (s.isEmpty()) return null;
+        return Integer.parseInt(s);
+    }
+
+    /** يحدّث أعمدة التغليف والحد الأدنى في جدول medicines. */
+    private void savePackagingToDb(long medId, PackagingSupport.PackagingInfo p) throws Exception {
+        try (Connection c = Database.get();
+             PreparedStatement ps = c.prepareStatement(
+                     "UPDATE medicines " +
+                             "SET base_unit = ?::med_unit, " +
+                             "    tablets_per_blister = ?, " +
+                             "    blisters_per_box    = ?, " +
+                             "    ml_per_bottle       = ?, " +
+                             "    grams_per_tube      = ?, " +
+                             "    split_allowed       = ?, " +
+                             "    reorder_threshold   = ?, " +
+                             "    updated_at          = NOW() " +
+                             "WHERE id = ?")) {
+            ps.setString(1, p.baseUnit);
+            if (p.tabletsPerBlister == null) ps.setNull(2, java.sql.Types.INTEGER); else ps.setInt(2, p.tabletsPerBlister);
+            if (p.blistersPerBox    == null) ps.setNull(3, java.sql.Types.INTEGER); else ps.setInt(3, p.blistersPerBox);
+            if (p.mlPerBottle       == null) ps.setNull(4, java.sql.Types.INTEGER); else ps.setInt(4, p.mlPerBottle);
+            if (p.gramsPerTube      == null) ps.setNull(5, java.sql.Types.INTEGER); else ps.setInt(5, p.gramsPerTube);
+            ps.setObject(6, (p.splitAllowed == null ? null : p.splitAllowed), java.sql.Types.BOOLEAN);
+            if (p.reorderThreshold  == null) ps.setNull(7, java.sql.Types.INTEGER); else ps.setInt(7, p.reorderThreshold);
+            ps.setLong(8, medId);
+
+            int updated = ps.executeUpdate();
+            if (updated == 0) throw new IllegalStateException("Medicine not found (id=" + medId + ")");
         }
     }
 }

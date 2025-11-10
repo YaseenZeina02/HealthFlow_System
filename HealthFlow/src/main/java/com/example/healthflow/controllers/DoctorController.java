@@ -379,18 +379,7 @@ public class DoctorController {
             // Make PatientNameTF editable with placeholder so user can type "name • NID"
             setPatientHeader("", null, true);
         });
-        if (LogOutBtn != null) {
-            LogOutBtn.setOnAction(e -> navigateWithGuard(() -> {
-                try {
-                    shutdown();
-                } catch (Exception ignored) {}
-                // Close the stage
-                if (rootPane != null) {
-                    Stage st = (Stage) rootPane.getScene().getWindow();
-                    if (st != null) st.close();
-                }
-            }));
-        }
+
 //        Add_Medication.setOnAction(e -> showPrescriptionPaneToAddMedication());
 
         Add_Medication.setOnAction(e -> {
@@ -2554,21 +2543,6 @@ public class DoctorController {
     /**
      * Try to infer patient user id from current appointments by matching national id or name.
      */
-    private Long fallbackResolvePatientIdFromAppointments(PatientRow row) {
-        if (row == null) return null;
-        // try by national id first
-        for (AppointmentRow ar : apptData) {
-            if (ar.getPatientUserId() > 0) {
-                if (row.getNationalId() != null && row.getNationalId().equals(ar.getNationalId())) {
-                    return ar.getPatientUserId();
-                }
-                if (row.getFullName() != null && row.getFullName().equalsIgnoreCase(ar.getPatientName())) {
-                    return ar.getPatientUserId();
-                }
-            }
-        }
-        return null;
-    }
 
     private PrescItemRow toRow(com.example.healthflow.model.PrescriptionItem it) {
         PrescItemRow r = new PrescItemRow();
@@ -2609,7 +2583,6 @@ public class DoctorController {
             r.setSuggestedCount(it.getSuggestedCount());
             r.setSuggestedUnitsTotal(it.getSuggestedUnitsTotal());
         } catch (Throwable ignore) {
-            // لو نسخة قديمة من الموديل لا تحتوي accessor → تجاهل بدون كسر الواجهة
         }
 
         // ---- Guard against unit/form mismatches (prevents "BOTTLE" with tablets, etc.) ----
