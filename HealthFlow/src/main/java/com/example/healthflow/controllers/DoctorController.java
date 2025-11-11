@@ -613,7 +613,7 @@ public class DoctorController {
                         FROM appointments a
                         JOIN doctors d  ON d.id = a.doctor_id
                         JOIN users   du ON du.id = d.user_id
-                        WHERE du.id = ?                -- الدكتور الحالي
+                        WHERE du.id = ?   
                         GROUP BY a.patient_id
                     )
                     SELECT

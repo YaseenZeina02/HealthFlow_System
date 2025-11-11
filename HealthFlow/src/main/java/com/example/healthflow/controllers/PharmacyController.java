@@ -210,9 +210,6 @@ public class PharmacyController {
     private Label UsernameLabel;
 
     @FXML
-    private Label alertLabel;
-
-    @FXML
     private Label MedicineLabelDt;
 
     @FXML
@@ -752,7 +749,6 @@ public class PharmacyController {
             }
         } catch (Exception ex) {
             System.err.println("[PharmacyController] refreshPharmacyDashboardCounts: " + ex);
-            if (alertLabel != null) alertLabel.setText("Failed to refresh counts: " + ex.getMessage());
         }
     }
 
@@ -772,9 +768,7 @@ public class PharmacyController {
         if (sb.length() > 0) {
             String miss = sb.substring(0, sb.length() - 2);
             System.out.println("[PharmacyController] Missing fx:id(s): " + miss);
-            if (alertLabel != null) {
-                alertLabel.setText("Missing fx:id(s): " + miss);
-            }
+
             return true;
         }
         return false;
@@ -805,8 +799,7 @@ public class PharmacyController {
         dashboardLoading = true;
         lastLoadedDate = day;
 
-        if (alertLabel != null) alertLabel.setText("Loading " + day + " ...");
-        System.out.println("[PharmacyController] loadDashboardAsync start day=" + day);
+
         if (PresciptionsTable != null) PresciptionsTable.setPlaceholder(new Label("Loading..."));
 
         // Busy UI hint
@@ -855,7 +848,6 @@ public class PharmacyController {
         task.setOnFailed(ev -> {
             Throwable ex = task.getException();
             System.err.println("[PharmacyController] loadDashboardAsync FAILED day=" + lastLoadedDate + " ex=" + ex);
-            if (alertLabel != null) alertLabel.setText("Failed to load dashboard: " + (ex == null ? "Unknown error" : ex.getMessage()));
             if (PresciptionsTable != null) PresciptionsTable.setPlaceholder(new Label("Failed to load"));
 
             // Finalize UI state
@@ -2675,18 +2667,10 @@ public class PharmacyController {
             ps.executeUpdate();
         } catch (Exception ex) {
             ex.printStackTrace();
-            if (alertLabel != null) alertLabel.setText("Failed to add medicine: " + ex.getMessage());
         }
     }
 
-    /**
-     * Try to resolve the currently logged-in user id without compile-time dependencies.
-     * Looks for common session holders via reflection:
-     *  - com.example.healthflow.auth.Session#getCurrentUserId()
-     *  - com.example.healthflow.controllers.LoginController#getLoggedInUserId()
-     *  - com.example.healthflow.core.AppSession#getUserId()
-     * Returns null if not found.
-     */
+
     private Long tryResolveCurrentUserId() {
         String[] candidates = new String[] {
                 "com.example.healthflow.auth.Session#getCurrentUserId",
