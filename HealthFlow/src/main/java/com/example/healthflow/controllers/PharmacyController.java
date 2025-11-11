@@ -373,7 +373,14 @@ public class PharmacyController {
 
     private DeductSupport deductSupport; // from the redy class
 
+    public PharmacyController(ConnectivityMonitor monitor) {
+        this.monitor = monitor;
+    }
 
+    // Default constructor for FXML loader
+    public PharmacyController() {
+        this(new ConnectivityMonitor());
+    }
 
 
     private volatile java.time.Instant lastPrescItemsFp = null;   // fingerprint لعناصر الوصفة المفتوحة
@@ -1197,28 +1204,6 @@ public class PharmacyController {
         if (PendingNumber    != null) PendingNumber.setText(String.valueOf(pending));
     }
 
-    /** Query packaging for a given medicine id. Safe to call per-row; tiny select. */
-//    private PackagingInfo fetchPackaging(long medId) {
-//        try (java.sql.Connection c = com.example.healthflow.db.Database.get();
-//             java.sql.PreparedStatement ps = c.prepareStatement(
-//                     "SELECT base_unit::text, tablets_per_blister, blisters_per_box, ml_per_bottle, grams_per_tube, split_allowed " +
-//                             "FROM medicines WHERE id = ?")) {
-//            ps.setLong(1, medId);
-//            try (java.sql.ResultSet rs = ps.executeQuery()) {
-//                if (rs.next()) {
-//                    return new PackagingInfo(
-//                            rs.getString(1),
-//                            (Integer)rs.getObject(2),
-//                            (Integer)rs.getObject(3),
-//                            (Integer)rs.getObject(4),
-//                            (Integer)rs.getObject(5),
-//                            (Boolean)rs.getObject(6)
-//                    );
-//                }
-//            }
-//        } catch (Exception ignore) {}
-//        return null;
-//    }
     private PackagingInfo fetchPackaging(long medId) {
         try (java.sql.Connection c = com.example.healthflow.db.Database.get();
              java.sql.PreparedStatement ps = c.prepareStatement(
@@ -1433,13 +1418,52 @@ public class PharmacyController {
             }
         }
 
-        // Diagnosis
+        // Diagnosis (prefer value from row; otherwise fetch from DB: diagnosis, then fallback to notes)
         if (DiagnosisView != null) {
-            DiagnosisView.setText(row.diagnosisNote == null ? "" : row.diagnosisNote);
+            String dx = (row.diagnosisNote == null || row.diagnosisNote.isBlank())
+                    ? fetchDiagnosisForPrescription(row.prescriptionId)
+                    : row.diagnosisNote;
+            DiagnosisView.setWrapText(true);
+
+            DiagnosisView.setText(dx == null ? "" : dx);
         }
 
         // Load items
         loadPrescriptionItems(row.prescriptionId);
+    }
+    /**
+     * Fetches the diagnosis text for a prescription. Tries the `diagnosis` column first;
+     * if it does not exist (older schema) or is NULL, it falls back to `notes`.
+     */
+    private String fetchDiagnosisForPrescription(long prescId) {
+        if (prescId <= 0) return null;
+        // 1) Try diagnosis column (if exists)
+        try (java.sql.Connection c = com.example.healthflow.db.Database.get();
+             java.sql.PreparedStatement ps = c.prepareStatement(
+                     "SELECT diagnosis FROM prescriptions WHERE id = ?")) {
+            ps.setLong(1, prescId);
+            try (java.sql.ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    String dx = rs.getString(1);
+                    if (dx != null && !dx.isBlank()) return dx;
+                }
+            }
+        } catch (Exception ignore) {
+            // Column may not exist on some environments; we'll fall back to notes.
+        }
+        // 2) Fallback to notes
+        try (java.sql.Connection c = com.example.healthflow.db.Database.get();
+             java.sql.PreparedStatement ps = c.prepareStatement(
+                     "SELECT notes FROM prescriptions WHERE id = ?")) {
+            ps.setLong(1, prescId);
+            try (java.sql.ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    String dx = rs.getString(1);
+                    if (dx != null && !dx.isBlank()) return dx;
+                }
+            }
+        } catch (Exception ignore) {}
+        return null;
     }
 
     private void loadPrescriptionItems(long prescId) {
@@ -1925,14 +1949,7 @@ public class PharmacyController {
         }
     }
 
-    public PharmacyController(ConnectivityMonitor monitor) {
-        this.monitor = monitor;
-    }
 
-    // Default constructor for FXML loader
-    public PharmacyController() {
-        this(new ConnectivityMonitor());
-    }
 
     private void ensureConnectivityBannerOnce() {
         if (rootPane == null) return;
@@ -2525,8 +2542,8 @@ public class PharmacyController {
         int r = 0;
         gp.addRow(r++, new Label("Name:"),     name);
         gp.addRow(r++, new Label("Strength:"), strength);
-        gp.addRow(r++, new Label("Form:"),     formCb);
         gp.addRow(r++, new Label("Base Unit:"),baseUnit);
+        gp.addRow(r++, new Label("Form:"),     formCb);
         gp.addRow(r++, new Label("Tablets/Blister:"), tabletsPerBlister);
         gp.addRow(r++, new Label("Blisters/Box:"),    blistersPerBox);
         gp.addRow(r++, new Label("mL/Bottle:"),       mlPerBottle);
@@ -3372,8 +3389,9 @@ public class PharmacyController {
                             psMed.setObject(6,  row.getBlistersPerBox(),    java.sql.Types.INTEGER);
                             psMed.setObject(7,  row.getMlPerBottle(),       java.sql.Types.INTEGER);
                             psMed.setObject(8,  row.getGramsPerTube(),      java.sql.Types.INTEGER);
-                            if (row.getSplitAllowed() == null) psMed.setNull(9, java.sql.Types.BOOLEAN);
-                            else                               psMed.setBoolean(9, row.getSplitAllowed());
+//                            if (row.getSplitAllowed() == null) psMed.setNull(9, java.sql.Types.BOOLEAN);
+//                            else                               psMed.setBoolean(9, row.getSplitAllowed());
+                            psMed.setBoolean(9, row.getSplitAllowed() != null && row.getSplitAllowed());
                             psMed.setObject(10, row.getReorderThreshold(),  java.sql.Types.INTEGER);
                             psMed.setString(11, desc);
 
@@ -3805,30 +3823,8 @@ public class PharmacyController {
         var result = dlg.showAndWait();
         if (result.isEmpty()) return;
 
-        // 3) حفظ في الداتابيز
-//        try {
-//            savePackagingToDb(medId, result.get());
-//            new Alert(Alert.AlertType.INFORMATION, "Saved successfully.").showAndWait();
-//
-//            if (MedicineDetails != null) {
-//                MedicineDetails.setWrapText(true);
-//                MedicineDetails.setText(formatPackagingDetails(p, name, strength, form));
-//                MedicineDetails.setVisible(true);
-//                MedicineDetails.setManaged(true);
-//                // Chip-like inline style (يمكنك لاحقًا تنقله لـ CSS class)
-//                MedicineDetails.setStyle(
-//                        "-fx-background-color:#F6F8FA; -fx-padding:10; " +
-//                                "-fx-border-color:#D0D7DE; -fx-border-radius:8; -fx-background-radius:8; " +
-//                                "-fx-font-size:13px;"
-//                );
-//                }
-//            // ممكن تحديث الـInventory أو بطاقة الدواء إذا أردت…
-//            // reloadInventoryTable();
-//        } catch (Exception ex) {
-//            new Alert(Alert.AlertType.ERROR, "Failed to save: " + ex.getMessage()).showAndWait();
-//        }
 
-        // 3) حفظ في الداتابيز
+
         try {
             // احفظ القيم التي رجعت من الديالوج ثم اعرضها
             PackagingSupport.PackagingInfo saved = result.get();
@@ -3916,3 +3912,4 @@ public class PharmacyController {
         }
     }
 }
+

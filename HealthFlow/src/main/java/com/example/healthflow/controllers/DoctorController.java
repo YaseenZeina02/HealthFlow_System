@@ -3268,10 +3268,7 @@ public class DoctorController {
         }
 
         if (formCombo != null) {
-            formCombo.getItems().setAll(
-                    "Tablet", "Capsule", "Syrup", "Injection", "Suspension",
-                    "Ointment", "Cream", "Drops", "Inhaler", "Powder"
-            );
+            formCombo.getItems().setAll(UNIFIED_FORMS);
         }
 
         if (routeCombo != null) {
@@ -3282,6 +3279,11 @@ public class DoctorController {
         }
         setupQtyLiveLabel();
     }
+    // Keep in sync with DB enum med_unit
+    private static final java.util.List<String> UNIFIED_FORMS = java.util.List.of(
+            "Tablet", "Capsule", "Syrup", "Suspension", "Injection",
+            "Cream", "Ointment", "Drops", "Spray"
+    );
 
     // ==== Tiny toast on alertLabel (auto-hide) ====
     private Timeline toastTimeline;
@@ -3690,10 +3692,18 @@ public class DoctorController {
     private String unitFromForm(String form) {
         if (form == null) return "units";
         String f = form.trim().toLowerCase();
+
+        // 💊 الأشكال الصلبة
         if (f.equals("tablet") || f.equals("tab") || f.equals("tablets")) return "tabs";
         if (f.equals("capsule") || f.equals("capsules") || f.equals("cap")) return "caps";
-        if (f.equals("syrup") || f.equals("suspension") || f.equals("injection") || f.equals("drops")) return "ml";
+
+        // 💧 السوائل / البخاخات / الحقن
+        if (f.equals("syrup") || f.equals("suspension") || f.equals("injection")
+                || f.equals("drops") || f.equals("spray")) return "ml";
+
+        // 🧴 الكريمات / المراهم
         if (f.equals("cream") || f.equals("ointment")) return "g";
+
         return "units";
     }
 

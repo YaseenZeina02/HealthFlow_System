@@ -1188,3 +1188,44 @@ CREATE TRIGGER trg_presc_require_items
     BEFORE INSERT OR UPDATE ON prescriptions
     FOR EACH ROW EXECUTE FUNCTION presc_require_items_on_pending();
 
+--------------------------------
+-- بتحذف الوصفات في حالة DRAFT الأقدم من 30 يوم
+
+DROP TRIGGER IF EXISTS trg_cleanup_old_drafts ON prescriptions;
+
+CREATE TRIGGER trg_cleanup_old_drafts
+    AFTER INSERT OR UPDATE ON prescriptions
+                        FOR EACH STATEMENT
+                        EXECUTE FUNCTION cleanup_old_draft_prescriptions();
+
+
+-- 1) إنشاء الدالة
+CREATE OR REPLACE FUNCTION cleanup_old_draft_prescriptions()
+RETURNS VOID LANGUAGE plpgsql AS $$
+BEGIN
+DELETE FROM prescriptions
+WHERE status = 'DRAFT'
+  AND created_at < NOW() - INTERVAL '24 hours';
+END;
+$$;
+
+-- 1) دالة الغلاف التي يستخدمها التريغر (لا تمسّ الدالة الأصلية)
+CREATE OR REPLACE FUNCTION cleanup_old_draft_prescriptions_trg()
+RETURNS trigger
+LANGUAGE plpgsql AS $$
+BEGIN
+  PERFORM cleanup_old_draft_prescriptions();  -- تستدعي دالتك RETURNS VOID
+RETURN NULL;  -- statement-level AFTER trigger
+END;
+$$;
+
+-- 2) أعِد إنشاء التريغر ليرتبط بدالة الغلاف
+DROP TRIGGER IF EXISTS trg_cleanup_old_drafts ON prescriptions;
+
+CREATE TRIGGER trg_cleanup_old_drafts
+    AFTER INSERT OR UPDATE ON prescriptions
+                        FOR EACH STATEMENT
+                        EXECUTE FUNCTION cleanup_old_draft_prescriptions_trg();
+
+
+---------------------
