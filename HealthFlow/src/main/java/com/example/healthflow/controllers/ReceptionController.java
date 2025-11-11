@@ -78,6 +78,7 @@ import javafx.scene.input.Clipboard;
 import javafx.scene.input.ClipboardContent;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
+import javafx.scene.paint.Color;
 
 import javax.swing.text.html.ImageView;
 
@@ -256,7 +257,6 @@ public class ReceptionController {
             java.time.format.DateTimeFormatter.ofPattern("EEE, MMM d, yyyy");
 
 
-    private final AtomicBoolean refreshBusy = new AtomicBoolean(false);
 
     public static final int DEFAULT_SESSION_MIN = 20;
     // --- Coalesced UI refresh + DB NOTIFY ---
@@ -461,10 +461,6 @@ public class ReceptionController {
             // no-op if not supported
         }
     }
-
-    // ========== DASHBOARD TABLE RELOAD ==========
-    // This is the method referenced in the instruction (see log message)
-
 
     /* ============ slot load ============ */
 
@@ -819,35 +815,66 @@ public class ReceptionController {
     }
 
     /* ============ Load header user ============ */
-    private void loadHeaderUser() {
-        var u = Session.get();
-        if (u == null) return;
-        String sql = "SELECT id, full_name FROM users WHERE id = ?";
-        try (Connection c = Database.get(); PreparedStatement ps = c.prepareStatement(sql)) {
-            ps.setLong(1, u.getId());
-            try (ResultSet rs = ps.executeQuery()) {
-                if (rs.next()) {
-                    long id = rs.getLong("id");
-                    String fullName = rs.getString("full_name");
-                    Platform.runLater(() -> {
-                        UsernameLabel.setText(fullName);
-                        UserIdLabel.setText(Long.toString(id));
-                        welcomeUser.setText(firstName(fullName));
-                    });
-                    return;
-                }
+private void loadHeaderUser() {
+    var u = Session.get();
+    if (u == null) return;
+
+    final String sql = "SELECT id, full_name, COALESCE(is_active, true) AS is_active FROM users WHERE id = ?";
+
+    try (Connection c = Database.get(); PreparedStatement ps = c.prepareStatement(sql)) {
+        ps.setLong(1, u.getId());
+        try (ResultSet rs = ps.executeQuery()) {
+            if (rs.next()) {
+                long id = rs.getLong("id");
+                String fullName = rs.getString("full_name");
+                boolean active = rs.getBoolean("is_active");
+
+                Platform.runLater(() -> {
+                    if (UsernameLabel != null) UsernameLabel.setText(fullName);
+                    if (UserIdLabel   != null) UserIdLabel.setText(Long.toString(id));
+                    if (welcomeUser   != null) welcomeUser.setText(firstName(fullName));
+
+                    updateStatusUI(Boolean.valueOf(active));
+
+                });
+                return;
             }
-        } catch (SQLException ignored) {}
-        Platform.runLater(() -> {
-            UsernameLabel.setText(u.getFullName());
-            UserIdLabel.setText(String.valueOf(u.getId()));
-            welcomeUser.setText(firstName(u.getFullName()));
-        });
+        }
+    } catch (SQLException e) {
+        // Print the exact DB error to understand why we fell back to "Unknown"
+        System.err.println("[ReceptionController] loadHeaderUser SQL error: " + e.getMessage());
     }
+
+    // ▼ مسار احتياطي يحافظ على السلوك القديم لو فشل الاتصال أو لم نجد السطر
+    Platform.runLater(() -> {
+        if (UsernameLabel != null) UsernameLabel.setText(u.getFullName());
+        if (UserIdLabel   != null) UserIdLabel.setText(String.valueOf(u.getId()));
+        if (welcomeUser   != null) welcomeUser.setText(firstName(u.getFullName()));
+
+        Boolean activeFlag = null;
+        try {
+            activeFlag = (u == null) ? null : Boolean.valueOf(u.isActive());
+        } catch (Throwable ignore) {}
+        updateStatusUI(activeFlag);
+
+    });
+}
 
     private String firstName(String full) {
         if (full == null || full.isBlank()) return "";
         return full.trim().split("\\s+")[0];
+    }
+
+    /** Unified status painter for the header status label (and the ActiveStatus circle if present). */
+    private void updateStatusUI(Boolean activeOpt) {
+        boolean active = (activeOpt == null) ? true : activeOpt.booleanValue();
+        if (lblStatus != null) {
+            lblStatus.setText(active ? "Active" : "Inactive");
+            lblStatus.setTextFill(active ? Color.web("#16a34a") : Color.web("#dc2626"));
+        }
+        if (ActiveStatus != null) {
+            ActiveStatus.setFill(active ? Color.web("#22c55e") : Color.web("#ef4444"));
+        }
     }
 
     /* ============ Navigation ============ */
@@ -1789,7 +1816,6 @@ public class ReceptionController {
     // Ensure FilteredList/SortedList are wired to the table items before applying predicates
     private void ensureAppointmentBindings() {
         if (TableINAppointment == null) return;
-        // initialize filteredAppt/sortedAppt if not already correct
         if (filteredAppt == null || sortedAppt == null || TableINAppointment.getItems() != sortedAppt) {
             if (filteredAppt == null) {
                 // fall back to current table items if present, else use apptEditable
@@ -2932,8 +2958,6 @@ public class ReceptionController {
         }
 
         // ختامًا: أول تحميل + فلترة (خفيفة جدًا)
-        reloadDashboardAppointments();
-        applyDashboardFilters();
     }
 
 
@@ -2946,8 +2970,6 @@ public class ReceptionController {
         if (searchAppointmentDach != null) {
             searchAppointmentDach.textProperty().addListener((obs, old, q) -> applyDashboardFilters());
         }
-        reloadDashboardAppointments();
-        applyDashboardFilters();
     }
 
     //    private void applyDashboardFilters() {
@@ -3237,37 +3259,11 @@ public class ReceptionController {
         }
     }
 
-    private java.sql.Timestamp fetchMaxPatientUpdatedAt() {
-        final String sql = "SELECT MAX(GREATEST(u.updated_at, p.updated_at)) " +
-                "FROM users u JOIN patients p ON p.user_id = u.id";
-        try (java.sql.Connection c = com.example.healthflow.db.Database.get();
-             java.sql.PreparedStatement ps = c.prepareStatement(sql);
-             java.sql.ResultSet rs = ps.executeQuery()) {
-            return rs.next() ? rs.getTimestamp(1) : null;
-        } catch (java.sql.SQLException e) {
-            return null;
-        }
-    }
-
-    public void setOnline(boolean online) {
-        lblStatus.setText(online ? "Active" : "Offline");
-        lblStatus.getStyleClass().removeAll("active", "offline");
-        lblStatus.getStyleClass().add(online ? "active" : "offline");
-    }
-
-    public void onLoginSuccess(User u) {
-        setOnline(true);
-        if (welcomeUser != null && u != null) {
-            welcomeUser.setText(u.getFullName());
-        }
-        // (اختياري) تحميل الصورة
-        // loadAvatarFromDb(u.getId());
-    }
     /* ============ Init ============ */
     @FXML
     private void initialize() {
-        setOnline(false);
         // CSS attach (safe if scene null at init)
+        lblStatus.setText("");
         if (rootPane != null) {
             var cssUrl = getClass().getResource("/com/example/healthflow/Design/ReceptionDesign.css");
             attachComboCss(rootPane);
@@ -3523,7 +3519,7 @@ public class ReceptionController {
 //
         wireAppointmentStatusFilter();  // ثبّت الافتراضي (SCHEDULED) أولًا
         wireAppointmentFilters();       // بعدين أربط باقي الفلاتر (التاريخ/البحث)
-        loadFilteredAppointments();     // أخيرًا حمّل البيانات أول مرة
+        refreshDashboardAll();          // تحميل موحّد بدل نداءات متعددة
 
         ComboAnimations.applySmoothSelect(statusFilter, s -> s);
 //        ComboAnimations.enableSlidingSelection(statusFilter, Duration.millis(260));
@@ -3539,7 +3535,6 @@ public class ReceptionController {
         if (dataPickerDashboard != null) {
             dataPickerDashboard.valueProperty().addListener((obs, oldD, newD) -> {
                 reloadDashboardAppointments(); // عشان يعرض بيانات اليوم المختار
-                applyDashboardFilters();
                 refreshAppointmentStatusChart(newD);
                 updateAppointmentCounters();
                 if (newD != null) {

@@ -31,6 +31,7 @@ import com.example.healthflow.core.packaging.PackagingSupport.PackagingInfo;
 import com.example.healthflow.core.packaging.PackagingSupport.PackSuggestion;
 import javafx.concurrent.Task; // (لو مش موجود بس)
 import javafx.scene.layout.*;
+import javafx.scene.paint.Color;
 import javafx.stage.Stage;
 import javafx.util.Duration;
 import com.example.healthflow.net.ConnectivityMonitor;
@@ -629,6 +630,8 @@ public class PharmacyController {
         } catch (Exception ex) {
             System.err.println("[PharmacyController] resolveLoggedInUserLabels: " + ex);
         }
+
+        refreshUserStatusFromDb();
     }
     // Helper to get selected date or today (Asia/Gaza)
     private LocalDate getSelectedDateOrToday() {
@@ -2249,6 +2252,64 @@ public class PharmacyController {
 
 
     }
+
+    /** Unified status painter for header (works with lblStatus and userStatus if present). */
+    private void updateStatusUI(boolean active) {
+        if (lblStatus != null) {
+            lblStatus.setText(active ? "Active" : "Inactive");
+            lblStatus.setTextFill(active ? Color.web("#16a34a") : Color.web("#dc2626"));
+        }
+        if (userStatus != null) { // في بعض FXML عندك userStatus
+            userStatus.setText(active ? "Active" : "Inactive");
+            userStatus.setTextFill(active ? Color.web("#16a34a") : Color.web("#dc2626"));
+        }
+    }
+
+    /** Read users.is_active for the logged-in user and update the header status label. */
+    private void refreshUserStatusFromDb() {
+        Long uid = null;
+        try { var u = Session.get(); if (u != null) uid = u.getId(); } catch (Throwable ignore) {}
+
+        // Fallback من اللابل لو السيشن مفقود
+        if (uid == null && UserIdLabel != null) {
+            try {
+                String t = UserIdLabel.getText();
+                if (t != null) {
+                    t = t.replaceAll("[^0-9]", "");
+                    if (!t.isBlank()) uid = Long.parseLong(t);
+                }
+            } catch (Exception ignore) {}
+        }
+
+        if (uid == null) {
+            Platform.runLater(() -> {
+                if (lblStatus != null) { lblStatus.setText("Unknown"); lblStatus.setTextFill(Color.web("#6b7280")); }
+                if (userStatus != null) { userStatus.setText("Unknown"); userStatus.setTextFill(Color.web("#6b7280")); }
+            });
+            return;
+        }
+
+        final long userId = uid;
+        Thread th = new Thread(() -> {
+            boolean active = true; // default = true لو العمود NULL
+            try (Connection c = Database.get();
+                 PreparedStatement ps = c.prepareStatement(
+                         "SELECT COALESCE(is_active, TRUE) AS is_active FROM users WHERE id = ?")) {
+                ps.setLong(1, userId);
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) active = rs.getBoolean("is_active");
+                }
+            } catch (Exception ex) {
+                System.err.println("[PharmacyController] refreshUserStatusFromDb error: " + ex.getMessage());
+            }
+            final boolean flag = active;
+            Platform.runLater(() -> updateStatusUI(flag));
+        }, "pharm-user-status");
+        th.setDaemon(true);
+        th.start();
+    }
+
+
     private void startPharmacyDbNotifications() {
         if (dbn != null) return; // already started
         System.out.println("[PharmacyController] starting DbNotifications listeners...");

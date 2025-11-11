@@ -28,7 +28,7 @@ import javafx.stage.Stage;
 import javafx.util.Duration;
 import org.mindrot.jbcrypt.BCrypt;
 import java.sql.Connection;
-
+import java.sql.SQLException;
 
 
 public class LoginController {
@@ -155,6 +155,15 @@ public class LoginController {
             AlertLabel.setText("");
             AlertLabel.setWrapText(true);
             AlertLabel.setUnderline(false);
+            // ✅ show full text without ellipsis & wrap nicely
+            AlertLabel.setTextAlignment(javafx.scene.text.TextAlignment.LEFT);
+            AlertLabel.setAlignment(javafx.geometry.Pos.TOP_LEFT);
+            AlertLabel.setTextOverrun(javafx.scene.control.OverrunStyle.CLIP);
+            AlertLabel.setMaxWidth(Double.MAX_VALUE);
+            if (rootPane != null) {
+                AlertLabel.maxWidthProperty().bind(rootPane.widthProperty().subtract(40));
+            }
+            AlertLabel.setMinHeight(javafx.scene.layout.Region.USE_PREF_SIZE);
         }
 
         // --- login spinner inside button ---
@@ -191,7 +200,14 @@ public class LoginController {
         if (key.length() > 255 || plainPassword.length() > 255) return null;
 
         User u = userDao.findByEmail(key);
-        if (u == null || !u.isActive()) return null;
+        if (u == null) return null;
+        if (!u.isActive()) {
+            // Special marker: inactive user (return user object with null password check)
+            // Option 1: return null, but we need a way to distinguish in LoginAction.
+            // Option 2: throw or wrap? We'll use: return a special user with a "inactive" flag, but for now, just return null and check isActive separately.
+            // We'll handle it in LoginAction by checking userDao.findByEmail if authenticate returned null.
+            return null;
+        }
 
         String hash = u.getPasswordHash();
 
@@ -427,7 +443,20 @@ public class LoginController {
                     pendingLogin = false;
 
                 } else {
-                    // فشل
+                    User u = null;
+                    try {
+                        u = userDao.findByEmail(normalizedEmail);
+                    } catch (Exception e) {
+                        System.err.println("User lookup failed: " + e.getMessage());
+                        setAlert("An error occurred during login.", "Please try again.");
+                        stopLoginUi();
+                        return;
+                    }
+                    if (u != null && !u.isActive()) {
+                        setAlert("Account inactive.", "Please contact the administrator to activate your account.");
+                        stopLoginUi();
+                        return;
+                    }
                     recordFailedAttempt(normalizedEmail);
                     int attempts = getAttemptsCount(normalizedEmail);
                     int remaining = Math.max(0, MAX_ATTEMPTS - attempts);
@@ -569,10 +598,13 @@ public class LoginController {
     /** تحديث تنبيه الواجهة في سطرين */
     private void setAlert(String line1, String line2) {
         if (AlertLabel == null) return;
-        if (line2 == null || line2.isBlank()) {
-            AlertLabel.setText(line1);
+        String full = (line2 == null || line2.isBlank()) ? line1 : (line1 + "\n" + line2);
+        AlertLabel.setText(full);
+        // keep a tooltip with the entire message so it’s readable even if layout is tight
+        if (AlertLabel.getTooltip() == null) {
+            AlertLabel.setTooltip(new Tooltip(full));
         } else {
-            AlertLabel.setText(line1 + "\n" + line2);
+            AlertLabel.getTooltip().setText(full);
         }
     }
 

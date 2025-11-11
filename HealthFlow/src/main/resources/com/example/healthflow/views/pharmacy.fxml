@@ -425,7 +425,7 @@
                                     </TableView>
                                     <AnchorPane layoutX="87.0" layoutY="390.0" prefHeight="87.0" prefWidth="696.0" style="-fx-border-color: #3232; -fx-border-radius: 10px;" styleClass="white-bg" AnchorPane.bottomAnchor="14.0" AnchorPane.leftAnchor="87.0" AnchorPane.rightAnchor="87.0">
                                        <children>
-                                          <Label layoutX="266.0" layoutY="14.0" prefHeight="25.0" prefWidth="140.0" styleClass="text-gradient" stylesheets="@../Design/ReceptionDesign.css" text="Some Information" AnchorPane.bottomAnchor="48.0" AnchorPane.leftAnchor="265.0" AnchorPane.rightAnchor="290.0">
+                                          <Label layoutX="382.0" layoutY="13.0" prefHeight="25.0" prefWidth="168.0" styleClass="text-gradient" stylesheets="@../Design/ReceptionDesign.css" text="Some Information" AnchorPane.bottomAnchor="49.0" AnchorPane.leftAnchor="382.0" AnchorPane.rightAnchor="387.0">
                                              <font>
                                                 <Font name="System Bold Italic" size="21.0" />
                                              </font>
@@ -435,27 +435,27 @@
                                                 <Font name="System Bold Italic" size="22.0" />
                                              </font>
                                           </Label>
-                                          <Label layoutX="266.0" layoutY="56.0" prefHeight="5.0" prefWidth="100.0" styleClass="text-gradient" stylesheets="@../Design/ReceptionDesign.css" text="Low stock:" AnchorPane.bottomAnchor="11.0" AnchorPane.rightAnchor="330.0">
+                                          <Label layoutX="341.0" layoutY="56.0" prefHeight="5.0" prefWidth="100.0" styleClass="text-gradient" stylesheets="@../Design/ReceptionDesign.css" text="Low stock:" AnchorPane.bottomAnchor="11.0" AnchorPane.rightAnchor="486.0">
                                              <font>
                                                 <Font name="System Bold Italic" size="22.0" />
                                              </font>
                                           </Label>
-                                          <Label layoutX="513.0" layoutY="54.0" prefHeight="25.0" prefWidth="111.0" styleClass="text-gradient" stylesheets="@../Design/ReceptionDesign.css" text="Expiring soon:" AnchorPane.bottomAnchor="8.0" AnchorPane.leftAnchor="513.0" AnchorPane.rightAnchor="71.0">
+                                          <Label layoutX="648.0" layoutY="54.0" prefHeight="25.0" prefWidth="123.0" styleClass="text-gradient" stylesheets="@../Design/ReceptionDesign.css" text="Expiring soon:" AnchorPane.bottomAnchor="8.0" AnchorPane.leftAnchor="648.0" AnchorPane.rightAnchor="158.0">
                                              <font>
                                                 <Font name="System Bold Italic" size="22.0" />
                                              </font>
                                           </Label>
-                                          <Label fx:id="TotalmedicinesNumber" layoutX="147.0" layoutY="53.0" prefHeight="25.0" prefWidth="47.0" styleClass="text-gradient" stylesheets="@../Design/ReceptionDesign.css" text="0" AnchorPane.bottomAnchor="10.0" AnchorPane.leftAnchor="146.0" AnchorPane.rightAnchor="503.0">
+                                          <Label fx:id="TotalmedicinesNumber" layoutX="148.0" layoutY="53.0" prefHeight="25.0" prefWidth="167.0" styleClass="text-gradient" stylesheets="@../Design/ReceptionDesign.css" text="0" AnchorPane.bottomAnchor="11.0" AnchorPane.leftAnchor="147.0" AnchorPane.rightAnchor="613.0">
                                              <font>
                                                 <Font name="System Bold Italic" size="22.0" />
                                              </font>
                                           </Label>
-                                          <Label fx:id="LowStockMedicine" layoutX="355.0" layoutY="54.0" prefHeight="25.0" prefWidth="39.0" styleClass="text-gradient" stylesheets="@../Design/ReceptionDesign.css" text="0" AnchorPane.bottomAnchor="9.0" AnchorPane.rightAnchor="302.0">
+                                          <Label fx:id="LowStockMedicine" layoutX="441.0" layoutY="53.0" prefHeight="25.0" prefWidth="39.0" styleClass="text-gradient" stylesheets="@../Design/ReceptionDesign.css" text="0" AnchorPane.bottomAnchor="9.0" AnchorPane.rightAnchor="447.0">
                                              <font>
                                                 <Font name="System Bold Italic" size="22.0" />
                                              </font>
                                           </Label>
-                                          <Label fx:id="ExpiringSoonMedicine" layoutX="629.0" layoutY="54.0" prefHeight="25.0" prefWidth="47.0" styleClass="text-gradient" stylesheets="@../Design/ReceptionDesign.css" text="0" AnchorPane.bottomAnchor="8.0" AnchorPane.leftAnchor="621.0" AnchorPane.rightAnchor="27.0">
+                                          <Label fx:id="ExpiringSoonMedicine" layoutX="774.0" layoutY="52.0" prefHeight="25.0" prefWidth="88.0" styleClass="text-gradient" stylesheets="@../Design/ReceptionDesign.css" text="0" AnchorPane.bottomAnchor="10.0" AnchorPane.leftAnchor="774.0" AnchorPane.rightAnchor="66.0">
                                              <font>
                                                 <Font name="System Bold Italic" size="22.0" />
                                              </font>

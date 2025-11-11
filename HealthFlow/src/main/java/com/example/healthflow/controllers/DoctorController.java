@@ -1,5 +1,7 @@
 package com.example.healthflow.controllers;
 
+import java.sql.ResultSet;
+import javafx.scene.paint.Color;
 import com.example.healthflow.dao.DoctorDAO;
 import com.example.healthflow.db.Database;
 import com.example.healthflow.model.*;
@@ -346,6 +348,17 @@ public class DoctorController {
         }
         if (active != null && !active.getStyleClass().contains(ACTIVE_CLASS)) {
             active.getStyleClass().add(ACTIVE_CLASS);
+        }
+    }
+
+    /** Update header status label (& circle) from a boolean flag. */
+    private void updateStatusUI(boolean active) {
+        if (lblStatus != null) {
+            lblStatus.setText(active ? "Active" : "Inactive");
+            lblStatus.setTextFill(active ? Color.web("#16a34a") : Color.web("#dc2626"));
+        }
+        if (ActiveStatus != null) {
+            ActiveStatus.setFill(active ? Color.web("#22c55e") : Color.web("#ef4444"));
         }
     }
 
@@ -904,6 +917,19 @@ public class DoctorController {
         UsernameLabel.setText(u.getFullName());
         UserIdLabel.setText(String.valueOf(u.getId()));
         welcomeUser.setText(firstName(u.getFullName()));
+        // Pull fresh is_active from DB (fallback to true if column is NULL/missing)
+        boolean activeFlag = true;
+        try (Connection c = Database.get();
+             PreparedStatement ps = c.prepareStatement(
+                     "SELECT COALESCE(is_active, TRUE) AS is_active FROM users WHERE id = ?")) {
+            ps.setLong(1, u.getId());
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) activeFlag = rs.getBoolean("is_active");
+            }
+        } catch (Exception ex) {
+            System.err.println("[DoctorController] loadUserAndEnsureDoctorProfile is_active read error: " + ex.getMessage());
+        }
+        updateStatusUI(activeFlag);
         // Cache doctor info for prescription header
         currentDoctorUserId = u.getId();
         currentDoctorFullName = u.getFullName();
