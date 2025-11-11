@@ -6,6 +6,7 @@ import com.example.healthflow.dao.DoctorDAO;
 import com.example.healthflow.model.Appointment;
 import com.example.healthflow.model.DoctorRow;
 import com.example.healthflow.model.PatientRow;
+import com.example.healthflow.model.User;
 import com.example.healthflow.net.ConnectivityMonitor;
 import com.example.healthflow.service.AuthService.Session;
 import com.example.healthflow.model.Appointment.ApptRow;
@@ -78,6 +79,7 @@ import javafx.scene.input.ClipboardContent;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
 
+import javax.swing.text.html.ImageView;
 
 
 public class ReceptionController {
@@ -215,6 +217,8 @@ public class ReceptionController {
 
     @FXML private ComboBox<String> statusFilter;
     @FXML private ComboBox<String> statusFilterDashboard; // لو معرف في FXML تجاهل هذا السطر
+    @FXML private javafx.scene.image.ImageView imgAvatar;
+    @FXML private Label lblStatus;
 
     private javafx.collections.ObservableList<com.example.healthflow.dao.DoctorDAO.AppointmentRow> dashBase =
             javafx.collections.FXCollections.observableArrayList();
@@ -3245,10 +3249,24 @@ public class ReceptionController {
         }
     }
 
+    public void setOnline(boolean online) {
+        lblStatus.setText(online ? "Active" : "Offline");
+        lblStatus.getStyleClass().removeAll("active", "offline");
+        lblStatus.getStyleClass().add(online ? "active" : "offline");
+    }
 
+    public void onLoginSuccess(User u) {
+        setOnline(true);
+        if (welcomeUser != null && u != null) {
+            welcomeUser.setText(u.getFullName());
+        }
+        // (اختياري) تحميل الصورة
+        // loadAvatarFromDb(u.getId());
+    }
     /* ============ Init ============ */
     @FXML
     private void initialize() {
+        setOnline(false);
         // CSS attach (safe if scene null at init)
         if (rootPane != null) {
             var cssUrl = getClass().getResource("/com/example/healthflow/Design/ReceptionDesign.css");

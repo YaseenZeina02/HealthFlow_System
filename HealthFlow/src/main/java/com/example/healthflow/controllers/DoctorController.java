@@ -288,7 +288,8 @@ public class DoctorController {
 
     @FXML
     private Label userStatus;
-
+    @FXML private javafx.scene.image.ImageView imgAvatar;
+    @FXML private Label lblStatus;
 
     /* ====== Services / state ====== */
     private final ConnectivityMonitor monitor;

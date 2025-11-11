@@ -370,7 +370,8 @@ public class PharmacyController {
     @FXML private Button plusToQuantity;
     @FXML private Button minusToQuantity;
     @FXML private Label sugestMedicinesItem;
-
+    @FXML private javafx.scene.image.ImageView imgAvatar;
+    @FXML private Label lblStatus;
     private DeductSupport deductSupport; // from the redy class
 
     public PharmacyController(ConnectivityMonitor monitor) {

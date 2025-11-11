@@ -839,3 +839,5 @@
     -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.3), 8, 0, 0, 2);
     -fx-padding: 4 10;
 }
+.status.active  { -fx-text-fill: #1ABC9C; }
+.status.offline { -fx-text-fill: #E74C3C; }

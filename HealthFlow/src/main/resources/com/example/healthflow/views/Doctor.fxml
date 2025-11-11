@@ -11,14 +11,15 @@
 <?import javafx.scene.control.TableView?>
 <?import javafx.scene.control.TextArea?>
 <?import javafx.scene.control.TextField?>
+<?import javafx.scene.image.ImageView?>
 <?import javafx.scene.layout.AnchorPane?>
 <?import javafx.scene.layout.BorderPane?>
-<?import javafx.scene.shape.Circle?>
+<?import javafx.scene.layout.HBox?>
 <?import javafx.scene.shape.Line?>
 <?import javafx.scene.text.Font?>
 <?import org.kordamp.ikonli.javafx.FontIcon?>
 
-<AnchorPane fx:id="rootPane" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="600.0" prefWidth="1100.0" stylesheets="@../Design/Doctrol.css" xmlns="http://javafx.com/javafx/19" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.example.healthflow.controllers.DoctorController">
+<AnchorPane fx:id="rootPane" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="600.0" prefWidth="1100.0" stylesheets="@../Design/Doctrol.css" xmlns="http://javafx.com/javafx/23.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.example.healthflow.controllers.DoctorController">
 
    <children>
       <BorderPane prefHeight="600.0" prefWidth="1100.0" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
@@ -461,9 +462,12 @@
                         <Font name="System Bold" size="13.0" />
                      </font>
                   </Label>
-                  <Label fx:id="ActiveLabel" layoutX="1014.0" layoutY="11.0" prefHeight="18.0" prefWidth="51.0" text="Active" AnchorPane.rightAnchor="34.799999999999955" />
-                  <Circle fill="DODGERBLUE" layoutX="993.0" layoutY="21.0" radius="15.0" stroke="BLACK" strokeType="INSIDE" strokeWidth="0.0" AnchorPane.rightAnchor="92.0" />
-                  <Circle fx:id="ActiveStatus" fill="#24c756" layoutX="1069.0" layoutY="22.0" radius="4.0" stroke="BLACK" strokeType="INSIDE" strokeWidth="0.0" AnchorPane.rightAnchor="27.0" />
+                  <HBox fx:id="statusBox" layoutX="1006.0" layoutY="10.0" prefHeight="25.0" prefWidth="80.0" AnchorPane.rightAnchor="14.0">
+                     <children>
+                        <ImageView fx:id="imgAvatar" fitHeight="25.0" fitWidth="25.0" pickOnBounds="true" preserveRatio="true" />
+                        <Label fx:id="lblStatus" prefHeight="25.0" prefWidth="50.0" text="Active" />
+                     </children>
+                  </HBox>
                </children>
                <styleClass>
                   <String fx:value="border-top" />
