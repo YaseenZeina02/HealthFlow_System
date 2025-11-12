@@ -1,0 +1,121 @@
+/* ============================================
+   Reports.css  — HealthFlow Reports Styling (v2)
+   Target: match the light, rounded “card” look
+   ============================================ */
+
+/* ---------- Surface / background ---------- */
+.anchor-pane, .split-pane, .vbox {
+    -fx-background-color: #f6f7fb; /* lighter neutral */
+}
+
+/* ---------- Page title ---------- */
+.page-title {
+    -fx-font-size: 22px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #1f2937; /* slate-800 */
+}
+
+/* ---------- Top controls (DatePicker + Buttons) ---------- */
+.text-field, .combo-box-base, .date-picker, .date-picker > .text-field {
+    -fx-background-color: #ffffff;
+    -fx-border-color: #e5e7eb; /* gray-200 */
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+    -fx-padding: 6 10;
+}
+
+.btn-primary {
+    -fx-background-color: #2f8fcb;
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+    -fx-background-radius: 8;
+    -fx-cursor: hand;
+    -fx-padding: 6 14;
+}
+.btn-primary:hover { -fx-background-color: #318fd9; }
+
+.btn-secondary {
+    -fx-background-color: #64748b; /* slate-500 */
+    -fx-text-fill: white;
+    -fx-background-radius: 8;
+    -fx-cursor: hand;
+    -fx-padding: 6 14;
+}
+.btn-secondary:hover { -fx-background-color: #748198; }
+
+/* ---------- Card (TitledPane) ---------- */
+.titled-pane {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+}
+
+/* header */
+.titled-pane > .title {
+    -fx-background-color: #ffffff;            /* white header */
+    -fx-text-fill: #111827;                   /* gray-900 */
+    -fx-font-weight: bold;
+    -fx-padding: 8 12;
+    -fx-background-radius: 10 10 0 0;
+    -fx-border-color: #e5e7eb;                /* subtle border */
+    -fx-border-width: 1 1 0 1;
+    -fx-border-radius: 10 10 0 0;
+}
+
+/* body */
+.titled-pane > .content {
+    -fx-background-color: #ffffff;
+    -fx-background-radius: 0 0 10 10;
+    -fx-padding: 14 14 14 14;                 /* roomy padding like the mock */
+    -fx-border-color: #e5e7eb;                /* same border as header */
+    -fx-border-width: 0 1 1 1;
+    -fx-border-radius: 0 0 10 10;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.06), 10, 0.15, 0, 2);
+}
+
+/* ===== Search fields inside report cards (polished) ===== */
+.titled-pane .text-field,
+.search-field {
+    -fx-background-color: #ffffff;      /* أبيض صافي */
+    -fx-background-insets: 0;           /* بدون طبقات داخلية */
+    -fx-background-radius: 10;          /* زوايا دائرية */
+    -fx-border-color: #e5e7eb;          /* إطار رمادي خفيف */
+    -fx-border-radius: 10;
+    -fx-padding: 8 12;                  /* مسافة داخلية مريحة */
+    -fx-pref-height: 36;                /* ارتفاع موحّد */
+    -fx-font-size: 13px;
+    -fx-prompt-text-fill: #9ca3af;      /* لون placeholder خافت */
+}
+
+/* Hover: حدّ أخفت بدرجة */
+.titled-pane .text-field:hover,
+.search-field:hover {
+    -fx-border-color: #cfd8e3;
+}
+
+/* Focus: أزرق العلامة + ظل لطيف */
+.titled-pane .text-field:focused,
+.search-field:focused {
+    -fx-border-color: #2f8fcb;
+    -fx-effect: dropshadow(gaussian, rgba(47,143,203,0.25), 10, 0.30, 0, 2);
+}
+
+/* ---------- Charts ---------- */
+.chart-plot-background { -fx-background-color: #ffffff; }
+.chart-title {
+    -fx-text-fill: #1f2937;
+    -fx-font-size: 16px;
+    -fx-font-weight: bold;
+}
+.axis-label { -fx-text-fill: #374151; }
+.axis { -fx-tick-label-fill: #4b5563; }
+
+/* grid lines more visible like mock */
+.chart-horizontal-grid-lines, .chart-vertical-grid-lines {
+    -fx-stroke: #edf1f5;   /* very light grid */
+}
+
+/* ---------- Split divider ---------- */
+.split-pane-divider {
+    -fx-padding: 1;
+    -fx-background-color: #e5e7eb;
+}
