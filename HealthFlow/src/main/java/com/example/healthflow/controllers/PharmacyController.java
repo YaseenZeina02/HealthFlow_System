@@ -1138,55 +1138,57 @@ public class PharmacyController {
         }
     }
 
-//    private void exportReportsCsv() {
-//        try {
-//            // نافذة المالك (لتركيز الديالوج بشكل صحيح)
-//            javafx.stage.Window owner =
-//                    (rootPane != null && rootPane.getScene() != null) ? rootPane.getScene().getWindow() : null;
-//
-//            // 1) نافذة الحفظ — تدخل اسم الملف من نفس الديالوج
-//            javafx.stage.FileChooser fc = new javafx.stage.FileChooser();
-//            fc.setTitle("Save Reports As");
-//            // فلتر الامتداد
-//            fc.getExtensionFilters().add(new javafx.stage.FileChooser.ExtensionFilter("CSV (*.csv)", "*.csv"));
-//            // المجلد المبدئي
-//            try {
-//                if (lastExcelDir != null && java.nio.file.Files.isDirectory(lastExcelDir)) {
-//                    fc.setInitialDirectory(lastExcelDir.toFile());
-//                }
-//            } catch (Throwable ignored) {}
-//            // اترك الاسم فارغ؛ المستخدم يكتب بنفسه
-//            try { fc.setInitialFileName(""); } catch (Throwable ignored) {}
-//
-//            java.io.File chosen = fc.showSaveDialog(owner);
-//            if (chosen == null) return; // إلغاء
-//
-//            // ضمان إضافة .csv لو المستخدم ما كتبها
-//            java.nio.file.Path target = chosen.toPath();
-//            String name = target.getFileName().toString();
-//            if (!name.toLowerCase().endsWith(".csv")) {
-//                target = target.resolveSibling(name + ".csv");
-//            }
-//            // خزّن آخر مجلد اختاره المستخدم
-//            try { lastExcelDir = target.getParent(); } catch (Throwable ignored) {}
-//
-//            // 2) صدّر باستخدام الهيلبر الحالي إلى المجلد المختار (اسم تلقائي) ثم أعد التسمية للاسم المطلوب
-//            java.nio.file.Path generated = Reports.exportCsv(target.getParent(), nearExpiryRows, lowStockRows);
-//
-//            try {
-//                java.nio.file.Files.move(generated, target, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-//            } catch (Exception moveEx) {
-//                // احتياط: لو فشل النقل جرّب النسخ
-//                java.nio.file.Files.copy(generated, target, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-//            }
-//
-//            new Alert(Alert.AlertType.INFORMATION, "Exported: " + target).showAndWait();
-//
-//        } catch (Exception ex) {
-//            new Alert(Alert.AlertType.ERROR, "Export failed: " + ex.getMessage()).showAndWait();
-//        }
-//    }
+    //csv
+    //    private void exportReportsCsv() {
+    //        try {
+    //            // نافذة المالك (لتركيز الديالوج بشكل صحيح)
+    //            javafx.stage.Window owner =
+    //                    (rootPane != null && rootPane.getScene() != null) ? rootPane.getScene().getWindow() : null;
+    //
+    //            // 1) نافذة الحفظ — تدخل اسم الملف من نفس الديالوج
+    //            javafx.stage.FileChooser fc = new javafx.stage.FileChooser();
+    //            fc.setTitle("Save Reports As");
+    //            // فلتر الامتداد
+    //            fc.getExtensionFilters().add(new javafx.stage.FileChooser.ExtensionFilter("CSV (*.csv)", "*.csv"));
+    //            // المجلد المبدئي
+    //            try {
+    //                if (lastExcelDir != null && java.nio.file.Files.isDirectory(lastExcelDir)) {
+    //                    fc.setInitialDirectory(lastExcelDir.toFile());
+    //                }
+    //            } catch (Throwable ignored) {}
+    //            // اترك الاسم فارغ؛ المستخدم يكتب بنفسه
+    //            try { fc.setInitialFileName(""); } catch (Throwable ignored) {}
+    //
+    //            java.io.File chosen = fc.showSaveDialog(owner);
+    //            if (chosen == null) return; // إلغاء
+    //
+    //            // ضمان إضافة .csv لو المستخدم ما كتبها
+    //            java.nio.file.Path target = chosen.toPath();
+    //            String name = target.getFileName().toString();
+    //            if (!name.toLowerCase().endsWith(".csv")) {
+    //                target = target.resolveSibling(name + ".csv");
+    //            }
+    //            // خزّن آخر مجلد اختاره المستخدم
+    //            try { lastExcelDir = target.getParent(); } catch (Throwable ignored) {}
+    //
+    //            // 2) صدّر باستخدام الهيلبر الحالي إلى المجلد المختار (اسم تلقائي) ثم أعد التسمية للاسم المطلوب
+    //            java.nio.file.Path generated = Reports.exportCsv(target.getParent(), nearExpiryRows, lowStockRows);
+    //
+    //            try {
+    //                java.nio.file.Files.move(generated, target, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+    //            } catch (Exception moveEx) {
+    //                // احتياط: لو فشل النقل جرّب النسخ
+    //                java.nio.file.Files.copy(generated, target, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+    //            }
+    //
+    //            new Alert(Alert.AlertType.INFORMATION, "Exported: " + target).showAndWait();
+    //
+    //        } catch (Exception ex) {
+    //            new Alert(Alert.AlertType.ERROR, "Export failed: " + ex.getMessage()).showAndWait();
+    //        }
+    //    }
 
+    //xlsx
     private void exportReportsCsv() {
         try {
             // نافذة المالك

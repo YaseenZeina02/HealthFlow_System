@@ -460,9 +460,23 @@ public class DoctorController {
 
         if (clearSelectionDach != null) {
             clearSelectionDach.setOnAction(e -> {
+                // 1) أزل أي تحديد داخل جدول المواعيد
                 if (AppointmentsTable != null) {
                     AppointmentsTable.getSelectionModel().clearSelection();
                 }
+
+                // 2) امسح حقول البحث كلها (searchLabel / search) بأمان
+//                TextField apptSearch = apptSearchField(); // يختار الأفضل بين searchLabel و search
+                try { if (apptSearch != null) apptSearch.clear(); } catch (Throwable ignore) {}
+                try { if (searchLabel != null && searchLabel != apptSearch) searchLabel.clear(); } catch (Throwable ignore) {}
+                try { if (search != null && search != apptSearch) search.clear(); } catch (Throwable ignore) {}
+
+                // 3) صفّر الفلترة (اعرض كل الصفوف)
+                try { applyAppointmentsFilter(""); } catch (Throwable ignore) {}
+
+                // 4) حدّث الجدول وارجع التركيز لحقل البحث
+                try { if (AppointmentsTable != null) AppointmentsTable.refresh(); } catch (Throwable ignore) {}
+                try { if (apptSearch != null) apptSearch.requestFocus(); } catch (Throwable ignore) {}
             });
         }
 
@@ -471,6 +485,9 @@ public class DoctorController {
                 if (patientTable != null) {
                     patientTable.getSelectionModel().clearSelection();
                 }
+                if (searchLabel != null) searchLabel.clear();
+                if (patientTable != null) patientTable.refresh();
+                if (searchLabel != null) searchLabel.requestFocus();
             });
         }
 

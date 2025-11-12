@@ -23,7 +23,7 @@
 <?import javafx.scene.text.Font?>
 <?import org.kordamp.ikonli.javafx.FontIcon?>
 
-<StackPane fx:id="rootPane" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="600.0" prefWidth="1100.0" xmlns="http://javafx.com/javafx/23.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.example.healthflow.controllers.ReceptionController">
+<StackPane fx:id="rootPane" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="600.0" prefWidth="1100.0" xmlns="http://javafx.com/javafx/19" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.example.healthflow.controllers.ReceptionController">
 
     <children>
         <AnchorPane prefHeight="200.0" prefWidth="200.0">
@@ -357,7 +357,7 @@
                                             </columnResizePolicy>
                                         </TableView>
                                         <TextField fx:id="searchDoctor" editable="false" layoutX="597.4" layoutY="22.0" prefHeight="30.0" prefWidth="200.0" promptText="searchDoctor" styleClass="box" AnchorPane.rightAnchor="92.60000000000002" />
-                              <Button fx:id="clearSelectionDoctor" layoutX="810.0" layoutY="23.0" mnemonicParsing="false" prefHeight="30.0" prefWidth="60.0" styleClass="btn-2" text="Clear" AnchorPane.rightAnchor="19.600000000000023">
+                              <Button fx:id="re" layoutX="810.0" layoutY="23.0" mnemonicParsing="false" prefHeight="30.0" prefWidth="60.0" styleClass="btn-2" text="Clear" AnchorPane.rightAnchor="19.600000000000023">
                                  <stylesheets>
                                     <URL value="@../Design/ButtonsStyles.css" />
                                     <URL value="@../Design/ReceptionDesign.css" />
