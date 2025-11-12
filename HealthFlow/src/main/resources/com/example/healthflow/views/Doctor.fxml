@@ -81,7 +81,7 @@
                <children>
 
                   <!-- ===== Dashboard (with icons) ===== -->
-                  <AnchorPane fx:id="DashboardAnchorPane" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+                  <AnchorPane fx:id="DashboardAnchorPane" visible="false" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
                      <children>
 
                         <!-- Stat cards -->
@@ -209,12 +209,12 @@
                               <TableView fx:id="AppointmentsTable" layoutX="14.0" layoutY="48.8" prefHeight="321.0" prefWidth="837.0" stylesheets="@../Design/ReceptionDesign.css" AnchorPane.bottomAnchor="10.0" AnchorPane.leftAnchor="14.0" AnchorPane.rightAnchor="15.0" AnchorPane.topAnchor="49.0">
                                  <columns>
                                     <TableColumn fx:id="colSerialNumber" maxWidth="50.0" prefWidth="30.0" resizable="false" text="#" />
-                                    <TableColumn fx:id="colDoctorName" prefWidth="200.0" text="Doctor Name" />
-                                    <TableColumn fx:id="colPatientName" prefWidth="200.0" text="Patient Name" />
-                                    <TableColumn fx:id="colDate" prefWidth="100.0" text="Date" />
-                                    <TableColumn fx:id="colTime" prefWidth="100.0" text="Time" />
-                                    <TableColumn fx:id="colStatus" prefWidth="100.0" text="Status" />
-                                    <TableColumn fx:id="colAction" prefWidth="300.0" text="Action" />
+                                    <TableColumn fx:id="colDoctorName" minWidth="200.0" prefWidth="200.0" text="Doctor Name" />
+                                    <TableColumn fx:id="colPatientName" minWidth="200.0" prefWidth="200.0" text="Patient Name" />
+                                    <TableColumn fx:id="colDate" minWidth="100.0" prefWidth="150.0" text="Date" />
+                                    <TableColumn fx:id="colTime" minWidth="100.0" prefWidth="150.0" text="Time" />
+                                    <TableColumn fx:id="colStatus" minWidth="100.0" prefWidth="150.0" text="Status" />
+                                    <TableColumn fx:id="colAction" minWidth="200.0" prefWidth="200.0" text="Action" />
                                  </columns>
                                  <columnResizePolicy>
                                     <TableView fx:constant="CONSTRAINED_RESIZE_POLICY" />
@@ -229,7 +229,7 @@
                   </AnchorPane>
 
                   <!-- ===== Patients pane (unchanged functionally) ===== -->
-                  <AnchorPane fx:id="PatientAnchorPane" visible="false" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+                  <AnchorPane fx:id="PatientAnchorPane" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
                      <children>
                         <AnchorPane prefHeight="533.0" prefWidth="866.0" stylesheets="@../Design/ReceptionDesign.css" AnchorPane.bottomAnchor="11.0" AnchorPane.leftAnchor="11.0" AnchorPane.rightAnchor="12.0" AnchorPane.topAnchor="14.0">
                            <children>
@@ -240,12 +240,12 @@
                               <TableView fx:id="patientTable" layoutX="11.0" layoutY="51.0" prefHeight="467.0" prefWidth="844.0" stylesheets="@../Design/ReceptionDesign.css" AnchorPane.bottomAnchor="14.599999999999909" AnchorPane.leftAnchor="11.0" AnchorPane.rightAnchor="11.400000000000091" AnchorPane.topAnchor="51.0">
                                  <columns>
                                     <TableColumn fx:id="colSerialPatient" maxWidth="50.0" prefWidth="30.0" resizable="false" text="#" />
-                                    <TableColumn fx:id="colNationalId" maxWidth="3000.0" prefWidth="75.0" text="National ID" />
-                                    <TableColumn fx:id="colName" prefWidth="75.0" text="Name" />
-                                    <TableColumn fx:id="colGender" maxWidth="2000.0" prefWidth="75.0" text="Gender" />
-                                    <TableColumn fx:id="colDob" maxWidth="2000.0" prefWidth="75.0" text="Age" />
-                                    <TableColumn fx:id="colMedicalHistory" maxWidth="3000.0" prefWidth="75.0" text="Medical History" />
-                                    <TableColumn fx:id="colAction2" maxWidth="4000.0" prefWidth="75.0" text="Action" />
+                                    <TableColumn fx:id="colNationalId" maxWidth="3000.0" minWidth="100.0" prefWidth="100.0" text="National ID" />
+                                    <TableColumn fx:id="colName" minWidth="200.0" prefWidth="200.0" text="Name" />
+                                    <TableColumn fx:id="colGender" maxWidth="2000.0" minWidth="100.0" prefWidth="100.0" text="Gender" />
+                                    <TableColumn fx:id="colDob" maxWidth="2000.0" minWidth="50.0" prefWidth="50.0" text="Age" />
+                                    <TableColumn fx:id="colMedicalHistory" maxWidth="3000.0" minWidth="300.0" prefWidth="500.0" text="Medical History" />
+                                    <TableColumn fx:id="colAction2" maxWidth="4000.0" minWidth="200.0" prefWidth="200.0" text="Action" />
                                  </columns>
                                  <columnResizePolicy>
                                     <TableView fx:constant="CONSTRAINED_RESIZE_POLICY" />
