@@ -1757,9 +1757,11 @@ public class PharmacyController {
             );
             // (اختياري) عرض صغير وثابت
             colSerialPhDashboard.setStyle("-fx-alignment: CENTER;");
-            colSerialPhDashboard.setMinWidth(60);
+            /*colSerialPhDashboard.setMinWidth(60);
             colSerialPhDashboard.setPrefWidth(70);
             colSerialPhDashboard.setMaxWidth(100);
+
+             */
         }
         // Names
         if (colPatientName != null) colPatientName.setCellValueFactory(cd -> new javafx.beans.property.SimpleStringProperty(cd.getValue().patientName));
@@ -2076,7 +2078,7 @@ public class PharmacyController {
             });
         }
 
-
+/*
         if (colIdx != null) colIdx.setPrefWidth(50);
         if (colMedicineName != null) colMedicineName.setPrefWidth(180);
         if (colStrength != null) colStrength.setPrefWidth(120);
@@ -2087,6 +2089,9 @@ public class PharmacyController {
         if (colStock != null) colStock.setPrefWidth(120);
         if (colItemStatus != null) colItemStatus.setPrefWidth(120);
         if (colPresesItemAction != null) colPresesItemAction.setPrefWidth(160);
+
+
+ */
     }
 
     private void onApproveItem(int rowIndex) {
@@ -2554,9 +2559,7 @@ public class PharmacyController {
 
         setupItemsTableColumns();
         if (TablePrescriptionItems != null) {
-            TablePrescriptionItems.setColumnResizePolicy(
-                    javafx.scene.control.TableView.UNCONSTRAINED_RESIZE_POLICY
-            );
+          // TablePrescriptionItems.setColumnResizePolicy(javafx.scene.control.TableView.UNCONSTRAINED_RESIZE_POLICY);
         }
         loadDashboardTable();
 

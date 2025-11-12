@@ -1541,7 +1541,7 @@ public class DoctorController {
 
         // Serial number column: running index (unsortable)
         if (colSerialNumber != null) {
-            colSerialNumber.setResizable(true);
+           // colSerialNumber.setResizable(true);
             colSerialNumber.setSortable(false);
             colSerialNumber.setCellFactory(col -> new TableCell<AppointmentRow, String>() {
                 @Override
@@ -1553,6 +1553,7 @@ public class DoctorController {
         }
 
         // Preferred widths so H-scroll appears when total exceeds viewport
+        /*
         if (colSerialNumber != null) colSerialNumber.setPrefWidth(60);
         if (colDoctorName != null) colDoctorName.setPrefWidth(140);
         if (colPatientName != null) colPatientName.setPrefWidth(220);
@@ -1563,7 +1564,7 @@ public class DoctorController {
             colAction.setPrefWidth(220);
             colAction.setMinWidth(180);
         }
-
+*/
         // --- Make the last column (Action) flex to fill remaining space when available ---
         final double actionBaseWidth = (colAction == null) ? 0 : Math.max(180, colAction.getPrefWidth());
 
@@ -1684,7 +1685,7 @@ public class DoctorController {
         apptSorted.comparatorProperty().bind(AppointmentsTable.comparatorProperty());
         AppointmentsTable.setItems(apptSorted);
         // سياسة القياس: سياسة غير مقيدة لتمكين سكرول أفقي عند تجاوز العرض
-        AppointmentsTable.setColumnResizePolicy(TableView.UNCONSTRAINED_RESIZE_POLICY);
+        //AppointmentsTable.setColumnResizePolicy(TableView.UNCONSTRAINED_RESIZE_POLICY);
         startDbNotificationsForDoctor();
         startLightweightPollingDoctor();
 
