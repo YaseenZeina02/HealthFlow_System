@@ -597,10 +597,43 @@ public class LoginController {
 
         } catch (Exception e) {
             System.err.println("Login error for user: " + username);
-            e.printStackTrace();
-            setAlert("An error occurred during login.", "Please try again.");
+            if (isConnectionError(e)) {
+                System.out.println("[Login] Offline – DB unreachable: " + e.getMessage());
+            } else {
+                e.printStackTrace();
+            }            setAlert("An error occurred during login.", "Please try again.");
             stopLoginUi(); // احتياط في حال الخطأ وقع قبل إطلاق الـ Task
         }
+    }
+
+    // --- helper: هل الخطأ سببه الاتصال بالداتابيز/الشبكة؟ ---
+    private static boolean isConnectionError(Throwable ex) {
+        if (ex == null) return false;
+
+        Throwable cur = ex;
+        while (cur != null) {
+            // 1) Socket / timeout problems
+            if (cur instanceof java.net.SocketException ||
+                    cur instanceof java.net.SocketTimeoutException) {
+                return true;
+            }
+
+            // 2) SQLState من نوع 08xxx (مشاكل اتصال DB)
+            if (cur instanceof java.sql.SQLException sql) {
+                String state = sql.getSQLState();
+                if (state != null && state.startsWith("08")) {
+                    return true;
+                }
+            }
+
+            // 3) PostgreSQL driver exception
+            if (cur instanceof org.postgresql.util.PSQLException) {
+                return true;
+            }
+
+            cur = cur.getCause();
+        }
+        return false;
     }
 
     // ================= Reload on Reconnect =================

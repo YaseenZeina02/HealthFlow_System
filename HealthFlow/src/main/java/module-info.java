@@ -18,6 +18,7 @@ module com.example.healthflow {
     requires org.controlsfx.controls;
     requires org.apache.poi.ooxml;
     requires jakarta.mail;
+    requires javafx.media;
 
 //    requires jdk.internal.md;
 

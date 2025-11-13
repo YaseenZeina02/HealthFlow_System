@@ -1258,3 +1258,19 @@ BEGIN
 DELETE FROM password_reset_tokens
 WHERE used = TRUE OR expires_at < NOW();
 END $$;
+
+
+
+
+
+CREATE OR REPLACE FUNCTION close_past_appointments()
+RETURNS VOID
+LANGUAGE plpgsql
+AS $$
+BEGIN
+UPDATE appointments
+SET status = 'NO_SHOW'
+WHERE status = 'SCHEDULED'
+  AND appointment_date::date < (NOW() AT TIME ZONE 'Asia/Gaza')::date;
+END;
+$$;

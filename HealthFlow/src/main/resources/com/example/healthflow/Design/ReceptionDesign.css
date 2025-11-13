@@ -585,26 +585,23 @@
     -fx-font-weight: bold;
     -fx-cursor: hand;
 }
+.button.action-btn .text {
+    -fx-fill: white !important;
+}
 .button.action-btn:hover {
     -fx-background-color: linear-gradient(to right, #40bd70, #0f8838);
+    -fx-fill: white !important;
 }
-/* On Clik */
-/*.button.action-btn:armed {*/
-/*    -fx-background-color: #c7d6eb;            !* pressed *!*/
-/*}*/
+ /*On Clik */
+.button.action-btn:armed {
+    -fx-fill: white !important;
+}
 
 
 .button.action-btn:disabled {
     -fx-opacity: 0.55;
 }
 
-/* keep it readable when the row is selected */
-/*.table-view .table-row-cell:filled:selected .button.action-btn {*/
-/*    -fx-background-color: rgba(255,255,255,0.92);*/
-/*    -fx-text-fill: #111827 ;*/
-/*    -fx-border-color: rgba(255,255,255,0.70);*/
-/*    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.18), 6, 0.2, 0, 1);*/
-/*}*/
 
 
 /* CHART CSS */
@@ -841,3 +838,39 @@
 }
 .status.active  { -fx-text-fill: #1ABC9C; }
 .status.offline { -fx-text-fill: #E74C3C; }
+
+
+/* Dashboard appointments row styles */
+.table-row-cell.appt-completed-row {
+    -fx-background-color: #57e18a; /* أخضر فاتح */
+}
+
+.table-row-cell.appt-completed-row .text {
+    -fx-fill: #20663a;
+    -fx-font-weight: bold;
+}
+
+/* CANCELLED */
+.table-row-cell.appt-cancelled-row {
+    -fx-background-color: #fde4e4; /* أحمر فاتح لطيف */
+}
+
+/* تلوين نص الصف الملغى */
+.table-row-cell.appt-cancelled-row .text {
+    -fx-fill: #b83a3a !important;
+    -fx-background-color: rgba(223, 20, 20, 0.21) !important;
+}
+
+/* استثناء زر Open */
+.button.action-btn .text {
+    -fx-fill: white !important;
+}
+
+/* SCHEDULED */
+.table-row-cell.appt-scheduled-row {
+    -fx-background-color: #f5f7fb;  /* رمادي خفيف */
+}
+
+.table-row-cell.appt-scheduled-row .text {
+    -fx-fill: #222222;
+}

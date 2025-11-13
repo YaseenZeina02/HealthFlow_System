@@ -46,6 +46,7 @@ import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.AnchorPane;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
+import javafx.scene.media.AudioClip;
 import javafx.scene.shape.Circle;
 import javafx.scene.text.Text;
 import javafx.stage.Modality;
@@ -258,6 +259,7 @@ public class ReceptionController {
     private static final java.time.format.DateTimeFormatter UI_DATE =
             java.time.format.DateTimeFormatter.ofPattern("EEE, MMM d, yyyy");
 
+    private boolean connectivityInitialized = false;
 
 
     public static final int DEFAULT_SESSION_MIN = 20;
@@ -291,11 +293,54 @@ public class ReceptionController {
     private static volatile boolean listenerRegistered = false;
     private static volatile Boolean lastNotifiedOnline = null;
 
+
+    // نتذكّر آخر حالة لكل موعد كي لا نرنّي عند أول تحميل
+    private final java.util.Map<Long, String> dashLastStatus = new java.util.HashMap<>();
+
+    private final Deque<AnchorPane> navigationHistory = new ArrayDeque<>();
+
+
     // Cache currently-selected patient to survive pane switches / refreshes
     private PatientRow selectedPatient;
     private boolean patientSelHooked = false;
 
-    private final Deque<AnchorPane> navigationHistory = new ArrayDeque<>();
+    private static AudioClip apptCompletedClip;
+    private static AudioClip apptCancelledClip;
+    static {
+        try {
+            var okUrl = ReceptionController.class.getResource(
+                    "/sounds/mixkit-software-interface-start-2574.mp3");   // COMPLETED
+            if (okUrl != null) {
+                apptCompletedClip = new AudioClip(okUrl.toExternalForm());
+                apptCompletedClip.setVolume(0.35); // صوت خفيف
+            }
+
+            var cancelUrl = ReceptionController.class.getResource(
+                    "/sounds/mixkit-software-interface-back-2575.mp3"); // CANCELLED
+            if (cancelUrl != null) {
+                apptCancelledClip = new AudioClip(cancelUrl.toExternalForm());
+                apptCancelledClip.setVolume(0.35);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+    private void playStatusChangeSound(String newStatus) {
+        if (newStatus == null) return;
+        String st = newStatus.trim().toUpperCase();
+
+        AudioClip clip = null;
+        if ("COMPLETED".equals(st)) {
+            clip = apptCompletedClip;
+        } else if ("CANCELLED".equals(st) || "CANCELED".equals(st) || "CANCEL".equals(st)) {
+            clip = apptCancelledClip;
+        }
+
+        if (clip != null) {
+            clip.play();
+        }
+    }
+
 
     // Gate for AppointmentsButton (avoid setDisable on a bound property)
     private javafx.beans.property.BooleanProperty appointmentsAccess =
@@ -308,6 +353,44 @@ public class ReceptionController {
 
     private static java.time.LocalDateTime toLocal(java.time.OffsetDateTime odt) {
         return odt == null ? null : odt.atZoneSameInstant(APP_ZONE).toLocalDateTime();
+    }
+
+    private void initConnectivity() {
+        if (connectivityInitialized) return;
+        connectivityInitialized = true;
+
+        // شغّل المونيتور
+        if (monitor != null) {
+            monitor.start();
+        }
+
+        // أضف البانر في أعلى الـ rootPane
+        if (rootPane != null && monitor != null) {
+            ConnectivityBanner banner = new ConnectivityBanner(monitor);
+            rootPane.getChildren().add(0, banner);
+            banner.prefWidthProperty().bind(rootPane.widthProperty());
+        }
+
+        // عطّل الأزرار فقط لما نكون أوفلاين
+        OnlineBindings.disableWhenOffline(monitor,
+                InsertButton, UpdateButton, deleteButton, clearBtn,
+                DachboardButton, PatientsButton, AppointmentsButton, DoctorsButton
+        );
+
+        // نفس اللي كان عندك قبل
+        if (!listenerRegistered) {
+            listenerRegistered = true;
+            final boolean[] firstEmissionHandled = {false};
+            monitor.onlineProperty().addListener((obs, wasOnline, isOnline) -> {
+                if (!firstEmissionHandled[0]) {
+                    firstEmissionHandled[0] = true;
+                    lastNotifiedOnline = isOnline;
+                    return;
+                }
+                if (lastNotifiedOnline != null && lastNotifiedOnline == isOnline) return;
+                lastNotifiedOnline = isOnline;
+            });
+        }
     }
 
     // ===== Transient banner on LabelToAlert (with fade) =====
@@ -1475,8 +1558,23 @@ private void loadHeaderUser() {
             patientData.remove(row);
             clearForm();
             showInfo("Delete", "Patient deleted.");
-        } catch (Exception e) {
-            showError("Delete Patient", e);
+        } catch (java.sql.SQLException ex) {
+            // 23503 = foreign_key_violation في PostgreSQL
+            if ("23503".equals(ex.getSQLState())) {
+                Alert alert = new Alert(Alert.AlertType.ERROR);
+                alert.setTitle("Delete patient");
+                alert.setHeaderText("Cannot delete this patient");
+                alert.setContentText(
+                        "This patient is still linked to one or more appointments.\n" +
+                                "Please cancel or complete all appointments for this patient " +
+                                "before deleting their record."
+                );
+                alert.showAndWait();
+            } else {
+                error("Delete patient", ex); // رسالتك العامة لأي خطأ آخر
+            }
+        } catch (Exception ex) {
+            error("Delete patient", ex);
         }
 
         try (Connection c = Database.get();
@@ -2145,6 +2243,11 @@ private void loadHeaderUser() {
     }
 
     private void updateAppointmentCounters() {
+        if (isOffline()) {
+            showToast("warn", "You are offline. Showing the last loaded appointments.");
+            return;
+        }
+
         java.time.LocalDate sel = (dataPickerDashboard != null && dataPickerDashboard.getValue() != null)
                 ? dataPickerDashboard.getValue()
                 : java.time.LocalDate.now();
@@ -2529,47 +2632,23 @@ private void loadHeaderUser() {
         }
     }
 
-//    private void reloadDashboardAppointments() {
-//        if (TableAppInDashboard == null) return;
-//
-//        java.time.LocalDate sel = (dataPickerDashboard != null && dataPickerDashboard.getValue() != null)
-//                ? dataPickerDashboard.getValue()
-//                : java.time.LocalDate.now();
-//
-//        // اجلب البيانات بالخلفية حتى ما يعلق الـ UI
-//        new Thread(() -> {
-//            try {
-//                var rows = com.example.healthflow.dao.AppointmentJdbcDAO.listByDateAll(sel);
-//
-//                // كل تفاعل مع الواجهة يتم داخل FX thread
-//                Platform.runLater(() -> {
-//                    if (rows != null && !rows.isEmpty()) {
-//                        dashBase.setAll(rows);
-//                        TableAppInDashboard.setPlaceholder(new Label(""));
-//                    } else {
-//                        System.out.println("[Dashboard] no appointments found, keeping previous rows temporarily");
-//                        TableAppInDashboard.setPlaceholder(new Label("No appointments on " + sel));
-//                    }
-//
-//                    applyDashboardFilters();
-//                    TableAppInDashboard.refresh();
-//                    System.out.println("[ReceptionController] reloadDashboardAppointments sel=" + sel + " rows=" + (rows == null ? 0 : rows.size()));
-//                });
-//
-//            } catch (Exception ex) {
-//                System.err.println("[ReceptionController] reloadDashboardAppointments error: " + ex);
-//                Platform.runLater(() -> {
-//                    if (TableAppInDashboard != null)
-//                        TableAppInDashboard.setPlaceholder(new Label("Failed to load"));
-//                });
-//            }
-//        }, "reload-dashboard").start();
-//    }
-
+    private boolean isOffline() {
+        if (monitor == null) return false;
+        try {
+            return !monitor.onlineProperty().get(); // أو isOnlineProperty حسب التسمية عندك
+        } catch (Exception e) {
+            return false;
+        }
+    }
 
     // ========== DASHBOARD TABLE RELOAD ==========
     // This is the method referenced in the instruction (see log message)
     private void reloadDashboardAppointments() {
+        if (isOffline()) {
+            showToast("warn", "You are offline. Showing the last loaded appointments.");
+            return;
+        }
+
         final LocalDate day = (dataPickerDashboard == null || dataPickerDashboard.getValue() == null)
                 ? java.time.LocalDate.now()
                 : dataPickerDashboard.getValue();
@@ -2581,13 +2660,12 @@ private void loadHeaderUser() {
             } catch (Exception e) {
                 e.printStackTrace();
                 final String msg = e.getMessage();
-                Platform.runLater(() -> showWarn("Dashboard", "Failed to load dashboard appointments: " + msg));
                 return;
             }
 
             final java.util.List<DoctorDAO.AppointmentRow> finalRows = rows;
+
             Platform.runLater(() -> {
-                System.out.println("[ReceptionController] reloadDashboardAppointments sel=" + day + " rows=" + (finalRows == null ? 0 : finalRows.size()));
 
                 // --- Apply rows to dashboard table (clear when empty) ---
                 if (finalRows == null || finalRows.isEmpty()) {
@@ -2596,7 +2674,7 @@ private void loadHeaderUser() {
                         if (TableAppInDashboard != null) {
                             TableAppInDashboard.getSelectionModel().clearSelection();
                             if (TableAppInDashboard.getItems() != dashSorted) {
-                                TableAppInDashboard.setItems(dashSorted); // fix: use dashSorted consistently
+                                TableAppInDashboard.setItems(dashSorted);
                             }
                             TableAppInDashboard.setPlaceholder(new Label(
                                     (day == null ? "No appointments" : ("No appointments for " + day))
@@ -2604,8 +2682,43 @@ private void loadHeaderUser() {
                             TableAppInDashboard.refresh();
                         }
                     } catch (Throwable ignore) {}
-                    System.out.println("[ReceptionController] reloadDashboardAppointments: no rows → cleared table");
-                    return; // stop here; nothing more to populate
+                    // ننظف الذاكرة تبعت الحالات
+                    dashLastStatus.clear();
+                    return;
+                }
+
+                // --- Detect status changes (for sound notification) ---
+                boolean anyInterestingChange = false;
+                String lastInterestingStatus = null;
+
+                java.util.Set<Long> currentIds = new java.util.HashSet<>();
+
+                for (DoctorDAO.AppointmentRow r : finalRows) {
+                    if (r == null) continue;
+                    currentIds.add(r.id);
+
+                    String newSt = (r.status == null ? "" : r.status.trim().toUpperCase());
+                    String oldSt = dashLastStatus.get(r.id);
+
+                    // نتجنب أول تحميل (oldSt == null)
+                    if (oldSt != null && !oldSt.equals(newSt)) {
+                        if ("COMPLETED".equals(newSt)
+                                || "CANCELLED".equals(newSt)
+                                || "CANCELED".equals(newSt)
+                                || "CANCEL".equals(newSt)) {
+                            anyInterestingChange = true;
+                            lastInterestingStatus = newSt;
+                        }
+                    }
+
+                    dashLastStatus.put(r.id, newSt);
+                }
+
+                // احذف من الخريطة أي مواعيد لم تعد موجودة في الجدول
+                dashLastStatus.keySet().removeIf(id -> !currentIds.contains(id));
+
+                if (anyInterestingChange) {
+                    playStatusChangeSound(lastInterestingStatus);
                 }
 
                 // If we have rows → show them
@@ -2616,6 +2729,9 @@ private void loadHeaderUser() {
                     }
                 } catch (Throwable ignore) {}
             });
+
+
+
         }, "reload-dashboard").start();
     }
 
@@ -2826,7 +2942,9 @@ private void loadHeaderUser() {
 
         // --- 1) Table wiring (idempotent) ---
         //TableAppInDashboard.setColumnResizePolicy(TableView.UNCONSTRAINED_RESIZE_POLICY);
-        try { dashSorted.comparatorProperty().bind(TableAppInDashboard.comparatorProperty()); } catch (Throwable ignore) {}
+        try {
+            dashSorted.comparatorProperty().bind(TableAppInDashboard.comparatorProperty());
+        } catch (Throwable ignore) {}
         if (TableAppInDashboard.getItems() != dashSorted) {
             TableAppInDashboard.setItems(dashSorted);
         }
@@ -2837,12 +2955,7 @@ private void loadHeaderUser() {
         // -------- Appointment ID (index shown 1..n) --------
         if (colAppointmentID != null) {
             colAppointmentID.setStyle("-fx-alignment: CENTER;");
-            /*
-            colAppointmentID.setMinWidth(10);
-            colAppointmentID.setPrefWidth(30);
-            colAppointmentID.setMaxWidth(30);
 
-             */
             colAppointmentID.setCellFactory(col -> new TableCell<DoctorDAO.AppointmentRow, Number>() {
                 @Override
                 protected void updateItem(Number item, boolean empty) {
@@ -2856,34 +2969,16 @@ private void loadHeaderUser() {
         // -------- Patient Name --------
         if (colPatientNameDash != null) {
             colPatientNameDash.setCellValueFactory(cd -> new SimpleStringProperty(cd.getValue().patientName));
-            /*
-            colPatientNameDash.setMinWidth(160);
-            colPatientNameDash.setPrefWidth(160);
-            //colPatientNameDash.setMaxWidth(250);
-
-             */
         }
 
         // -------- Doctor Name --------
         if (colDoctorNameDash != null) {
             colDoctorNameDash.setCellValueFactory(cd -> new SimpleStringProperty(cd.getValue().doctorName));
-            /*
-            colDoctorNameDash.setMinWidth(160);
-            colDoctorNameDash.setPrefWidth(160);
-            //colDoctorNameDash.setMaxWidth(250);
-
-             */
         }
 
         // -------- Specialty --------
         if (colSpecialtyDash != null) {
             colSpecialtyDash.setCellValueFactory(cd -> new SimpleStringProperty(cd.getValue().specialty));
-            /*
-            colSpecialtyDash.setMinWidth(120);
-            colSpecialtyDash.setPrefWidth(120);
-            //colSpecialtyDash.setMaxWidth(140);
-
-             */
         }
 
         // -------- Date --------
@@ -2894,12 +2989,6 @@ private void loadHeaderUser() {
             });
             colAppintementDateDash.setEditable(false);
             colAppintementDateDash.setStyle("-fx-alignment: CENTER;");
-            /*
-            colAppintementDateDash.setMinWidth(100);
-            colAppintementDateDash.setPrefWidth(100);
-            //colAppintementDateDash.setMaxWidth(120);
-
-             */
         }
 
         // -------- Time --------
@@ -2912,43 +3001,31 @@ private void loadHeaderUser() {
                 return new SimpleStringProperty(from.format(SLOT_FMT_12H) + " \u2192 " + to.format(SLOT_FMT_12H));
             });
             colAppintementTimeDash.setStyle("-fx-alignment: CENTER;");
-            /*
-            colAppintementTimeDash.setMinWidth(180);
-            colAppintementTimeDash.setPrefWidth(180);
-            //colAppintementTimeDash.setMaxWidth(260);
-
-             */
-
         }
 
         // -------- Room --------
         if (colRoomDash != null) {
             colRoomDash.setCellValueFactory(cd -> new SimpleStringProperty(cd.getValue().location));
             colRoomDash.setStyle("-fx-alignment: CENTER;");
-            /*
-            colRoomDash.setMinWidth(100);
-            colRoomDash.setPrefWidth(100);
-
-             */
         }
 
         // -------- Action (button) --------
         if (colActionDash != null) {
             colActionDash.setStyle("-fx-alignment: CENTER;");
-            /*
-            colActionDash.setMinWidth(100);
-            colActionDash.setPrefWidth(100);
-            //colActionDash.setMaxWidth(100);
-            colActionDash.setResizable(true);
-
-             */
 
             colActionDash.setCellFactory(col -> new TableCell<DoctorDAO.AppointmentRow, Void>() {
                 private final Button btn = new Button("Open");
-                { btn.getStyleClass().add("action-btn"); btn.setFocusTraversable(false); }
-                @Override protected void updateItem(Void item, boolean empty) {
+                {
+                    btn.getStyleClass().add("action-btn");
+                    btn.setFocusTraversable(false);
+                }
+                @Override
+                protected void updateItem(Void item, boolean empty) {
                     super.updateItem(item, empty);
-                    if (empty) { setGraphic(null); return; }
+                    if (empty) {
+                        setGraphic(null);
+                        return;
+                    }
                     btn.setOnAction(e -> {
                         DoctorDAO.AppointmentRow r = getTableView().getItems().get(getIndex());
                         if (r == null) return;
@@ -2975,7 +3052,37 @@ private void loadHeaderUser() {
             });
         }
 
-        // ختامًا: أول تحميل + فلترة (خفيفة جدًا)
+        // -------- Row styling: color by status (more visible) --------
+        TableAppInDashboard.setRowFactory(tv -> new TableRow<DoctorDAO.AppointmentRow>() {
+            @Override
+            protected void updateItem(DoctorDAO.AppointmentRow item, boolean empty) {
+                super.updateItem(item, empty);
+
+                if (empty || item == null) {
+                    setStyle("");
+                    return;
+                }
+
+                // Normalize status to a safe upper-case string
+                String st = String.valueOf(item.status).trim().toUpperCase();
+
+//                String style;
+                switch (st) {
+                    case "COMPLETED" -> {
+                        getStyleClass().add("appt-completed-row");
+                    }
+                    case "CANCELLED", "CANCELED", "CANCEL" -> {
+                        getStyleClass().add("appt-cancelled-row");
+                    }
+                    case "SCHEDULED" -> {
+                        getStyleClass().add("appt-scheduled-row");
+                    }
+                    default -> {
+                        // لا شيء
+                    }
+                }
+            }
+        });
     }
 
 
@@ -2989,33 +3096,6 @@ private void loadHeaderUser() {
             searchAppointmentDach.textProperty().addListener((obs, old, q) -> applyDashboardFilters());
         }
     }
-
-    //    private void applyDashboardFilters() {
-    //        String q = (searchAppointmentDach == null || searchAppointmentDach.getText() == null)
-    //                ? "" : searchAppointmentDach.getText().trim().toLowerCase();
-    //        LocalDate sel = (dataPickerDashboard == null) ? null : dataPickerDashboard.getValue();
-    //
-    //        dashFiltered.setPredicate(r -> {            // date filter
-    //            LocalDateTime ldt = toLocal(r.startAt);
-    //            if (sel != null) {
-    //                if (ldt == null || !ldt.toLocalDate().equals(sel)) return false;
-    //            }
-    //            // search filter across multiple fields
-    //            if (q.isEmpty()) return true;
-    //            return (r.patientName != null && r.patientName.toLowerCase().contains(q)) ||
-    //                    (r.doctorName != null && r.doctorName.toLowerCase().contains(q)) ||
-    //                    (r.specialty != null && r.specialty.toLowerCase().contains(q)) ||
-    //                    (r.location != null && r.location.toLowerCase().contains(q)) ||
-    //                    (String.valueOf(r.id).contains(q));
-    //        });
-    //
-    //        if (TableAppInDashboard != null) {
-    //            TableAppInDashboard.refresh();
-    //            if (sel != null && TableAppInDashboard.getItems().isEmpty()) {
-    //                // messages handled on date listener
-    //            }
-    //        }
-    //    }
 
     private void applyDashboardFilters() {
         String q = (searchAppointmentDach == null || searchAppointmentDach.getText() == null)
@@ -3044,6 +3124,11 @@ private void loadHeaderUser() {
      * تحديث مخطط حالات المواعيد حسب تاريخ محدد (BarChart)
      */
     private void refreshAppointmentStatusChart(LocalDate day) {
+        if (isOffline()) {
+            showToast("warn", "You are offline. Showing the last loaded appointments.");
+            return;
+        }
+
         if (appointmentStatusChart == null) return;
         if (day == null) {
             day = (dataPickerDashboard != null && dataPickerDashboard.getValue() != null)
@@ -3057,8 +3142,17 @@ private void loadHeaderUser() {
             try {
                 counts = com.example.healthflow.dao.AppointmentJdbcDAO.countByStatusOnDate(dayFinal);
             } catch (Exception e) {
-                e.printStackTrace();
+                if (isConnectionError(e)) {
+                    // لا تفتح Alert، فقط خبّر المستخدم بتوست صغير وخلي آخر داتا موجودة
+                    Platform.runLater(() ->
+                            showToast("warn", "Connection lost. Showing last loaded chart data.")
+                    );
+                    return; // لا نكمل تحديث الشارت
+                } else {
+                    e.printStackTrace();
+                }
             }
+
             final java.util.Map<String, Integer> dataMap = counts;
 
             Platform.runLater(() -> {
@@ -3068,7 +3162,7 @@ private void loadHeaderUser() {
                 appointmentStatusChart.setLegendVisible(false); // save space
 
                 // ---- X Axis (Category) – use short labels to fit space ----
-                final String[] ORDER_FULL = {"SCHEDULED", "COMPLETED", "CANCELLED"};
+                final String[] ORDER_FULL  = {"SCHEDULED", "COMPLETED", "CANCELLED"};
                 final String[] ORDER_SHORT = {"SCHED.", "COMP.", "CANCEL."};
 
                 if (appointmentStatusChart.getXAxis() instanceof CategoryAxis cat) {
@@ -3103,7 +3197,7 @@ private void loadHeaderUser() {
                 series.setName(dayFinal.toString());
 
                 for (int i = 0; i < ORDER_FULL.length; i++) {
-                    String full = ORDER_FULL[i];
+                    String full   = ORDER_FULL[i];
                     String shortL = ORDER_SHORT[i];
                     int v = dataMap.getOrDefault(full, 0);
 
@@ -3193,18 +3287,60 @@ private void loadHeaderUser() {
         return null;
     }
 
+
+    // يعتبر أي SocketException / SQLState 08xxx كـ مشكلة اتصال
+    // --- helper: هل الخطأ سببه الاتصال بالداتابيز/الشبكة؟ ---
+    private static boolean isConnectionError(Throwable ex) {
+        if (ex == null) return false;
+
+        Throwable cur = ex;
+        while (cur != null) {
+            if (cur instanceof java.net.SocketException ||
+                    cur instanceof java.net.SocketTimeoutException) {
+                return true;
+            }
+
+            if (cur instanceof java.sql.SQLException sql) {
+                String state = sql.getSQLState();
+                if (state != null && state.startsWith("08")) {
+                    return true;
+                }
+            }
+
+            if (cur instanceof org.postgresql.util.PSQLException) {
+                return true;
+            }
+
+            cur = cur.getCause();
+        }
+        return false;
+    }
+
     // Unified, debounced UI refresh pipeline used by DB NOTIFY and manual triggers
     private void scheduleCoalescedRefresh() {
         if (uiRefresh == null) return;
+
         uiRefresh.request(() -> {
             // 0) Ensure tables are wired to the right backing lists (fixes empty tables like TableINAppointment)
             ensureTableBindings();
+
+            // Helper صغير عشان ما نكرر الكود
+            java.util.function.Consumer<Throwable> connHandler = t -> {
+                final Throwable ex = t;
+                Platform.runLater(() -> {
+                    if (isConnectionError(ex)) {
+                        showToast("warn", "Connection lost. Dashboard data not refreshed.");
+                    } else {
+                        showError("Dashboard", (Exception) ex);                    }
+                });
+            };
 
             // 1) Dashboard appointments (date picker respected inside)
             try {
                 reloadDashboardAppointments();
             } catch (Throwable t) {
-                System.err.println("[UI-Refresh] reloadDashboardAppointments: " + t);
+                connHandler.accept(t);
+                return; // نوقف باقي خطوات الريفريش
             }
             try {
                 applyDashboardFilters();
@@ -3214,23 +3350,33 @@ private void loadHeaderUser() {
 
             // 2) Chart & counters
             try {
-                LocalDate day = (dataPickerDashboard == null) ? LocalDate.now() : dataPickerDashboard.getValue();
-                if (appointmentStatusChart != null) refreshAppointmentStatusChart(day);
+                reloadDashboardAppointments();
             } catch (Throwable t) {
-                System.err.println("[UI-Refresh] refreshAppointmentStatusChart: " + t);
+                if (isConnectionError(t)) {
+                    Platform.runLater(() ->
+                            showToast("warn", "Connection lost. Dashboard data not refreshed.")
+                    );
+                    return; // نوقف باقي خطوات الريفريش في هذا الدور
+                } else {
+                    System.err.println("[UI-Refresh] reloadDashboardAppointments: " + t);
+                }
             }
             try {
                 updateAppointmentCounters();
             } catch (Throwable t) {
-                System.err.println("[UI-Refresh] updateAppointmentCounters: " + t);
+                connHandler.accept(t);
+                return;
             }
 
-            // 3) Patients/Doctors datasets (background fetches but UI swap on FX thread)
+            // 3) Patients dataset
             try {
                 loadPatientsBG();
             } catch (Throwable t) {
-                System.err.println("[UI-Refresh] loadPatientsBG: " + t);
+                connHandler.accept(t);
+                return;
             }
+
+            // 3b) Doctors dataset (background thread)
             try {
                 new Thread(() -> {
                     try {
@@ -3239,11 +3385,13 @@ private void loadHeaderUser() {
                             doctorData.setAll(list);
                             ensureTableBindings();
                         });
-                    } catch (Throwable ignore) {
+                    } catch (Throwable t) {
+                        connHandler.accept(t);
                     }
                 }, "doctors-reload").start();
             } catch (Throwable t) {
-                System.err.println("[UI-Refresh] reload doctors: " + t);
+                connHandler.accept(t);
+                return;
             }
 
             // 4) Appointments pane table (if visible)
@@ -3251,10 +3399,11 @@ private void loadHeaderUser() {
                 loadAppointmentsTable();
                 if (TableINAppointment != null) TableINAppointment.refresh();
             } catch (Throwable t) {
-                System.err.println("[UI-Refresh] loadAppointmentsTable: " + t);
+                connHandler.accept(t);
+                return;
             }
 
-            // 5) Final touch: refresh visuals
+            // 5) Final touch: refresh visuals (ما في DB calls هنا)
             try {
                 if (TableAppInDashboard != null) TableAppInDashboard.refresh();
                 if (DocTable_Recption != null) DocTable_Recption.refresh();
@@ -3263,7 +3412,6 @@ private void loadHeaderUser() {
             }
         });
     }
-
     private java.sql.Timestamp fetchMaxApptUpdatedAt(java.time.LocalDate day) {
         final String sql = "SELECT MAX(updated_at) FROM appointments WHERE appointment_date::date = ?";
         try (java.sql.Connection c = com.example.healthflow.db.Database.get();
@@ -3302,29 +3450,8 @@ private void loadHeaderUser() {
             }
         }
 
-        monitor.start();
-        if (rootPane != null) {
-            ConnectivityBanner banner = new ConnectivityBanner(monitor);
-            rootPane.getChildren().add(0, banner);
-            banner.prefWidthProperty().bind(rootPane.widthProperty());
-        }
-        OnlineBindings.disableWhenOffline(monitor,
-                InsertButton, UpdateButton, deleteButton, clearBtn,
-                DachboardButton, PatientsButton, AppointmentsButton, DoctorsButton);
+        initConnectivity();
 
-        if (!listenerRegistered) {
-            listenerRegistered = true;
-            final boolean[] firstEmissionHandled = {false};
-            monitor.onlineProperty().addListener((obs, wasOnline, isOnline) -> {
-                if (!firstEmissionHandled[0]) {
-                    firstEmissionHandled[0] = true;
-                    lastNotifiedOnline = isOnline;
-                    return;
-                }
-                if (lastNotifiedOnline != null && lastNotifiedOnline == isOnline) return;
-                lastNotifiedOnline = isOnline;
-            });
-        }
 
         DachboardButton.setOnAction(e -> showDashboardPane());
         PatientsButton.setOnAction(e -> showPatientsPaneAction());
