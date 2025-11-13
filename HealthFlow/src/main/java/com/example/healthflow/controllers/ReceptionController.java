@@ -79,6 +79,8 @@ import javafx.scene.input.ClipboardContent;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
 import javafx.scene.paint.Color;
+import org.controlsfx.control.textfield.AutoCompletionBinding;
+import org.controlsfx.control.textfield.TextFields;
 
 import javax.swing.text.html.ImageView;
 
@@ -1145,25 +1147,41 @@ private void loadHeaderUser() {
         if (DocTable_Recption != null) DocTable_Recption.setItems(doctorData);
     }
 
+    /** Bind text change on searchDoctor to filter DocTable_Recption in real-time (with SortedList binding). */
     private void wireSearchDoctors() {
-        doctorFiltered = new FilteredList<>(doctorData, d -> true);
         if (searchDoctor != null) {
-            searchDoctor.textProperty().addListener((obs, old, q) -> {
-                String s = (q == null) ? "" : q.trim().toLowerCase();
-                if (s.isEmpty()) doctorFiltered.setPredicate(d -> true);
-                else doctorFiltered.setPredicate(d ->
-                        contains(d.getFullName(), s) || contains(d.getGender(), s) ||
-                                contains(d.getPhone(), s) || contains(d.getSpecialty(), s) ||
-                                contains(d.getBio(), s) || contains(d.getStatusText(), s));
-            });
+            try { searchDoctor.setEditable(true); } catch (Throwable ignore) {}
         }
+
+        // تأكيد وجود قائمة مفلترة فوق doctorData
+        if (doctorFiltered == null) {
+            doctorFiltered = new FilteredList<>(doctorData, r -> true);
+        }
+
+        // اربط الجدول بقائمة مرتبة فوق doctorFiltered (مرة واحدة)
         if (DocTable_Recption != null) {
             SortedList<DoctorRow> sorted = new SortedList<>(doctorFiltered);
-            sorted.comparatorProperty().bind(DocTable_Recption.comparatorProperty());
+            try { sorted.comparatorProperty().bind(DocTable_Recption.comparatorProperty()); } catch (Throwable ignore) {}
             DocTable_Recption.setItems(sorted);
         }
-    }
 
+        // فلترة حيّة أثناء الكتابة
+        if (searchDoctor != null) {
+            searchDoctor.textProperty().addListener((obs, oldText, newText) -> {
+                final String q = (newText == null) ? "" : newText.trim().toLowerCase();
+
+                doctorFiltered.setPredicate(r -> {
+                    if (r == null) return false;
+                    if (q.isEmpty()) return true;
+                    // الاسم/التخصص/الغرفة/الايميل… إلخ (مع fallback إلى toString)
+                    String haystack = buildDoctorHaystack(r);
+                    return haystack.contains(q);
+                });
+
+                try { if (DocTable_Recption != null) DocTable_Recption.refresh(); } catch (Throwable ignore) {}
+            });
+        }
+    }
     private void setupDoctorFilters() {
         if (DoctorspecialtyApp != null) {
             DoctorspecialtyApp.setPromptText("Select specialty");
@@ -3570,6 +3588,8 @@ private void loadHeaderUser() {
                 if (searchDoctor != null)
                     searchDoctor.requestFocus();
             });
+            try { if (doctorFiltered != null) doctorFiltered.setPredicate(r -> true); } catch (Throwable ignore) {}
+            try { if (DocTable_Recption != null) DocTable_Recption.refresh(); } catch (Throwable ignore) {}
         }
         if (clearSelectionPatient != null) {
             clearSelectionPatient.setOnAction(e -> {
@@ -4075,6 +4095,103 @@ private void loadHeaderUser() {
             b.setGraphic(null);
             b.setMouseTransparent(false);
         } catch (Throwable ignored) {}
+    }
+
+    // --- Doctor search & autocomplete ---
+    private AutoCompletionBinding<String> doctorAutoComplete;
+
+    /** ControlsFX autocomplete on the doctor search field (name/specialty/room). */
+    private void setupDoctorSearchAutocomplete() {
+        if (searchDoctor == null) return;
+
+        try {
+            if (doctorAutoComplete != null) {
+                doctorAutoComplete.dispose();
+                doctorAutoComplete = null;
+            }
+        } catch (Throwable ignore) {}
+
+        doctorAutoComplete = TextFields.bindAutoCompletion(searchDoctor, req -> {
+            String q = (req.getUserText() == null) ? "" : req.getUserText().trim().toLowerCase();
+            if (q.isEmpty()) return java.util.Collections.emptyList();
+
+            java.util.List<String> out = new java.util.ArrayList<>();
+            for (Object r : doctorData) {
+                String s = formatDoctorSuggestion(r);
+                if (s.toLowerCase().contains(q)) {
+                    out.add(s);
+                    if (out.size() >= 20) break; // حد أقصى للاقتراحات
+                }
+            }
+            return out;
+        });
+
+        doctorAutoComplete.setOnAutoCompleted(ev -> {
+            try { searchDoctor.setText(ev.getCompletion()); } catch (Throwable ignore) {}
+        });
+    }
+
+    private static String s(Object o) { return (o == null) ? "" : String.valueOf(o); }
+
+    private String buildDoctorHaystack(Object r) {
+        try {
+            Class<?> c = r.getClass();
+            StringBuilder sb = new StringBuilder();
+
+            // حقول محتملة
+            try { sb.append(s(c.getField("fullName").get(r))).append(' '); } catch (Throwable ignore) {}
+            try { sb.append(s(c.getField("name").get(r))).append(' '); } catch (Throwable ignore) {}
+            try { sb.append(s(c.getField("doctorName").get(r))).append(' '); } catch (Throwable ignore) {}
+            try { sb.append(s(c.getField("specialty").get(r))).append(' '); } catch (Throwable ignore) {}
+            try { sb.append(s(c.getField("roomNumber").get(r))).append(' '); } catch (Throwable ignore) {}
+            try { sb.append(s(c.getField("location").get(r))).append(' '); } catch (Throwable ignore) {}
+            try { sb.append(s(c.getField("email").get(r))).append(' '); } catch (Throwable ignore) {}
+
+            // Getters محتملة
+            try { sb.append(s(c.getMethod("getFullName").invoke(r))).append(' '); } catch (Throwable ignore) {}
+            try { sb.append(s(c.getMethod("getName").invoke(r))).append(' '); } catch (Throwable ignore) {}
+            try { sb.append(s(c.getMethod("getDoctorName").invoke(r))).append(' '); } catch (Throwable ignore) {}
+            try { sb.append(s(c.getMethod("getSpecialty").invoke(r))).append(' '); } catch (Throwable ignore) {}
+            try { sb.append(s(c.getMethod("getRoomNumber").invoke(r))).append(' '); } catch (Throwable ignore) {}
+            try { sb.append(s(c.getMethod("getLocation").invoke(r))).append(' '); } catch (Throwable ignore) {}
+            try { sb.append(s(c.getMethod("getEmail").invoke(r))).append(' '); } catch (Throwable ignore) {}
+
+            String hay = sb.toString().trim();
+            if (!hay.isEmpty()) return hay.toLowerCase();
+        } catch (Throwable ignore) {}
+        return s(r).toLowerCase();
+    }
+
+    /** صياغة نص الاقتراح المعرُوض للمستخدم. */
+    private String formatDoctorSuggestion(Object r) {
+        try {
+            Class<?> c = r.getClass();
+            String name = null, spec = null, room = null;
+
+            try { name = s(c.getField("fullName").get(r)); } catch (Throwable ignore) {}
+            if (name == null || name.isEmpty()) try { name = s(c.getField("name").get(r)); } catch (Throwable ignore) {}
+            if (name == null || name.isEmpty()) try { name = s(c.getField("doctorName").get(r)); } catch (Throwable ignore) {}
+            if (name == null || name.isEmpty()) try { name = s(c.getMethod("getFullName").invoke(r)); } catch (Throwable ignore) {}
+            if (name == null || name.isEmpty()) try { name = s(c.getMethod("getName").invoke(r)); } catch (Throwable ignore) {}
+            if (name == null || name.isEmpty()) try { name = s(c.getMethod("getDoctorName").invoke(r)); } catch (Throwable ignore) {}
+
+            try { spec = s(c.getField("specialty").get(r)); } catch (Throwable ignore) {}
+            if (spec == null || spec.isEmpty()) try { spec = s(c.getMethod("getSpecialty").invoke(r)); } catch (Throwable ignore) {}
+
+            try { room = s(c.getField("roomNumber").get(r)); } catch (Throwable ignore) {}
+            if (room == null || room.isEmpty()) try { room = s(c.getField("location").get(r)); } catch (Throwable ignore) {}
+            if (room == null || room.isEmpty()) try { room = s(c.getMethod("getRoomNumber").invoke(r)); } catch (Throwable ignore) {}
+            if (room == null || room.isEmpty()) try { room = s(c.getMethod("getLocation").invoke(r)); } catch (Throwable ignore) {}
+
+            StringBuilder sb = new StringBuilder();
+            if (name != null && !name.isEmpty()) sb.append(name);
+            if (spec != null && !spec.isEmpty()) sb.append(" — ").append(spec);
+            if (room != null && !room.isEmpty()) sb.append(" (").append(room).append(')');
+            String out = sb.toString().trim();
+            return out.isEmpty() ? s(r) : out;
+        } catch (Throwable ignore) {
+            return s(r);
+        }
     }
 
 }

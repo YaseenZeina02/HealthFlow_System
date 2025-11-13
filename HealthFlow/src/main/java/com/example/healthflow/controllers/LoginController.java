@@ -1,5 +1,6 @@
 package com.example.healthflow.controllers;
 
+import com.example.healthflow.core.email.EmailSender;
 import com.example.healthflow.db.Database;
 import com.example.healthflow.service.AuthService.Session;
 import com.example.healthflow.dao.UserDAO;
@@ -13,22 +14,22 @@ import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.geometry.Insets;
+import javafx.geometry.Pos;
 import javafx.geometry.Rectangle2D;
+import javafx.scene.Node;
+import javafx.scene.layout.*;
 import javafx.stage.Screen;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
-import javafx.scene.layout.AnchorPane;
-import javafx.scene.layout.HBox;
-import javafx.scene.layout.Pane;
-import javafx.scene.layout.StackPane;
 import javafx.stage.Stage;
 import javafx.util.Duration;
 import org.mindrot.jbcrypt.BCrypt;
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.util.Optional;
 
 
 public class LoginController {
@@ -41,6 +42,7 @@ public class LoginController {
     @FXML private CheckBox ShowPasswordCheckBox;
     @FXML private AnchorPane rootPane;
     @FXML private Button LoginButton;
+    @FXML private Button ForgotButton;
     @FXML private Label AlertLabel;
 
     private boolean rebindDisableAfterLock;
@@ -182,9 +184,109 @@ public class LoginController {
 
             // لو حاب تأثير بصري خفيف أثناء التحميل
             LoginButton.getStyleClass().add("hf-btn");
+            // wire Forgot password
+            if (ForgotButton != null) {
+                ForgotButton.setOnAction(e -> onForgot());
+            }
         }
     }
 
+    /** فتح نافذة "نسيت كلمة المرور" وجمع البيانات ثم إرسال الطلب للإدمن */
+    private void onForgot() {
+        // Dialog UI
+        Dialog<ButtonType> dlg = new Dialog<>();
+        dlg.setTitle("Forgot Password");
+        dlg.setHeaderText("Enter your email and phone to verify your identity");
+
+        ButtonType sendBtn = new ButtonType("Send Request", ButtonBar.ButtonData.OK_DONE);
+        dlg.getDialogPane().getButtonTypes().addAll(sendBtn, ButtonType.CANCEL);
+
+        GridPane gp = new GridPane();
+        gp.setHgap(12);
+        gp.setVgap(8);
+        gp.setAlignment(Pos.CENTER_LEFT);
+
+        TextField emailField = new TextField();
+        TextField phoneField = new TextField();
+        TextArea noteArea = new TextArea();
+        emailField.setPromptText("email@example.com");
+        phoneField.setPromptText("+9705xxxxxxxx");
+        noteArea.setPromptText("Any notes to help the admin verify (optional)");
+        noteArea.setPrefRowCount(3);
+
+        // Prefill email من حقل اليوزر لو موجود
+        if (UserNameTextField != null && UserNameTextField.getText() != null) {
+            emailField.setText(UserNameTextField.getText().trim());
+        }
+
+        gp.add(new Label("Email:"), 0, 0);   gp.add(emailField, 1, 0);
+        gp.add(new Label("Phone:"), 0, 1);   gp.add(phoneField, 1, 1);
+        gp.add(new Label("Notes:"), 0, 2);   gp.add(noteArea, 1, 2);
+
+        dlg.getDialogPane().setContent(gp);
+
+        // Validation: عطّل زر الإرسال لو الإيميل مش صالح
+        Node sendNode = dlg.getDialogPane().lookupButton(sendBtn);
+        sendNode.setDisable(true);
+        emailField.textProperty().addListener((o,a,b) ->
+                sendNode.setDisable(!isValidEmail(b == null ? "" : b.trim().toLowerCase()))
+        );
+
+        Optional<ButtonType> res = dlg.showAndWait();
+        if (res.isEmpty() || res.get() != sendBtn) return;
+
+        String email = emailField.getText() == null ? "" : emailField.getText().trim().toLowerCase();
+        String phone = phoneField.getText() == null ? "" : phoneField.getText().trim();
+        String note  = noteArea.getText() == null  ? "" : noteArea.getText().trim();
+
+        boolean ok = sendResetRequestToAdmin(email, phone, note);
+
+        Alert done = new Alert(ok ? Alert.AlertType.INFORMATION : Alert.AlertType.ERROR);
+        done.setTitle("Password reset request");
+        done.setHeaderText(null);
+        done.setContentText(ok
+                ? "Your request has been sent to the administrator.\nYou'll receive a reply by email."
+                : "Failed to send the request. Please try again later.");
+        done.showAndWait();
+    }
+
+    /**
+     * إرسال الطلب للإدمن (حاليًا: يسجل في activity_logs، ويحاول يرسل إيميل إذا توفّر EmailSender).
+     * يمكنك لاحقًا استبدال الجزء الخاص بالإيميل بدمج AdminMailWatcher/EmailSender لديك.
+     */
+    private boolean sendResetRequestToAdmin(String email, String phone, String note) {
+        try {
+            // (1) سجل في activity_logs (كما هو عندك)
+            try (Connection c = Database.get();
+                 java.sql.PreparedStatement ps = c.prepareStatement(
+                         "INSERT INTO activity_logs(user_id, action, entity_type, metadata) " +
+                                 "VALUES (NULL, 'PASSWORD_RESET_REQUEST', 'USER', jsonb_build_object('email', ?, 'phone', ?, 'note', ?, 'app','HealthFlow'))")) {
+                ps.setString(1, email);
+                ps.setString(2, phone);
+                ps.setString(3, note);
+                ps.executeUpdate();
+            }
+
+            // (2) إرسال بريد
+            String smtpUser = System.getenv("HF_SMTP_USER"); //    healthFlow.System@gmail.com
+            String smtpPass = System.getenv("HF_SMTP_PASS"); //   healt******ystem2025
+            String adminTo  = System.getenv().getOrDefault("HF_ADMIN_EMAIL", smtpUser);
+            System.out.println("SMTP USER: " + System.getenv("HF_SMTP_USER"));
+            if (smtpUser != null && smtpPass != null && adminTo != null) {
+                EmailSender sender = new EmailSender("smtp.gmail.com", 587, smtpUser, smtpPass, true);
+                String subject = "Reset request: " + email;
+                String body = buildAdminResetHtml(email, phone, note);
+                sender.sendHtml(adminTo, subject, body);
+            } else {
+                System.err.println("[ForgotPassword] SMTP env vars missing: HF_SMTP_USER/HF_SMTP_PASS");
+            }
+
+            return true;
+        } catch (Exception e) {
+            System.err.println("[ForgotPassword] unexpected error: " + e.getMessage());
+            return false;
+        }
+    }
 
     /** تحقّق باستخدام BCrypt فقط */
     private User authenticate(String emailOrUser, String plainPassword) throws Exception {
@@ -774,4 +876,53 @@ public class LoginController {
         });
         stay.play();
     }
+
+    // ====== Helpers for nicely formatted admin email (approve/reject buttons) ======
+    private static String buildAdminResetHtml(String userEmail, String phone, String notes) {
+        String toSystem = System.getenv().getOrDefault("HF_SMTP_USER", "healthflow.system@gmail.com");
+
+        String approveHref = "mailto:" + toSystem
+                + "?subject=" + url("APPROVE " + userEmail)
+                + "&body="    + url("APPROVE " + userEmail);
+        String rejectHref  = "mailto:" + toSystem
+                + "?subject=" + url("REJECT " + userEmail)
+                + "&body="    + url("REJECT " + userEmail);
+
+        return """
+    <div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif">
+      <h2 style="margin:0 0 12px">HealthFlow – Password Reset Request</h2>
+      <table style="border-collapse:collapse;margin:10px 0 16px">
+        <tr><td style="padding:4px 8px;color:#555">Email:</td><td style="padding:4px 8px"><b>%s</b></td></tr>
+        <tr><td style="padding:4px 8px;color:#555">Phone:</td><td style="padding:4px 8px">%s</td></tr>
+        <tr><td style="padding:4px 8px;color:#555;vertical-align:top">Notes:</td><td style="padding:4px 8px">%s</td></tr>
+      </table>
+
+      <div style="margin:14px 0 8px">Action:</div>
+      <div style="display:flex;gap:8px">
+        <a href="%s"
+           style="text-decoration:none;background:#10b981;color:#fff;padding:10px 14px;border-radius:8px;font-weight:600">
+           ✅ APPROVE
+        </a>
+        <a href="%s"
+           style="text-decoration:none;background:#ef4444;color:#fff;padding:10px 14px;border-radius:8px;font-weight:600">
+           ❌ REJECT
+        </a>
+      </div>
+
+      <p style="color:#666;margin-top:14px;font-size:12px">
+        Clicking a button opens a reply with the required command. Just send it.
+      </p>
+    </div>
+    """.formatted(escape(userEmail), escape(nullToDash(phone)), escape(nullToDash(notes)), approveHref, rejectHref);
+    }
+
+    private static String url(String s) {
+        try { return java.net.URLEncoder.encode(s, java.nio.charset.StandardCharsets.UTF_8); }
+        catch (Exception e) { return s; }
+    }
+    private static String escape(String s) {
+        if (s == null) return "";
+        return s.replace("&","&amp;").replace("<","&lt;").replace(">","&gt;");
+    }
+    private static String nullToDash(String s){ return (s==null||s.isBlank())? "—" : s; }
 }
