@@ -1,6 +1,8 @@
 package com.example.healthflow.controllers;
 
 import java.sql.ResultSet;
+
+import javafx.scene.media.AudioClip;
 import javafx.scene.paint.Color;
 import com.example.healthflow.dao.DoctorDAO;
 import com.example.healthflow.db.Database;
@@ -300,13 +302,13 @@ public class DoctorController {
     private final PrescriptionDAO prescriptionDAO = new PrescriptionDAO();
 
     private final ObservableList<AppointmentRow> apptData = FXCollections.observableArrayList();
+
+    // Track known appointment IDs to detect newly inserted rows for this doctor
+    private final java.util.Set<Long> knownApptIds = new java.util.HashSet<>();
+    private boolean firstApptLoadDone = false;
+
     private FilteredList<AppointmentRow> apptFiltered = new FilteredList<>(apptData, r -> true);
     private SortedList<AppointmentRow> apptSorted = new SortedList<>(apptFiltered);
-//    private org.controlsfx.control.textfield.AutoCompletionBinding<String> apptSearchBinding;
-
-    // Lightweight autocomplete (no ControlsFX modules needed) (Dashbord)
-//    private final ContextMenu apptAutoMenu = new ContextMenu();
-//    private final java.util.ArrayList<String> apptSuggestions = new java.util.ArrayList<>();
 
     /** Returns the TextField used to search/filter the Appointments table.
      *  Prefer 'searchLabel' (the dashboard search near AppointmentsTable),
@@ -329,6 +331,21 @@ public class DoctorController {
         this(new ConnectivityMonitor());
     }
 
+    // ====== Sounds for doctor dashboard (new appointments) ======
+    private static AudioClip apptNewClip;
+    static {
+        try {
+            var url = DoctorController.class.getResource(
+                    "/sounds/mixkit-software-interface-start-2574.mp3"
+            );
+            if (url != null) {
+                apptNewClip = new AudioClip(url.toExternalForm());
+                apptNewClip.setVolume(0.35); // صوت خفيف
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
 
     /* ====== Nav highlight ====== */
     private static final String ACTIVE_CLASS = "current";
@@ -503,6 +520,10 @@ public class DoctorController {
             // Reload whenever the date changes
             datePickerPatientsWithDoctorDash.valueProperty().addListener((obs, ov, nv) -> {
                 if (nv != null) {
+                    // نبدأ العد من جديد لليوم الجديد
+                    knownApptIds.clear();
+                    firstApptLoadDone = false;
+
                     loadStatsForDateAsync(nv);
                     loadAppointmentsForDateAsync(nv);
                 }
@@ -1018,6 +1039,8 @@ public class DoctorController {
     }
 
     private void reloadAll() {
+        knownApptIds.clear();
+        firstApptLoadDone = false;
         var _dashDate = (datePickerPatientsWithDoctorDash != null && datePickerPatientsWithDoctorDash.getValue() != null)
                 ? datePickerPatientsWithDoctorDash.getValue()
                 : java.time.ZonedDateTime.now(APP_TZ).toLocalDate();
@@ -1462,7 +1485,26 @@ public class DoctorController {
             final List<Appt> finalList = list;
             final Exception finalErr = lastErr;
             Platform.runLater(() -> {
-                // امسح القائمة الحالية دائمًا ثم املأ
+                // 1) اكتشف المواعيد الجديدة بناءً على الـ ID
+                java.util.Set<Long> newIds = new java.util.HashSet<>();
+                if (finalList != null && !finalList.isEmpty()) {
+                    for (Appt a : finalList) {
+                        if (a == null) continue;
+                        long id = a.id;
+                        // لو ID جديد ولم يكن معروف سابقًا
+                        if (!knownApptIds.contains(id)) {
+                            if (firstApptLoadDone) {
+                                // بعد أول تحميل، اعتبر أي ID جديد = موعد جديد -> صوت
+                                newIds.add(id);
+                            }
+                            knownApptIds.add(id);
+                        }
+                    }
+                }
+                // اعتبر إننا خلصنا أول تحميل لليوم الحالي
+                firstApptLoadDone = true;
+
+                // 2) امسح القائمة الحالية دائمًا ثم املأ (نفس السلوك القديم بالضبط)
                 apptData.clear();
 
                 if (finalList != null && !finalList.isEmpty()) {
@@ -1477,6 +1519,14 @@ public class DoctorController {
                     showWarn("Appointments", msg);
                 }
 
+                // 3) لو فيه مواعيد جديدة فعلاً → شغّل صوت الموعد الجديد
+                if (!newIds.isEmpty() && apptNewClip != null) {
+                    try {
+                        apptNewClip.play();
+                    } catch (Exception ignore) { }
+                }
+
+                // 4) فلترة البحث (نفس الكود القديم)
                 try {
                     TextField fld = apptSearchField();
                     String q = (fld == null) ? "" : fld.getText();
@@ -1487,8 +1537,11 @@ public class DoctorController {
                     }
                 } catch (Throwable ignore) { }
 
+                // 5) إعادة ضبط الأعمدة وتحديث الجدول (كما كان)
                 refitAppointmentsColumnsLater();
-                try { if (AppointmentsTable != null) AppointmentsTable.refresh(); } catch (Throwable ignore) { }
+                try {
+                    if (AppointmentsTable != null) AppointmentsTable.refresh();
+                } catch (Throwable ignore) { }
             });
         }, "doc-appts-by-date");
 
