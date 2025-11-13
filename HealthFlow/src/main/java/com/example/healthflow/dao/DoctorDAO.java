@@ -143,9 +143,35 @@ public class DoctorDAO {
                 list.add(r);
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            if (isConnectionException(e)) {
+                // اتصال الداتابيز انقطع (انترنت أو سيرفر) → لا نطبع StackTrace طويلة
+                System.err.println("[doctors-reload] offline \u2013 cannot load doctors (no internet connection).");
+            } else {
+                // أخطاء أخرى (غير متعلقة بالاتصال) نخليها كاملة للديبج
+                e.printStackTrace();
+            }
         }
         return list;
+    }
+
+    // Helper داخلي لاكتشاف أخطاء الاتصال (انقطاع إنترنت / سيرفر)
+    private static boolean isConnectionException(Throwable t) {
+        while (t != null) {
+            if (t instanceof java.net.SocketException
+                    || t instanceof java.net.SocketTimeoutException
+                    || t instanceof java.net.UnknownHostException) {
+                return true;
+            }
+            if (t instanceof org.postgresql.util.PSQLException ps) {
+                String state = ps.getSQLState();
+                if (state != null && state.startsWith("08")) {
+                    // 08xxx → SQLState لفئة connection exception (سيرفر مش شغال / نت مقطوع)
+                    return true;
+                }
+            }
+            t = t.getCause();
+        }
+        return false;
     }
 
     public List<DoctorOption> listAvailableBySpecialty(Connection c, String specialty) throws Exception {

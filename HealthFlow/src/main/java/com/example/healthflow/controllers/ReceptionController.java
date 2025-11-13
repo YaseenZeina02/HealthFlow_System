@@ -18,6 +18,8 @@ import com.example.healthflow.ui.OnlineBindings;
 import com.example.healthflow.db.notify.DbNotifications;
 import com.example.healthflow.ui.fx.RefreshScheduler;
 import com.example.healthflow.ui.fx.TableUtils;
+
+import static com.example.healthflow.dao.DoctorDAO.loadDoctorsBG;
 import static com.example.healthflow.ui.base.Dialogs.error;
 //import static jdk.internal.org.commonmark.text.Characters.isBlank;
 
@@ -33,6 +35,7 @@ import javafx.collections.transformation.SortedList;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.geometry.Insets;
+import javafx.scene.Node;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.chart.BarChart;
@@ -355,6 +358,23 @@ public class ReceptionController {
         return odt == null ? null : odt.atZoneSameInstant(APP_ZONE).toLocalDateTime();
     }
 
+
+
+
+    private void ensureConnectivityBannerOnce() {
+        if (rootPane == null) return;
+        for (Node n : rootPane.getChildren()) {
+            if (n instanceof ConnectivityBanner) {
+                return;
+            }
+        }
+        OnlineBindings.disableWhenOffline(monitor,
+                InsertButton, UpdateButton, deleteButton, clearBtn,
+                DachboardButton, PatientsButton, AppointmentsButton, DoctorsButton
+        );
+        ConnectivityBanner banner = new ConnectivityBanner(monitor);
+        rootPane.getChildren().add(0, banner);
+    }
     private void initConnectivity() {
         if (connectivityInitialized) return;
         connectivityInitialized = true;
@@ -372,10 +392,6 @@ public class ReceptionController {
         }
 
         // عطّل الأزرار فقط لما نكون أوفلاين
-        OnlineBindings.disableWhenOffline(monitor,
-                InsertButton, UpdateButton, deleteButton, clearBtn,
-                DachboardButton, PatientsButton, AppointmentsButton, DoctorsButton
-        );
 
         // نفس اللي كان عندك قبل
         if (!listenerRegistered) {
@@ -389,6 +405,15 @@ public class ReceptionController {
                 }
                 if (lastNotifiedOnline != null && lastNotifiedOnline == isOnline) return;
                 lastNotifiedOnline = isOnline;
+
+                if (!isOnline) {
+                    // أول مرة ينقطع الاتصال في هذه الجلسة → رسالة بسيطة للمستخدم
+                    showToast("warn", "No internet connection.");
+                } else {
+                    // رجع الاتصال → نسمح برسالة انقطاع جديدة في المرة القادمة
+                    offlineToastPrinted = false;
+                    showToast("success", "Back online.");
+                }
             });
         }
     }
@@ -1357,6 +1382,45 @@ private void loadHeaderUser() {
         startDbNotificationsSafe();
     }
 
+
+    // Flag to avoid spamming the same offline toast
+    private boolean offlineToastPrinted = false;
+
+    // Detect network/connection-related exceptions (DB unreachable, timeout, DNS, etc.)
+    private static boolean isConnectionException(Throwable t) {
+        while (t != null) {
+            if (t instanceof java.net.SocketException
+                    || t instanceof java.net.SocketTimeoutException
+                    || t instanceof java.net.UnknownHostException) {
+                return true;
+            }
+            if (t instanceof org.postgresql.util.PSQLException) {
+                String state = ((org.postgresql.util.PSQLException) t).getSQLState();
+                if (state != null && state.startsWith("08")) {
+                    // 08xxx → connection exception (server down, network I/O, ...)
+                    return true;
+                }
+            }
+            t = t.getCause();
+        }
+        return false;
+    }
+
+    private void handleOfflineException(String tag, String op, Exception e) {
+        if (isConnectionException(e)) {
+            // اطبع سطر واضح بدون تفاصيل مزعجة
+            System.err.println(tag + " offline – cannot " + op + " (no internet connection).");
+
+            // رسالة توست بسيطة مرة واحدة لكل فترة انقطاع
+            if (!offlineToastPrinted) {
+                offlineToastPrinted = true;
+                showToast("warn", "No internet connection.");
+            }
+        } else {
+            // أخطاء أخرى (غير متعلقة بالاتصال) نخليها كاملة للديبج
+            e.printStackTrace();
+        }
+    }
 
 
     /* ===== Helpers (alerts & online guard wrapper) ===== */
@@ -2658,8 +2722,8 @@ private void loadHeaderUser() {
             try {
                 rows = doctorDAO.listDashboardAppointments(day);
             } catch (Exception e) {
-                e.printStackTrace();
-                final String msg = e.getMessage();
+                // تعامل موحّد مع أخطاء الاتصال: رسالة بسيطة بدون StackTrace مزعجة
+                handleOfflineException("[reload-dashboard]", "load dashboard appointments", e);
                 return;
             }
 
@@ -3318,97 +3382,41 @@ private void loadHeaderUser() {
 
     // Unified, debounced UI refresh pipeline used by DB NOTIFY and manual triggers
     private void scheduleCoalescedRefresh() {
-        if (uiRefresh == null) return;
-
         uiRefresh.request(() -> {
-            // 0) Ensure tables are wired to the right backing lists (fixes empty tables like TableINAppointment)
-            ensureTableBindings();
+            // لو أصلاً مراقب الاتصال شايفنا أوفلاين، اختصر من البداية
+            if (monitor != null && !monitor.isOnline()) {
+                System.err.println("[ui-refresh] offline – skip refresh cycle.");
+                return;
+            }
 
-            // Helper صغير عشان ما نكرر الكود
-            java.util.function.Consumer<Throwable> connHandler = t -> {
-                final Throwable ex = t;
-                Platform.runLater(() -> {
-                    if (isConnectionError(ex)) {
-                        showToast("warn", "Connection lost. Dashboard data not refreshed.");
-                    } else {
-                        showError("Dashboard", (Exception) ex);                    }
-                });
-            };
-
-            // 1) Dashboard appointments (date picker respected inside)
             try {
                 reloadDashboardAppointments();
-            } catch (Throwable t) {
-                connHandler.accept(t);
-                return; // نوقف باقي خطوات الريفريش
-            }
-            try {
-                applyDashboardFilters();
-            } catch (Throwable t) {
-                System.err.println("[UI-Refresh] applyDashboardFilters: " + t);
+            } catch (Exception e) {
+                handleOfflineException("[ui-refresh]", "reload dashboard appointments", e);
             }
 
-            // 2) Chart & counters
-            try {
-                reloadDashboardAppointments();
-            } catch (Throwable t) {
-                if (isConnectionError(t)) {
-                    Platform.runLater(() ->
-                            showToast("warn", "Connection lost. Dashboard data not refreshed.")
-                    );
-                    return; // نوقف باقي خطوات الريفريش في هذا الدور
-                } else {
-                    System.err.println("[UI-Refresh] reloadDashboardAppointments: " + t);
-                }
-            }
             try {
                 updateAppointmentCounters();
-            } catch (Throwable t) {
-                connHandler.accept(t);
-                return;
+            } catch (Exception e) {
+                handleOfflineException("[ui-refresh]", "update appointment counters", e);
             }
 
-            // 3) Patients dataset
-            try {
-                loadPatientsBG();
-            } catch (Throwable t) {
-                connHandler.accept(t);
-                return;
-            }
-
-            // 3b) Doctors dataset (background thread)
-            try {
-                new Thread(() -> {
-                    try {
-                        var list = DoctorDAO.loadDoctorsBG();
-                        Platform.runLater(() -> {
-                            doctorData.setAll(list);
-                            ensureTableBindings();
-                        });
-                    } catch (Throwable t) {
-                        connHandler.accept(t);
-                    }
-                }, "doctors-reload").start();
-            } catch (Throwable t) {
-                connHandler.accept(t);
-                return;
-            }
-
-            // 4) Appointments pane table (if visible)
             try {
                 loadAppointmentsTable();
-                if (TableINAppointment != null) TableINAppointment.refresh();
-            } catch (Throwable t) {
-                connHandler.accept(t);
-                return;
+            } catch (Exception e) {
+                handleOfflineException("[ui-refresh]", "load appointments table", e);
             }
 
-            // 5) Final touch: refresh visuals (ما في DB calls هنا)
             try {
-                if (TableAppInDashboard != null) TableAppInDashboard.refresh();
-                if (DocTable_Recption != null) DocTable_Recption.refresh();
-                if (patientTable != null) patientTable.refresh();
-            } catch (Throwable ignore) {
+                loadPatientsBG();
+            } catch (Exception e) {
+                handleOfflineException("[ui-refresh]", "load patients", e);
+            }
+
+            try {
+                loadDoctorsBG();
+            } catch (Exception e) {
+                handleOfflineException("[ui-refresh]", "load doctors", e);
             }
         });
     }
@@ -3430,6 +3438,9 @@ private void loadHeaderUser() {
     private void initialize() {
         // CSS attach (safe if scene null at init)
         lblStatus.setText("");
+        if (rootPane != null) {
+            ensureConnectivityBannerOnce();
+        }
         if (rootPane != null) {
             var cssUrl = getClass().getResource("/com/example/healthflow/Design/ReceptionDesign.css");
             attachComboCss(rootPane);
@@ -3621,7 +3632,7 @@ private void loadHeaderUser() {
             }, "hdr-user-load").start();
             new Thread(this::loadPatientsBG, "patients-load").start();
             new Thread(() -> {
-                var list = DoctorDAO.loadDoctorsBG();
+                var list = loadDoctorsBG();
                 Platform.runLater(() -> doctorData.setAll(list));
             }, "doctors-load").start();
         });
