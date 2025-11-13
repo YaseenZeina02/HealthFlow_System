@@ -1961,7 +1961,41 @@ public class DoctorController {
                 showPrescriptionPane();
             }
 
-            Platform.runLater(() -> setPatientHeader(row.getPatientName(), row.getNationalId(), false));
+            // خزّن معلومات الهيدر (اسم المريض + NID + تاريخ/وقت الموعد)
+            final LocalDate apptDate = row.getDate();      // يفترض عندك getter للـ date
+            final String   apptTime = row.getTimeStr();    // هذا اللي استخدمناه في عمود الوقت
+
+            Platform.runLater(() -> {
+                // العنوان القديم (اسم + هوية)
+                setPatientHeader(row.getPatientName(), row.getNationalId(), false);
+
+                // تعبئة dateWithTimePres بتاريخ ووقت الموعد
+                if (dateWithTimePres != null) {
+                    String txt = "";
+
+                    if (apptDate != null) {
+                        // شكله: 2025-11-13  (غيّر الفورمات لو حابب)
+                        txt = apptDate.format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+                    }
+
+                    if (apptTime != null && !apptTime.isBlank()) {
+                        // نحاول نحول "9:00" إلى "09:00 AM" لنفس شكل جدول المواعيد
+                        try {
+                            java.time.LocalTime t24 = java.time.LocalTime.parse(
+                                    apptTime,
+                                    java.time.format.DateTimeFormatter.ofPattern("H:mm")
+                            );
+                            String t12 = t24.format(java.time.format.DateTimeFormatter.ofPattern("hh:mm a"));
+                            txt = txt.isEmpty() ? t12 : (txt + "  " + t12);
+                        } catch (Exception ex) {
+                            // لو فشل البارس، اعرضها زي ما هي
+                            txt = txt.isEmpty() ? apptTime : (txt + "  " + apptTime);
+                        }
+                    }
+
+                    dateWithTimePres.setText(txt);
+                }
+            });
         } catch (Exception ex) {
             showError("Open Prescription", ex);
         }
