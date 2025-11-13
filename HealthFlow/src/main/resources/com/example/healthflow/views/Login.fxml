@@ -64,7 +64,7 @@
                         </Button>
                         <FontIcon iconLiteral="fas-user" iconSize="24" layoutX="74.0" layoutY="213.0" />
                         <FontIcon iconLiteral="fas-lock" iconSize="24" layoutX="75.0" layoutY="276.0" />
-                  <Label fx:id="AlertLabel" layoutX="102.0" layoutY="317.0" prefHeight="39.0" prefWidth="295.0" stylesheets="@../Design/LoginDesign.css" textFill="#4a90e2">
+                  <Label fx:id="AlertLabel" layoutX="102.0" layoutY="317.0" prefHeight="39.0" prefWidth="347.0" stylesheets="@../Design/LoginDesign.css" textFill="#4a90e2">
                      <font>
                         <Font name="System Bold Italic" size="12.0" />
                      </font>

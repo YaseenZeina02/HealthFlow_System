@@ -16,7 +16,10 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.HashSet;
 import java.util.Optional;
+
+import java.util.Set;
 
 import com.example.healthflow.ui.fx.TableUtils;
 import javafx.application.Platform;
@@ -31,6 +34,8 @@ import com.example.healthflow.core.packaging.PackagingSupport.PackagingInfo;
 import com.example.healthflow.core.packaging.PackagingSupport.PackSuggestion;
 import javafx.concurrent.Task; // (لو مش موجود بس)
 import javafx.scene.layout.*;
+import javafx.scene.media.AudioClip;
+import javafx.scene.paint.Color;
 import javafx.stage.Stage;
 import javafx.util.Duration;
 import com.example.healthflow.net.ConnectivityMonitor;
@@ -48,6 +53,7 @@ import javafx.collections.ObservableList;
 import javafx.scene.control.cell.PropertyValueFactory;
 import com.example.healthflow.model.dto.InventoryRow;
 import com.example.healthflow.dao.PharmacyQueries;
+import com.example.healthflow.core.Reports.Reports;
 
 import javafx.collections.transformation.FilteredList;
 import javafx.collections.transformation.SortedList;
@@ -152,6 +158,9 @@ public class PharmacyController {
     @FXML
     private Button PrescriptionsButton;
 
+    @FXML private Button ReportsButton;
+    @FXML private AnchorPane ReportsAnchorPane;
+
     @FXML
     private Label PrescriptionsCompleteNum;
 
@@ -170,11 +179,6 @@ public class PharmacyController {
 
     @FXML
     private Label RejectedNumber;
-
-    @FXML
-    private Button ReportsButton;
-
-
 
     @FXML
     private TableView<PrescItemRow> TablePrescriptionItems;
@@ -208,9 +212,6 @@ public class PharmacyController {
 
     @FXML
     private Label UsernameLabel;
-
-    @FXML
-    private Label alertLabel;
 
     @FXML
     private Label MedicineLabelDt;
@@ -341,6 +342,41 @@ public class PharmacyController {
     @FXML private TableColumn<MedicineSuggestion, String> colSuggName;
     @FXML private TableColumn<MedicineSuggestion, String> colSuggStrength;
 
+
+    //Reports
+    @FXML private TableView<?> nearExpiryTable;
+    @FXML private TableColumn<?, ?> colSerialNumberRep;
+    @FXML private TableColumn<?, ?> colMedicineNameRep;
+    @FXML private TableColumn<?, ?> colBatchNumberRep;
+    @FXML private TableColumn<?, ?> colRepQty;
+    @FXML private TableColumn<?, ?> colExpiryDateRep;
+    @FXML private TableColumn<?, ?> colDays;
+
+
+    @FXML private TableView<?> lowStockTable;
+    @FXML private TableColumn<?, ?> colSerialNumberRepLS;
+    @FXML private TableColumn<?, ?> colMedicineNameRepLow;
+    @FXML private TableColumn<?, ?> colAvailableUnitsRep;
+    @FXML private TableColumn<?, ?> colThresholdRep;
+
+    @FXML private TextField repSearchExpiry;
+    @FXML private TextField repSearchLow;
+    // Backing data for Reports tables
+    private final ObservableList<Reports.NearExpiryRow> nearExpiryRows = FXCollections.observableArrayList();
+    private final ObservableList<Reports.LowStockRow>   lowStockRows   = FXCollections.observableArrayList();
+    private javafx.collections.transformation.FilteredList<Reports.NearExpiryRow> nearFiltered;
+    private javafx.collections.transformation.SortedList<Reports.NearExpiryRow>   nearSorted;
+    private javafx.collections.transformation.FilteredList<Reports.LowStockRow>   lowFiltered;
+    private javafx.collections.transformation.SortedList<Reports.LowStockRow>     lowSorted;
+    private boolean reportsInit = false;
+
+    @FXML private javafx.scene.chart.BarChart<String, Number> repChartMedicinesExpird;
+    @FXML private javafx.scene.chart.LineChart<String, Number> repChartPatients;
+
+    @FXML private DatePicker repMonthPicker;
+    @FXML private Button repBtnExport;
+
+
     private final ObservableList<MedicineSuggestion> medSuggestions = FXCollections.observableArrayList();
     private Long selectedMedicineId = null;
     private final PauseTransition medDebounce = new PauseTransition(Duration.millis(200));
@@ -374,6 +410,23 @@ public class PharmacyController {
     @FXML private Label lblStatus;
     private DeductSupport deductSupport; // from the redy class
 
+    // audio clip forprescription pending
+    private static AudioClip prescPendingClip;
+
+    static {
+        try {
+            var url = PharmacyController.class.getResource(
+                    "/sounds/mixkit-software-interface-start-2574.mp3"
+            );
+            if (url != null) {
+                prescPendingClip = new AudioClip(url.toExternalForm());
+                prescPendingClip.setVolume(0.35);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
     public PharmacyController(ConnectivityMonitor monitor) {
         this.monitor = monitor;
     }
@@ -392,6 +445,8 @@ public class PharmacyController {
     private final javafx.animation.PauseTransition itemsCoalesce = new javafx.animation.PauseTransition(javafx.util.Duration.millis(200));
     private final javafx.animation.PauseTransition invCoalesce   = new javafx.animation.PauseTransition(javafx.util.Duration.millis(200));
     private volatile javafx.concurrent.Task<java.util.List<MedicineSuggestion>> currentMedTask;
+
+    private final java.util.Map<Long, String> prescLastStatus = new java.util.HashMap<>();
 
     private static final class DashboardData {
         int total;
@@ -412,7 +467,7 @@ public class PharmacyController {
 
 
     private void markNavActive(Button active) {
-        Button[] all = {DashboardButton, PrescriptionsButton, InventoryButton};
+        Button[] all = {DashboardButton, PrescriptionsButton, InventoryButton ,ReportsButton};
         for (Button b : all) {
             if (b == null) continue;
             b.getStyleClass().remove(ACTIVE_CLASS);
@@ -632,6 +687,8 @@ public class PharmacyController {
         } catch (Exception ex) {
             System.err.println("[PharmacyController] resolveLoggedInUserLabels: " + ex);
         }
+
+        refreshUserStatusFromDb();
     }
     // Helper to get selected date or today (Asia/Gaza)
     private LocalDate getSelectedDateOrToday() {
@@ -752,7 +809,6 @@ public class PharmacyController {
             }
         } catch (Exception ex) {
             System.err.println("[PharmacyController] refreshPharmacyDashboardCounts: " + ex);
-            if (alertLabel != null) alertLabel.setText("Failed to refresh counts: " + ex.getMessage());
         }
     }
 
@@ -772,9 +828,7 @@ public class PharmacyController {
         if (sb.length() > 0) {
             String miss = sb.substring(0, sb.length() - 2);
             System.out.println("[PharmacyController] Missing fx:id(s): " + miss);
-            if (alertLabel != null) {
-                alertLabel.setText("Missing fx:id(s): " + miss);
-            }
+
             return true;
         }
         return false;
@@ -791,11 +845,451 @@ public class PharmacyController {
         System.out.println("[PharmacyController] showDashboardPane -> ensure listeners running");
         startPharmacyDbNotifications();
         loadDashboardAsync(false);
+        setVisibleManaged(ReportsAnchorPane, false);
+    }
+
+    /** Show Reports pane and mark nav active */
+    private void showReportsPane() {
+        // أخفِ كل الأقسام الأخرى
+        setPrescriptionSidebarState(false, false);
+        setVisibleManaged(pharmacyDashboardAnchorPane, false);
+        setVisibleManaged(PrescriptionAnchorPane, false);
+        setVisibleManaged(InventoryAnchorPane, false);
+        setVisibleManaged(ReportsAnchorPane, true);
+        markNavActive(ReportsButton);
+        startPharmacyDbNotifications();
+
+        // تهيئة الجداول/التشارتات مرة واحدة ثم تحميل البيانات
+        initReportsUiIfNeeded();
+        refreshReportsData();
+    }
+
+    // ===== Reports: one-time UI setup =====
+//    private void initReportsUiIfNeeded() {
+//        if (reportsInit) return;
+//
+//        // ---- Near Expiry table ----
+//        if (nearExpiryTable != null) {
+//            // serial #
+//            if (colSerialNumberRep != null) {
+//                @SuppressWarnings("unchecked")
+//                TableColumn<Reports.NearExpiryRow, Number> sn =
+//                        (TableColumn<Reports.NearExpiryRow, Number>) colSerialNumberRep;
+//                sn.setCellValueFactory(cf ->
+//                        new javafx.beans.property.SimpleIntegerProperty(
+//                                nearExpiryTable.getItems().indexOf(cf.getValue()) + 1));
+//                sn.setStyle("-fx-alignment:CENTER;");
+//            }
+//            // columns mapping
+//            @SuppressWarnings("unchecked")
+//            TableColumn<Reports.NearExpiryRow, String> medCol =
+//                    (TableColumn<Reports.NearExpiryRow, String>) colMedicineNameRep;
+//            @SuppressWarnings("unchecked")
+//            TableColumn<Reports.NearExpiryRow, String> batchCol =
+//                    (TableColumn<Reports.NearExpiryRow, String>) colBatchNumberRep;
+//            @SuppressWarnings("unchecked")
+//            TableColumn<Reports.NearExpiryRow, Number> qtyCol =
+//                    (TableColumn<Reports.NearExpiryRow, Number>) colRepQty;
+//            @SuppressWarnings("unchecked")
+//            TableColumn<Reports.NearExpiryRow, java.time.LocalDate> expCol =
+//                    (TableColumn<Reports.NearExpiryRow, java.time.LocalDate>) colExpiryDateRep;
+//            @SuppressWarnings("unchecked")
+//            TableColumn<Reports.NearExpiryRow, Number> daysCol =
+//                    (TableColumn<Reports.NearExpiryRow, Number>) colDays;
+//
+//            if (medCol  != null) medCol.setCellValueFactory(cd -> new SimpleStringProperty(cd.getValue().medicine()));
+//            if (batchCol!= null) batchCol.setCellValueFactory(cd -> new SimpleStringProperty(cd.getValue().batchNo()));
+//            if (qtyCol  != null) qtyCol.setCellValueFactory(cd -> new javafx.beans.property.SimpleIntegerProperty(cd.getValue().qty()));
+//            if (expCol  != null) expCol.setCellValueFactory(cd -> new javafx.beans.property.SimpleObjectProperty<>(cd.getValue().expiry()));
+//            if (daysCol != null) daysCol.setCellValueFactory(cd -> new javafx.beans.property.SimpleIntegerProperty(cd.getValue().daysLeft()));
+//
+//            // filtering/sorting
+//            if (nearFiltered == null) {
+//                nearFiltered = new javafx.collections.transformation.FilteredList<>(nearExpiryRows, r -> true);
+//                nearSorted   = new javafx.collections.transformation.SortedList<>(nearFiltered);
+//                nearSorted.comparatorProperty().bind(((TableView<Reports.NearExpiryRow>)nearExpiryTable).comparatorProperty());
+//                ((TableView<Reports.NearExpiryRow>)nearExpiryTable).setItems(nearSorted);
+//            }
+//            if (repSearchExpiry != null) {
+//                repSearchExpiry.textProperty().addListener((o,a,b) -> {
+//                    String q = (b==null? "" : b.trim().toLowerCase());
+//                    nearFiltered.setPredicate(r ->
+//                            q.isEmpty()
+//                                    || (r.medicine()!=null && r.medicine().toLowerCase().contains(q))
+//                                    || (r.batchNo()!=null  && r.batchNo().toLowerCase().contains(q)));
+//                });
+//            }
+//        }
+//
+//        // ---- Low Stock table ----
+//        if (lowStockTable != null) {
+//            // serial #
+//            if (colSerialNumberRepLS != null) {
+//                @SuppressWarnings("unchecked")
+//                TableColumn<Reports.LowStockRow, Number> sn2 =
+//                        (TableColumn<Reports.LowStockRow, Number>) colSerialNumberRepLS;
+//                sn2.setCellValueFactory(cf ->
+//                        new javafx.beans.property.SimpleIntegerProperty(
+//                                lowStockTable.getItems().indexOf(cf.getValue()) + 1));
+//                sn2.setStyle("-fx-alignment:CENTER;");
+//            }
+//            @SuppressWarnings("unchecked")
+//            TableColumn<Reports.LowStockRow, String> lMed =
+//                    (TableColumn<Reports.LowStockRow, String>) colMedicineNameRepLow;
+//            @SuppressWarnings("unchecked")
+//            TableColumn<Reports.LowStockRow, Number> lAvail =
+//                    (TableColumn<Reports.LowStockRow, Number>) colAvailableUnitsRep;
+//            @SuppressWarnings("unchecked")
+//            TableColumn<Reports.LowStockRow, Number> lThr =
+//                    (TableColumn<Reports.LowStockRow, Number>) colThresholdRep;
+//
+//            if (lMed   != null) lMed.setCellValueFactory(cd -> new SimpleStringProperty(cd.getValue().medicine()));
+//            if (lAvail != null) lAvail.setCellValueFactory(cd -> new javafx.beans.property.SimpleIntegerProperty(cd.getValue().available()));
+//            if (lThr   != null) lThr.setCellValueFactory(cd -> new javafx.beans.property.SimpleIntegerProperty(cd.getValue().threshold()));
+//
+//            if (lowFiltered == null) {
+//                lowFiltered = new javafx.collections.transformation.FilteredList<>(lowStockRows, r -> true);
+//                lowSorted   = new javafx.collections.transformation.SortedList<>(lowFiltered);
+//                lowSorted.comparatorProperty().bind(((TableView<Reports.LowStockRow>)lowStockTable).comparatorProperty());
+//                ((TableView<Reports.LowStockRow>)lowStockTable).setItems(lowSorted);
+//            }
+//            if (repSearchLow != null) {
+//                repSearchLow.textProperty().addListener((o,a,b) -> {
+//                    String q = (b==null? "" : b.trim().toLowerCase());
+//                    lowFiltered.setPredicate(r -> q.isEmpty()
+//                            || (r.medicine()!=null && r.medicine().toLowerCase().contains(q)));
+//                });
+//            }
+//        }
+//
+//        // Month default + listener
+//        if (repMonthPicker != null && repMonthPicker.getValue() == null) {
+//            repMonthPicker.setValue(java.time.ZonedDateTime.now(APP_TZ).toLocalDate().withDayOfMonth(1));
+//            repMonthPicker.valueProperty().addListener((o,a,b) -> refreshCharts());
+//        }
+//
+//        // Export button
+//        if (repBtnExport != null && repBtnExport.getOnAction() == null) {
+//            repBtnExport.setOnAction(e -> exportReportsCsv());
+//        }
+//
+//        reportsInit = true;
+//    }
+
+    private void initReportsUiIfNeeded() {
+        if (reportsInit) return;
+
+        // ---- Near Expiry table ----
+        if (nearExpiryTable != null) {
+            // serial #
+            if (colSerialNumberRep != null) {
+                @SuppressWarnings("unchecked")
+                TableColumn<Reports.NearExpiryRow, Number> sn =
+                        (TableColumn<Reports.NearExpiryRow, Number>) colSerialNumberRep;
+                sn.setCellValueFactory(cf ->
+                        new javafx.beans.property.SimpleIntegerProperty(
+                                nearExpiryTable.getItems().indexOf(cf.getValue()) + 1));
+                sn.setStyle("-fx-alignment:CENTER;");
+            }
+            // columns mapping
+            @SuppressWarnings("unchecked")
+            TableColumn<Reports.NearExpiryRow, String> medCol =
+                    (TableColumn<Reports.NearExpiryRow, String>) colMedicineNameRep;
+            @SuppressWarnings("unchecked")
+            TableColumn<Reports.NearExpiryRow, String> batchCol =
+                    (TableColumn<Reports.NearExpiryRow, String>) colBatchNumberRep;
+            @SuppressWarnings("unchecked")
+            TableColumn<Reports.NearExpiryRow, Number> qtyCol =
+                    (TableColumn<Reports.NearExpiryRow, Number>) colRepQty;
+            @SuppressWarnings("unchecked")
+            TableColumn<Reports.NearExpiryRow, java.time.LocalDate> expCol =
+                    (TableColumn<Reports.NearExpiryRow, java.time.LocalDate>) colExpiryDateRep;
+            @SuppressWarnings("unchecked")
+            TableColumn<Reports.NearExpiryRow, Number> daysCol =
+                    (TableColumn<Reports.NearExpiryRow, Number>) colDays;
+
+            if (medCol  != null) medCol.setCellValueFactory(cd -> new SimpleStringProperty(cd.getValue().medicine()));
+            if (batchCol!= null) batchCol.setCellValueFactory(cd -> new SimpleStringProperty(cd.getValue().batchNo()));
+            if (qtyCol  != null) qtyCol.setCellValueFactory(cd -> new javafx.beans.property.SimpleIntegerProperty(cd.getValue().qty()));
+            if (expCol  != null) expCol.setCellValueFactory(cd -> new javafx.beans.property.SimpleObjectProperty<>(cd.getValue().expiry()));
+            if (daysCol != null) daysCol.setCellValueFactory(cd -> new javafx.beans.property.SimpleIntegerProperty(cd.getValue().daysLeft()));
+
+            // filtering/sorting
+            if (nearFiltered == null) {
+                nearFiltered = new javafx.collections.transformation.FilteredList<>(nearExpiryRows, r -> true);
+                nearSorted   = new javafx.collections.transformation.SortedList<>(nearFiltered);
+                nearSorted.comparatorProperty().bind(((TableView<Reports.NearExpiryRow>)nearExpiryTable).comparatorProperty());
+                ((TableView<Reports.NearExpiryRow>)nearExpiryTable).setItems(nearSorted);
+            }
+            if (repSearchExpiry != null) {
+                repSearchExpiry.textProperty().addListener((o,a,b) -> {
+                    String q = (b==null? "" : b.trim().toLowerCase());
+                    nearFiltered.setPredicate(r ->
+                            q.isEmpty()
+                                    || (r.medicine()!=null && r.medicine().toLowerCase().contains(q))
+                                    || (r.batchNo()!=null  && r.batchNo().toLowerCase().contains(q)));
+                });
+            }
+        }
+
+        // ---- Low Stock table ----
+        if (lowStockTable != null) {
+            // serial #
+            if (colSerialNumberRepLS != null) {
+                @SuppressWarnings("unchecked")
+                TableColumn<Reports.LowStockRow, Number> sn2 =
+                        (TableColumn<Reports.LowStockRow, Number>) colSerialNumberRepLS;
+                sn2.setCellValueFactory(cf ->
+                        new javafx.beans.property.SimpleIntegerProperty(
+                                lowStockTable.getItems().indexOf(cf.getValue()) + 1));
+                sn2.setStyle("-fx-alignment:CENTER;");
+            }
+            @SuppressWarnings("unchecked")
+            TableColumn<Reports.LowStockRow, String> lMed =
+                    (TableColumn<Reports.LowStockRow, String>) colMedicineNameRepLow;
+            @SuppressWarnings("unchecked")
+            TableColumn<Reports.LowStockRow, Number> lAvail =
+                    (TableColumn<Reports.LowStockRow, Number>) colAvailableUnitsRep;
+            @SuppressWarnings("unchecked")
+            TableColumn<Reports.LowStockRow, Number> lThr =
+                    (TableColumn<Reports.LowStockRow, Number>) colThresholdRep;
+
+            if (lMed   != null) lMed.setCellValueFactory(cd -> new SimpleStringProperty(cd.getValue().medicine()));
+            if (lAvail != null) lAvail.setCellValueFactory(cd -> new javafx.beans.property.SimpleIntegerProperty(cd.getValue().available()));
+            if (lThr   != null) lThr.setCellValueFactory(cd -> new javafx.beans.property.SimpleIntegerProperty(cd.getValue().threshold()));
+
+            if (lowFiltered == null) {
+                lowFiltered = new javafx.collections.transformation.FilteredList<>(lowStockRows, r -> true);
+                lowSorted   = new javafx.collections.transformation.SortedList<>(lowFiltered);
+                lowSorted.comparatorProperty().bind(((TableView<Reports.LowStockRow>)lowStockTable).comparatorProperty());
+                ((TableView<Reports.LowStockRow>)lowStockTable).setItems(lowSorted);
+            }
+            if (repSearchLow != null) {
+                repSearchLow.textProperty().addListener((o,a,b) -> {
+                    String q = (b==null? "" : b.trim().toLowerCase());
+                    lowFiltered.setPredicate(r -> q.isEmpty()
+                            || (r.medicine()!=null && r.medicine().toLowerCase().contains(q)));
+                });
+            }
+        }
+
+        // Month default + listener (snap to day 1)
+        if (repMonthPicker != null && repMonthPicker.getValue() == null) {
+            repMonthPicker.setValue(java.time.ZonedDateTime.now(APP_TZ).toLocalDate().withDayOfMonth(1));
+        }
+        if (repMonthPicker != null) {
+            repMonthPicker.valueProperty().addListener((o,a,b) -> {
+                if (b != null) {
+                    java.time.LocalDate first = b.withDayOfMonth(1);
+                    if (!b.equals(first)) { repMonthPicker.setValue(first); return; }
+                }
+                refreshCharts();
+            });
+        }
+
+        // Export button
+        if (repBtnExport != null && repBtnExport.getOnAction() == null) {
+            repBtnExport.setOnAction(e -> exportReportsCsv());
+        }
+
+        // ===== Fix X-axis labels to W1..W5 =====
+        if (repChartMedicinesExpird != null && repChartMedicinesExpird.getXAxis() instanceof javafx.scene.chart.CategoryAxis x) {
+            x.setCategories(javafx.collections.FXCollections.observableArrayList("W1","W2","W3","W4","W5"));
+        }
+        if (repChartPatients != null && repChartPatients.getXAxis() instanceof javafx.scene.chart.CategoryAxis x2) {
+            x2.setCategories(javafx.collections.FXCollections.observableArrayList("W1","W2","W3","W4","W5"));
+        }
+
+        reportsInit = true;
+    }
+
+    // ===== Reports: loaders =====
+    private void refreshReportsData() {
+        loadNearExpiry();
+        loadLowStock();
+        refreshCharts();
+    }
+
+    private void loadNearExpiry() {
+        if (nearExpiryTable == null) return;
+        Task<ObservableList<Reports.NearExpiryRow>> t = new Task<>() {
+            @Override protected ObservableList<Reports.NearExpiryRow> call() throws Exception {
+                try (Connection c = Database.get()) {
+                    return Reports.loadNearExpiry(c, 30);
+                }
+            }
+        };
+        t.setOnSucceeded(e -> nearExpiryRows.setAll(t.getValue()));
+        t.setOnFailed(e -> System.err.println("[Reports] loadNearExpiry failed: " + t.getException()));
+        new Thread(t, "rep-near-expiry").start();
+    }
+
+    private void loadLowStock() {
+        if (lowStockTable == null) return;
+        Task<ObservableList<Reports.LowStockRow>> t = new Task<>() {
+            @Override protected ObservableList<Reports.LowStockRow> call() throws Exception {
+                try (Connection c = Database.get()) {
+                    return Reports.loadLowStock(c);
+                }
+            }
+        };
+        t.setOnSucceeded(e -> lowStockRows.setAll(t.getValue()));
+        t.setOnFailed(e -> System.err.println("[Reports] loadLowStock failed: " + t.getException()));
+        new Thread(t, "rep-low-stock").start();
+    }
+
+    private void refreshCharts() {
+        if (repMonthPicker == null) return;
+        LocalDate monthStart = repMonthPicker.getValue().withDayOfMonth(1);
+
+        if (repChartMedicinesExpird != null) {
+            repChartMedicinesExpird.getData().clear();
+            try (Connection c = Database.get()) {
+                repChartMedicinesExpird.getData().add(Reports.loadDispensedPerWeek(c, monthStart));
+            } catch (Exception ex) {
+                System.err.println("[Reports] chart medicines failed: " + ex);
+            }
+        }
+
+        if (repChartPatients != null) {
+            repChartPatients.getData().clear();
+            try (Connection c = Database.get()) {
+                repChartPatients.getData().add(Reports.loadNewPatientsPerWeek(c, monthStart));
+            } catch (Exception ex) {
+                System.err.println("[Reports] chart patients failed: " + ex);
+            }
+        }
+    }
+
+    //csv
+    //    private void exportReportsCsv() {
+    //        try {
+    //            // نافذة المالك (لتركيز الديالوج بشكل صحيح)
+    //            javafx.stage.Window owner =
+    //                    (rootPane != null && rootPane.getScene() != null) ? rootPane.getScene().getWindow() : null;
+    //
+    //            // 1) نافذة الحفظ — تدخل اسم الملف من نفس الديالوج
+    //            javafx.stage.FileChooser fc = new javafx.stage.FileChooser();
+    //            fc.setTitle("Save Reports As");
+    //            // فلتر الامتداد
+    //            fc.getExtensionFilters().add(new javafx.stage.FileChooser.ExtensionFilter("CSV (*.csv)", "*.csv"));
+    //            // المجلد المبدئي
+    //            try {
+    //                if (lastExcelDir != null && java.nio.file.Files.isDirectory(lastExcelDir)) {
+    //                    fc.setInitialDirectory(lastExcelDir.toFile());
+    //                }
+    //            } catch (Throwable ignored) {}
+    //            // اترك الاسم فارغ؛ المستخدم يكتب بنفسه
+    //            try { fc.setInitialFileName(""); } catch (Throwable ignored) {}
+    //
+    //            java.io.File chosen = fc.showSaveDialog(owner);
+    //            if (chosen == null) return; // إلغاء
+    //
+    //            // ضمان إضافة .csv لو المستخدم ما كتبها
+    //            java.nio.file.Path target = chosen.toPath();
+    //            String name = target.getFileName().toString();
+    //            if (!name.toLowerCase().endsWith(".csv")) {
+    //                target = target.resolveSibling(name + ".csv");
+    //            }
+    //            // خزّن آخر مجلد اختاره المستخدم
+    //            try { lastExcelDir = target.getParent(); } catch (Throwable ignored) {}
+    //
+    //            // 2) صدّر باستخدام الهيلبر الحالي إلى المجلد المختار (اسم تلقائي) ثم أعد التسمية للاسم المطلوب
+    //            java.nio.file.Path generated = Reports.exportCsv(target.getParent(), nearExpiryRows, lowStockRows);
+    //
+    //            try {
+    //                java.nio.file.Files.move(generated, target, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+    //            } catch (Exception moveEx) {
+    //                // احتياط: لو فشل النقل جرّب النسخ
+    //                java.nio.file.Files.copy(generated, target, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+    //            }
+    //
+    //            new Alert(Alert.AlertType.INFORMATION, "Exported: " + target).showAndWait();
+    //
+    //        } catch (Exception ex) {
+    //            new Alert(Alert.AlertType.ERROR, "Export failed: " + ex.getMessage()).showAndWait();
+    //        }
+    //    }
+
+    //xlsx
+    private void exportReportsCsv() {
+        try {
+            // نافذة المالك
+            javafx.stage.Window owner =
+                    (rootPane != null && rootPane.getScene() != null) ? rootPane.getScene().getWindow() : null;
+
+            // Dialog الحفظ: يتيح كتابة الاسم مباشرة
+            javafx.stage.FileChooser fc = new javafx.stage.FileChooser();
+            fc.setTitle("Save Reports As");
+            javafx.stage.FileChooser.ExtensionFilter xlsxFilter =
+                    new javafx.stage.FileChooser.ExtensionFilter("Excel Workbook (*.xlsx)", "*.xlsx");
+            javafx.stage.FileChooser.ExtensionFilter csvFilter =
+                    new javafx.stage.FileChooser.ExtensionFilter("CSV (*.csv)", "*.csv");
+            fc.getExtensionFilters().addAll(xlsxFilter, csvFilter);
+            fc.setSelectedExtensionFilter(xlsxFilter); // XLSX كخيار افتراضي
+            try {
+                if (lastExcelDir != null && java.nio.file.Files.isDirectory(lastExcelDir)) {
+                    fc.setInitialDirectory(lastExcelDir.toFile());
+                }
+            } catch (Throwable ignored) {}
+            try { fc.setInitialFileName(""); } catch (Throwable ignored) {}
+
+            java.io.File chosen = fc.showSaveDialog(owner);
+            if (chosen == null) return; // إلغاء
+
+            java.nio.file.Path target = chosen.toPath();
+            String name = target.getFileName().toString();
+            boolean wantsXlsx = name.toLowerCase().endsWith(".xlsx")
+                    || fc.getSelectedExtensionFilter() == xlsxFilter;
+
+            // طبّق الامتداد المناسب
+            if (wantsXlsx && !name.toLowerCase().endsWith(".xlsx")) {
+                target = target.resolveSibling(name + ".xlsx");
+            } else if (!wantsXlsx && !name.toLowerCase().endsWith(".csv")) {
+                target = target.resolveSibling(name + ".csv");
+            }
+            try { lastExcelDir = target.getParent(); } catch (Throwable ignored) {}
+
+            // نفّذ التصدير
+            java.nio.file.Path generated;
+            if (wantsXlsx) {
+                generated = com.example.healthflow.core.Reports.Reports.exportXlsx(
+                        target.getParent(),
+                        new java.util.ArrayList<>(nearExpiryRows),
+                        new java.util.ArrayList<>(lowStockRows)
+                );
+            } else {
+                generated = com.example.healthflow.core.Reports.Reports.exportCsv(
+                        target.getParent(), nearExpiryRows, lowStockRows
+                );
+            }
+
+            // نقل/نسخ إلى الاسم النهائي
+            try {
+                java.nio.file.Files.move(generated, target, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            } catch (Exception moveEx) {
+                java.nio.file.Files.copy(generated, target, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            }
+
+            new Alert(Alert.AlertType.INFORMATION, "Exported: " + target).showAndWait();
+
+        } catch (Exception ex) {
+            new Alert(Alert.AlertType.ERROR, "Export failed: " + ex.getMessage()).showAndWait();
+        }
+    }
+
+    // Ensure ReportsButton navigates to Reports pane
+    private void wireReportsButtonIfNeeded() {
+        if (ReportsButton != null && ReportsButton.getOnAction() == null) {
+            ReportsButton.setOnAction(e -> showReportsPane());
+        }
     }
 
     private void loadDashboardTable() {
         loadDashboardAsync(true);
     }
+
+
     private void loadDashboardAsync(boolean force) {
         LocalDate day = getSelectedDateOrToday();
         if (!force && lastLoadedDate != null && lastLoadedDate.equals(day) && !dashboardRows.isEmpty()) {
@@ -805,9 +1299,9 @@ public class PharmacyController {
         dashboardLoading = true;
         lastLoadedDate = day;
 
-        if (alertLabel != null) alertLabel.setText("Loading " + day + " ...");
-        System.out.println("[PharmacyController] loadDashboardAsync start day=" + day);
-        if (PresciptionsTable != null) PresciptionsTable.setPlaceholder(new Label("Loading..."));
+        if (PresciptionsTable != null) {
+            PresciptionsTable.setPlaceholder(new Label("Loading..."));
+        }
 
         // Busy UI hint
         if (rootPane != null) rootPane.setCursor(Cursor.WAIT);
@@ -816,7 +1310,8 @@ public class PharmacyController {
         }
 
         Task<DashboardData> task = new Task<>() {
-            @Override protected DashboardData call() throws Exception {
+            @Override
+            protected DashboardData call() throws Exception {
                 DashboardData data = new DashboardData();
                 try (Connection c = Database.get()) {
                     PrescriptionDAO dao = new PrescriptionDAO();
@@ -834,17 +1329,57 @@ public class PharmacyController {
             System.out.println("[PharmacyController] loadDashboardAsync SUCCESS day=" + lastLoadedDate
                     + " rows=" + (d == null || d.rows == null ? 0 : d.rows.size()));
 
-            // Update counts
             if (d != null) {
-                if (PrescriptionsTodayTotal != null)   PrescriptionsTodayTotal.setText(String.valueOf(d.total));
-                if (PrescriptionsWatingNum != null)    PrescriptionsWatingNum.setText(String.valueOf(d.waiting));
-                if (PrescriptionsCompleteNum != null)  PrescriptionsCompleteNum.setText(String.valueOf(d.completed));
-                // Update table
-                dashboardRows.setAll(d.rows == null ? java.util.Collections.emptyList() : d.rows);
-            }
-            if (PresciptionsTable != null) PresciptionsTable.setPlaceholder(new Label(dashboardRows.isEmpty() ? "No data" : ""));
+                if (PrescriptionsTodayTotal != null)
+                    PrescriptionsTodayTotal.setText(String.valueOf(d.total));
+                if (PrescriptionsWatingNum != null)
+                    PrescriptionsWatingNum.setText(String.valueOf(d.waiting));
+                if (PrescriptionsCompleteNum != null)
+                    PrescriptionsCompleteNum.setText(String.valueOf(d.completed));
 
-            // Finalize UI state
+                // --- صوت تحوّل DRAFT -> PENDING في الداشبورد ---
+                boolean anyNewPending = false;
+                java.util.Set<Long> currentIds = new java.util.HashSet<>();
+
+                if (d.rows != null) {
+                    for (var r : d.rows) {
+                        if (r == null) continue;
+
+                        long id = r.prescriptionId;       // تأكد أن الاسم صحيح في DashboardRow
+                        currentIds.add(id);
+
+                        String newStatus = (r.status == null ? "" : r.status.name());
+                        String oldStatus = prescLastStatus.get(id);
+
+                        // لو كانت قديمة DRAFT والجديدة PENDING → شغّل الصوت
+                        if (oldStatus != null
+                                && "DRAFT".equals(oldStatus)
+                                && "PENDING".equals(newStatus)) {
+                            anyNewPending = true;
+                        }
+
+                        prescLastStatus.put(id, newStatus);
+                    }
+                }
+
+                // احذف الوصفات اللي بطلت موجودة في الداشبورد من الخريطة
+                prescLastStatus.keySet().removeIf(oldId -> !currentIds.contains(oldId));
+
+                // شغّل الصوت لو صار أي انتقال من DRAFT → PENDING
+                if (anyNewPending && prescPendingClip != null) {
+                    prescPendingClip.play();
+                }
+
+                // تحديث الجدول
+                dashboardRows.setAll(
+                        d.rows == null ? java.util.Collections.emptyList() : d.rows
+                );
+            }
+
+            if (PresciptionsTable != null) {
+                PresciptionsTable.setPlaceholder(new Label(dashboardRows.isEmpty() ? "No data" : ""));
+            }
+
             dashboardLoading = false;
             if (rootPane != null) rootPane.setCursor(Cursor.DEFAULT);
             if (DashboardButton != null && !DashboardButton.disableProperty().isBound()) {
@@ -855,8 +1390,9 @@ public class PharmacyController {
         task.setOnFailed(ev -> {
             Throwable ex = task.getException();
             System.err.println("[PharmacyController] loadDashboardAsync FAILED day=" + lastLoadedDate + " ex=" + ex);
-            if (alertLabel != null) alertLabel.setText("Failed to load dashboard: " + (ex == null ? "Unknown error" : ex.getMessage()));
-            if (PresciptionsTable != null) PresciptionsTable.setPlaceholder(new Label("Failed to load"));
+            if (PresciptionsTable != null) {
+                PresciptionsTable.setPlaceholder(new Label("Failed to load"));
+            }
 
             // Finalize UI state
             dashboardLoading = false;
@@ -1290,9 +1826,11 @@ public class PharmacyController {
             );
             // (اختياري) عرض صغير وثابت
             colSerialPhDashboard.setStyle("-fx-alignment: CENTER;");
-            colSerialPhDashboard.setMinWidth(60);
+            /*colSerialPhDashboard.setMinWidth(60);
             colSerialPhDashboard.setPrefWidth(70);
             colSerialPhDashboard.setMaxWidth(100);
+
+             */
         }
         // Names
         if (colPatientName != null) colPatientName.setCellValueFactory(cd -> new javafx.beans.property.SimpleStringProperty(cd.getValue().patientName));
@@ -1609,7 +2147,7 @@ public class PharmacyController {
             });
         }
 
-
+/*
         if (colIdx != null) colIdx.setPrefWidth(50);
         if (colMedicineName != null) colMedicineName.setPrefWidth(180);
         if (colStrength != null) colStrength.setPrefWidth(120);
@@ -1620,6 +2158,9 @@ public class PharmacyController {
         if (colStock != null) colStock.setPrefWidth(120);
         if (colItemStatus != null) colItemStatus.setPrefWidth(120);
         if (colPresesItemAction != null) colPresesItemAction.setPrefWidth(160);
+
+
+ */
     }
 
     private void onApproveItem(int rowIndex) {
@@ -1836,6 +2377,7 @@ public class PharmacyController {
             setVisibleManaged(PrescriptionMedicationAnchorPane, true);
         }
         startPharmacyDbNotifications();
+        setVisibleManaged(ReportsAnchorPane, false);
     }
 
     private void showInventoryPane() {
@@ -1846,6 +2388,7 @@ public class PharmacyController {
         markNavActive(InventoryButton);
         startPharmacyDbNotifications();
         wireInventoryToggles();
+        setVisibleManaged(ReportsAnchorPane, false);
     }
 
     /* ====== Inventory Receive vs Deduct (like segmented behavior) ====== */
@@ -2030,6 +2573,9 @@ public class PharmacyController {
         if (InventoryButton != null) {
             InventoryButton.setOnAction(e -> showInventoryPane());
         }
+        if (ReportsButton != null) {
+            ReportsButton.setOnAction(e -> showReportsPane());
+        }
         // Wire Finish button to handler
         if (Finish_Prescription != null) {
             Finish_Prescription.setOnAction(e -> onFinishPrescription());
@@ -2047,7 +2593,13 @@ public class PharmacyController {
         }
 
         // Disable actions when offline (if OnlineBindings present)
-        try { OnlineBindings.disableWhenOffline(monitor, DashboardButton, InventoryButton, saveBtnReceive, saveBtnDeduct); } catch (Throwable ignored) {}
+        try {
+            OnlineBindings.disableWhenOffline(
+                    monitor,
+                    DashboardButton, InventoryButton, ReportsButton,
+                    saveBtnReceive, saveBtnDeduct
+            );
+        } catch (Throwable ignored) {}
         // Prevent multiple async loads via rapid clicks (if button stays enabled from bindings)
         if (DashboardButton != null) {
             DashboardButton.setOnAction(e -> {
@@ -2076,9 +2628,7 @@ public class PharmacyController {
 
         setupItemsTableColumns();
         if (TablePrescriptionItems != null) {
-            TablePrescriptionItems.setColumnResizePolicy(
-                    javafx.scene.control.TableView.UNCONSTRAINED_RESIZE_POLICY
-            );
+          // TablePrescriptionItems.setColumnResizePolicy(javafx.scene.control.TableView.UNCONSTRAINED_RESIZE_POLICY);
         }
         loadDashboardTable();
 
@@ -2193,7 +2743,9 @@ public class PharmacyController {
                     PresciptionsTable,
                     TableMedicinesInventory,
                     TablePrescriptionItems,
-                    tblMedSuggest
+                    tblMedSuggest,
+                    nearExpiryTable,
+                    lowStockTable
             );
         } catch (Throwable ignore) {}
 
@@ -2257,6 +2809,64 @@ public class PharmacyController {
 
 
     }
+
+    /** Unified status painter for header (works with lblStatus and userStatus if present). */
+    private void updateStatusUI(boolean active) {
+        if (lblStatus != null) {
+            lblStatus.setText(active ? "Active" : "Inactive");
+            lblStatus.setTextFill(active ? Color.web("#16a34a") : Color.web("#dc2626"));
+        }
+        if (userStatus != null) { // في بعض FXML عندك userStatus
+            userStatus.setText(active ? "Active" : "Inactive");
+            userStatus.setTextFill(active ? Color.web("#16a34a") : Color.web("#dc2626"));
+        }
+    }
+
+    /** Read users.is_active for the logged-in user and update the header status label. */
+    private void refreshUserStatusFromDb() {
+        Long uid = null;
+        try { var u = Session.get(); if (u != null) uid = u.getId(); } catch (Throwable ignore) {}
+
+        // Fallback من اللابل لو السيشن مفقود
+        if (uid == null && UserIdLabel != null) {
+            try {
+                String t = UserIdLabel.getText();
+                if (t != null) {
+                    t = t.replaceAll("[^0-9]", "");
+                    if (!t.isBlank()) uid = Long.parseLong(t);
+                }
+            } catch (Exception ignore) {}
+        }
+
+        if (uid == null) {
+            Platform.runLater(() -> {
+                if (lblStatus != null) { lblStatus.setText("Unknown"); lblStatus.setTextFill(Color.web("#6b7280")); }
+                if (userStatus != null) { userStatus.setText("Unknown"); userStatus.setTextFill(Color.web("#6b7280")); }
+            });
+            return;
+        }
+
+        final long userId = uid;
+        Thread th = new Thread(() -> {
+            boolean active = true; // default = true لو العمود NULL
+            try (Connection c = Database.get();
+                 PreparedStatement ps = c.prepareStatement(
+                         "SELECT COALESCE(is_active, TRUE) AS is_active FROM users WHERE id = ?")) {
+                ps.setLong(1, userId);
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) active = rs.getBoolean("is_active");
+                }
+            } catch (Exception ex) {
+                System.err.println("[PharmacyController] refreshUserStatusFromDb error: " + ex.getMessage());
+            }
+            final boolean flag = active;
+            Platform.runLater(() -> updateStatusUI(flag));
+        }, "pharm-user-status");
+        th.setDaemon(true);
+        th.start();
+    }
+
+
     private void startPharmacyDbNotifications() {
         if (dbn != null) return; // already started
         System.out.println("[PharmacyController] starting DbNotifications listeners...");
@@ -2675,18 +3285,10 @@ public class PharmacyController {
             ps.executeUpdate();
         } catch (Exception ex) {
             ex.printStackTrace();
-            if (alertLabel != null) alertLabel.setText("Failed to add medicine: " + ex.getMessage());
         }
     }
 
-    /**
-     * Try to resolve the currently logged-in user id without compile-time dependencies.
-     * Looks for common session holders via reflection:
-     *  - com.example.healthflow.auth.Session#getCurrentUserId()
-     *  - com.example.healthflow.controllers.LoginController#getLoggedInUserId()
-     *  - com.example.healthflow.core.AppSession#getUserId()
-     * Returns null if not found.
-     */
+
     private Long tryResolveCurrentUserId() {
         String[] candidates = new String[] {
                 "com.example.healthflow.auth.Session#getCurrentUserId",
@@ -3914,3 +4516,6 @@ public class PharmacyController {
     }
 }
 
+
+    // Call wireReportsButtonIfNeeded from initialize (if present)
+    // (If you have an initialize() method, append this call at its end)

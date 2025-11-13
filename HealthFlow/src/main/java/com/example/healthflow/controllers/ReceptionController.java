@@ -18,6 +18,8 @@ import com.example.healthflow.ui.OnlineBindings;
 import com.example.healthflow.db.notify.DbNotifications;
 import com.example.healthflow.ui.fx.RefreshScheduler;
 import com.example.healthflow.ui.fx.TableUtils;
+
+import static com.example.healthflow.dao.DoctorDAO.loadDoctorsBG;
 import static com.example.healthflow.ui.base.Dialogs.error;
 //import static jdk.internal.org.commonmark.text.Characters.isBlank;
 
@@ -33,6 +35,7 @@ import javafx.collections.transformation.SortedList;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.geometry.Insets;
+import javafx.scene.Node;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.chart.BarChart;
@@ -46,6 +49,7 @@ import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.AnchorPane;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
+import javafx.scene.media.AudioClip;
 import javafx.scene.shape.Circle;
 import javafx.scene.text.Text;
 import javafx.stage.Modality;
@@ -78,6 +82,9 @@ import javafx.scene.input.Clipboard;
 import javafx.scene.input.ClipboardContent;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
+import javafx.scene.paint.Color;
+import org.controlsfx.control.textfield.AutoCompletionBinding;
+import org.controlsfx.control.textfield.TextFields;
 
 import javax.swing.text.html.ImageView;
 
@@ -216,7 +223,6 @@ public class ReceptionController {
     @FXML private Label AppointmentDateDetailes;
 
     @FXML private ComboBox<String> statusFilter;
-    @FXML private ComboBox<String> statusFilterDashboard; // لو معرف في FXML تجاهل هذا السطر
     @FXML private javafx.scene.image.ImageView imgAvatar;
     @FXML private Label lblStatus;
 
@@ -255,10 +261,11 @@ public class ReceptionController {
     private static final java.time.format.DateTimeFormatter UI_DATE =
             java.time.format.DateTimeFormatter.ofPattern("EEE, MMM d, yyyy");
 
+    private boolean connectivityInitialized = false;
 
-    private final AtomicBoolean refreshBusy = new AtomicBoolean(false);
 
     public static final int DEFAULT_SESSION_MIN = 20;
+
     // --- Coalesced UI refresh + DB NOTIFY ---
     private final RefreshScheduler uiRefresh = new RefreshScheduler(600);
     private DbNotifications apptDbListener;
@@ -289,11 +296,54 @@ public class ReceptionController {
     private static volatile boolean listenerRegistered = false;
     private static volatile Boolean lastNotifiedOnline = null;
 
+
+    // نتذكّر آخر حالة لكل موعد كي لا نرنّي عند أول تحميل
+    private final java.util.Map<Long, String> dashLastStatus = new java.util.HashMap<>();
+
+    private final Deque<AnchorPane> navigationHistory = new ArrayDeque<>();
+
+
     // Cache currently-selected patient to survive pane switches / refreshes
     private PatientRow selectedPatient;
     private boolean patientSelHooked = false;
 
-    private final Deque<AnchorPane> navigationHistory = new ArrayDeque<>();
+    private static AudioClip apptCompletedClip;
+    private static AudioClip apptCancelledClip;
+    static {
+        try {
+            var okUrl = ReceptionController.class.getResource(
+                    "/sounds/mixkit-software-interface-start-2574.mp3");   // COMPLETED
+            if (okUrl != null) {
+                apptCompletedClip = new AudioClip(okUrl.toExternalForm());
+                apptCompletedClip.setVolume(0.35); // صوت خفيف
+            }
+
+            var cancelUrl = ReceptionController.class.getResource(
+                    "/sounds/mixkit-software-interface-back-2575.mp3"); // CANCELLED
+            if (cancelUrl != null) {
+                apptCancelledClip = new AudioClip(cancelUrl.toExternalForm());
+                apptCancelledClip.setVolume(0.35);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+    private void playStatusChangeSound(String newStatus) {
+        if (newStatus == null) return;
+        String st = newStatus.trim().toUpperCase();
+
+        AudioClip clip = null;
+        if ("COMPLETED".equals(st)) {
+            clip = apptCompletedClip;
+        } else if ("CANCELLED".equals(st) || "CANCELED".equals(st) || "CANCEL".equals(st)) {
+            clip = apptCancelledClip;
+        }
+
+        if (clip != null) {
+            clip.play();
+        }
+    }
+
 
     // Gate for AppointmentsButton (avoid setDisable on a bound property)
     private javafx.beans.property.BooleanProperty appointmentsAccess =
@@ -306,6 +356,66 @@ public class ReceptionController {
 
     private static java.time.LocalDateTime toLocal(java.time.OffsetDateTime odt) {
         return odt == null ? null : odt.atZoneSameInstant(APP_ZONE).toLocalDateTime();
+    }
+
+
+
+
+    private void ensureConnectivityBannerOnce() {
+        if (rootPane == null) return;
+        for (Node n : rootPane.getChildren()) {
+            if (n instanceof ConnectivityBanner) {
+                return;
+            }
+        }
+        OnlineBindings.disableWhenOffline(monitor,
+                InsertButton, UpdateButton, deleteButton, clearBtn,
+                DachboardButton, PatientsButton, AppointmentsButton, DoctorsButton,BookAppointmentFromPateint
+        );
+        ConnectivityBanner banner = new ConnectivityBanner(monitor);
+        rootPane.getChildren().add(0, banner);
+    }
+    private void initConnectivity() {
+        if (connectivityInitialized) return;
+        connectivityInitialized = true;
+
+        // شغّل المونيتور
+        if (monitor != null) {
+            monitor.start();
+        }
+
+        // أضف البانر في أعلى الـ rootPane
+        if (rootPane != null && monitor != null) {
+            ConnectivityBanner banner = new ConnectivityBanner(monitor);
+            rootPane.getChildren().add(0, banner);
+            banner.prefWidthProperty().bind(rootPane.widthProperty());
+        }
+
+        // عطّل الأزرار فقط لما نكون أوفلاين
+
+        // نفس اللي كان عندك قبل
+        if (!listenerRegistered) {
+            listenerRegistered = true;
+            final boolean[] firstEmissionHandled = {false};
+            monitor.onlineProperty().addListener((obs, wasOnline, isOnline) -> {
+                if (!firstEmissionHandled[0]) {
+                    firstEmissionHandled[0] = true;
+                    lastNotifiedOnline = isOnline;
+                    return;
+                }
+                if (lastNotifiedOnline != null && lastNotifiedOnline == isOnline) return;
+                lastNotifiedOnline = isOnline;
+
+                if (!isOnline) {
+                    // أول مرة ينقطع الاتصال في هذه الجلسة → رسالة بسيطة للمستخدم
+                    showToast("warn", "No internet connection.");
+                } else {
+                    // رجع الاتصال → نسمح برسالة انقطاع جديدة في المرة القادمة
+                    offlineToastPrinted = false;
+                    showToast("success", "Back online.");
+                }
+            });
+        }
     }
 
     // ===== Transient banner on LabelToAlert (with fade) =====
@@ -461,10 +571,6 @@ public class ReceptionController {
             // no-op if not supported
         }
     }
-
-    // ========== DASHBOARD TABLE RELOAD ==========
-    // This is the method referenced in the instruction (see log message)
-
 
     /* ============ slot load ============ */
 
@@ -819,35 +925,66 @@ public class ReceptionController {
     }
 
     /* ============ Load header user ============ */
-    private void loadHeaderUser() {
-        var u = Session.get();
-        if (u == null) return;
-        String sql = "SELECT id, full_name FROM users WHERE id = ?";
-        try (Connection c = Database.get(); PreparedStatement ps = c.prepareStatement(sql)) {
-            ps.setLong(1, u.getId());
-            try (ResultSet rs = ps.executeQuery()) {
-                if (rs.next()) {
-                    long id = rs.getLong("id");
-                    String fullName = rs.getString("full_name");
-                    Platform.runLater(() -> {
-                        UsernameLabel.setText(fullName);
-                        UserIdLabel.setText(Long.toString(id));
-                        welcomeUser.setText(firstName(fullName));
-                    });
-                    return;
-                }
+private void loadHeaderUser() {
+    var u = Session.get();
+    if (u == null) return;
+
+    final String sql = "SELECT id, full_name, COALESCE(is_active, true) AS is_active FROM users WHERE id = ?";
+
+    try (Connection c = Database.get(); PreparedStatement ps = c.prepareStatement(sql)) {
+        ps.setLong(1, u.getId());
+        try (ResultSet rs = ps.executeQuery()) {
+            if (rs.next()) {
+                long id = rs.getLong("id");
+                String fullName = rs.getString("full_name");
+                boolean active = rs.getBoolean("is_active");
+
+                Platform.runLater(() -> {
+                    if (UsernameLabel != null) UsernameLabel.setText(fullName);
+                    if (UserIdLabel   != null) UserIdLabel.setText(Long.toString(id));
+                    if (welcomeUser   != null) welcomeUser.setText(firstName(fullName));
+
+                    updateStatusUI(Boolean.valueOf(active));
+
+                });
+                return;
             }
-        } catch (SQLException ignored) {}
-        Platform.runLater(() -> {
-            UsernameLabel.setText(u.getFullName());
-            UserIdLabel.setText(String.valueOf(u.getId()));
-            welcomeUser.setText(firstName(u.getFullName()));
-        });
+        }
+    } catch (SQLException e) {
+        // Print the exact DB error to understand why we fell back to "Unknown"
+        System.err.println("[ReceptionController] loadHeaderUser SQL error: " + e.getMessage());
     }
+
+    // ▼ مسار احتياطي يحافظ على السلوك القديم لو فشل الاتصال أو لم نجد السطر
+    Platform.runLater(() -> {
+        if (UsernameLabel != null) UsernameLabel.setText(u.getFullName());
+        if (UserIdLabel   != null) UserIdLabel.setText(String.valueOf(u.getId()));
+        if (welcomeUser   != null) welcomeUser.setText(firstName(u.getFullName()));
+
+        Boolean activeFlag = null;
+        try {
+            activeFlag = (u == null) ? null : Boolean.valueOf(u.isActive());
+        } catch (Throwable ignore) {}
+        updateStatusUI(activeFlag);
+
+    });
+}
 
     private String firstName(String full) {
         if (full == null || full.isBlank()) return "";
         return full.trim().split("\\s+")[0];
+    }
+
+    /** Unified status painter for the header status label (and the ActiveStatus circle if present). */
+    private void updateStatusUI(Boolean activeOpt) {
+        boolean active = (activeOpt == null) ? true : activeOpt.booleanValue();
+        if (lblStatus != null) {
+            lblStatus.setText(active ? "Active" : "Inactive");
+            lblStatus.setTextFill(active ? Color.web("#16a34a") : Color.web("#dc2626"));
+        }
+        if (ActiveStatus != null) {
+            ActiveStatus.setFill(active ? Color.web("#22c55e") : Color.web("#ef4444"));
+        }
     }
 
     /* ============ Navigation ============ */
@@ -1118,25 +1255,41 @@ public class ReceptionController {
         if (DocTable_Recption != null) DocTable_Recption.setItems(doctorData);
     }
 
+    /** Bind text change on searchDoctor to filter DocTable_Recption in real-time (with SortedList binding). */
     private void wireSearchDoctors() {
-        doctorFiltered = new FilteredList<>(doctorData, d -> true);
         if (searchDoctor != null) {
-            searchDoctor.textProperty().addListener((obs, old, q) -> {
-                String s = (q == null) ? "" : q.trim().toLowerCase();
-                if (s.isEmpty()) doctorFiltered.setPredicate(d -> true);
-                else doctorFiltered.setPredicate(d ->
-                        contains(d.getFullName(), s) || contains(d.getGender(), s) ||
-                                contains(d.getPhone(), s) || contains(d.getSpecialty(), s) ||
-                                contains(d.getBio(), s) || contains(d.getStatusText(), s));
-            });
+            try { searchDoctor.setEditable(true); } catch (Throwable ignore) {}
         }
+
+        // تأكيد وجود قائمة مفلترة فوق doctorData
+        if (doctorFiltered == null) {
+            doctorFiltered = new FilteredList<>(doctorData, r -> true);
+        }
+
+        // اربط الجدول بقائمة مرتبة فوق doctorFiltered (مرة واحدة)
         if (DocTable_Recption != null) {
             SortedList<DoctorRow> sorted = new SortedList<>(doctorFiltered);
-            sorted.comparatorProperty().bind(DocTable_Recption.comparatorProperty());
+            try { sorted.comparatorProperty().bind(DocTable_Recption.comparatorProperty()); } catch (Throwable ignore) {}
             DocTable_Recption.setItems(sorted);
         }
-    }
 
+        // فلترة حيّة أثناء الكتابة
+        if (searchDoctor != null) {
+            searchDoctor.textProperty().addListener((obs, oldText, newText) -> {
+                final String q = (newText == null) ? "" : newText.trim().toLowerCase();
+
+                doctorFiltered.setPredicate(r -> {
+                    if (r == null) return false;
+                    if (q.isEmpty()) return true;
+                    // الاسم/التخصص/الغرفة/الايميل… إلخ (مع fallback إلى toString)
+                    String haystack = buildDoctorHaystack(r);
+                    return haystack.contains(q);
+                });
+
+                try { if (DocTable_Recption != null) DocTable_Recption.refresh(); } catch (Throwable ignore) {}
+            });
+        }
+    }
     private void setupDoctorFilters() {
         if (DoctorspecialtyApp != null) {
             DoctorspecialtyApp.setPromptText("Select specialty");
@@ -1229,6 +1382,45 @@ public class ReceptionController {
         startDbNotificationsSafe();
     }
 
+
+    // Flag to avoid spamming the same offline toast
+    private boolean offlineToastPrinted = false;
+
+    // Detect network/connection-related exceptions (DB unreachable, timeout, DNS, etc.)
+    private static boolean isConnectionException(Throwable t) {
+        while (t != null) {
+            if (t instanceof java.net.SocketException
+                    || t instanceof java.net.SocketTimeoutException
+                    || t instanceof java.net.UnknownHostException) {
+                return true;
+            }
+            if (t instanceof org.postgresql.util.PSQLException) {
+                String state = ((org.postgresql.util.PSQLException) t).getSQLState();
+                if (state != null && state.startsWith("08")) {
+                    // 08xxx → connection exception (server down, network I/O, ...)
+                    return true;
+                }
+            }
+            t = t.getCause();
+        }
+        return false;
+    }
+
+    private void handleOfflineException(String tag, String op, Exception e) {
+        if (isConnectionException(e)) {
+            // اطبع سطر واضح بدون تفاصيل مزعجة
+            System.err.println(tag + " offline – cannot " + op + " (no internet connection).");
+
+            // رسالة توست بسيطة مرة واحدة لكل فترة انقطاع
+            if (!offlineToastPrinted) {
+                offlineToastPrinted = true;
+                showToast("warn", "No internet connection.");
+            }
+        } else {
+            // أخطاء أخرى (غير متعلقة بالاتصال) نخليها كاملة للديبج
+            e.printStackTrace();
+        }
+    }
 
 
     /* ===== Helpers (alerts & online guard wrapper) ===== */
@@ -1430,8 +1622,23 @@ public class ReceptionController {
             patientData.remove(row);
             clearForm();
             showInfo("Delete", "Patient deleted.");
-        } catch (Exception e) {
-            showError("Delete Patient", e);
+        } catch (java.sql.SQLException ex) {
+            // 23503 = foreign_key_violation في PostgreSQL
+            if ("23503".equals(ex.getSQLState())) {
+                Alert alert = new Alert(Alert.AlertType.ERROR);
+                alert.setTitle("Delete patient");
+                alert.setHeaderText("Cannot delete this patient");
+                alert.setContentText(
+                        "This patient is still linked to one or more appointments.\n" +
+                                "Please cancel or complete all appointments for this patient " +
+                                "before deleting their record."
+                );
+                alert.showAndWait();
+            } else {
+                error("Delete patient", ex); // رسالتك العامة لأي خطأ آخر
+            }
+        } catch (Exception ex) {
+            error("Delete patient", ex);
         }
 
         try (Connection c = Database.get();
@@ -1789,7 +1996,6 @@ public class ReceptionController {
     // Ensure FilteredList/SortedList are wired to the table items before applying predicates
     private void ensureAppointmentBindings() {
         if (TableINAppointment == null) return;
-        // initialize filteredAppt/sortedAppt if not already correct
         if (filteredAppt == null || sortedAppt == null || TableINAppointment.getItems() != sortedAppt) {
             if (filteredAppt == null) {
                 // fall back to current table items if present, else use apptEditable
@@ -2101,6 +2307,11 @@ public class ReceptionController {
     }
 
     private void updateAppointmentCounters() {
+        if (isOffline()) {
+            showToast("warn", "You are offline. Showing the last loaded appointments.");
+            return;
+        }
+
         java.time.LocalDate sel = (dataPickerDashboard != null && dataPickerDashboard.getValue() != null)
                 ? dataPickerDashboard.getValue()
                 : java.time.LocalDate.now();
@@ -2485,47 +2696,23 @@ public class ReceptionController {
         }
     }
 
-//    private void reloadDashboardAppointments() {
-//        if (TableAppInDashboard == null) return;
-//
-//        java.time.LocalDate sel = (dataPickerDashboard != null && dataPickerDashboard.getValue() != null)
-//                ? dataPickerDashboard.getValue()
-//                : java.time.LocalDate.now();
-//
-//        // اجلب البيانات بالخلفية حتى ما يعلق الـ UI
-//        new Thread(() -> {
-//            try {
-//                var rows = com.example.healthflow.dao.AppointmentJdbcDAO.listByDateAll(sel);
-//
-//                // كل تفاعل مع الواجهة يتم داخل FX thread
-//                Platform.runLater(() -> {
-//                    if (rows != null && !rows.isEmpty()) {
-//                        dashBase.setAll(rows);
-//                        TableAppInDashboard.setPlaceholder(new Label(""));
-//                    } else {
-//                        System.out.println("[Dashboard] no appointments found, keeping previous rows temporarily");
-//                        TableAppInDashboard.setPlaceholder(new Label("No appointments on " + sel));
-//                    }
-//
-//                    applyDashboardFilters();
-//                    TableAppInDashboard.refresh();
-//                    System.out.println("[ReceptionController] reloadDashboardAppointments sel=" + sel + " rows=" + (rows == null ? 0 : rows.size()));
-//                });
-//
-//            } catch (Exception ex) {
-//                System.err.println("[ReceptionController] reloadDashboardAppointments error: " + ex);
-//                Platform.runLater(() -> {
-//                    if (TableAppInDashboard != null)
-//                        TableAppInDashboard.setPlaceholder(new Label("Failed to load"));
-//                });
-//            }
-//        }, "reload-dashboard").start();
-//    }
-
+    private boolean isOffline() {
+        if (monitor == null) return false;
+        try {
+            return !monitor.onlineProperty().get(); // أو isOnlineProperty حسب التسمية عندك
+        } catch (Exception e) {
+            return false;
+        }
+    }
 
     // ========== DASHBOARD TABLE RELOAD ==========
     // This is the method referenced in the instruction (see log message)
     private void reloadDashboardAppointments() {
+        if (isOffline()) {
+            showToast("warn", "You are offline. Showing the last loaded appointments.");
+            return;
+        }
+
         final LocalDate day = (dataPickerDashboard == null || dataPickerDashboard.getValue() == null)
                 ? java.time.LocalDate.now()
                 : dataPickerDashboard.getValue();
@@ -2535,15 +2722,14 @@ public class ReceptionController {
             try {
                 rows = doctorDAO.listDashboardAppointments(day);
             } catch (Exception e) {
-                e.printStackTrace();
-                final String msg = e.getMessage();
-                Platform.runLater(() -> showWarn("Dashboard", "Failed to load dashboard appointments: " + msg));
+                // تعامل موحّد مع أخطاء الاتصال: رسالة بسيطة بدون StackTrace مزعجة
+                handleOfflineException("[reload-dashboard]", "load dashboard appointments", e);
                 return;
             }
 
             final java.util.List<DoctorDAO.AppointmentRow> finalRows = rows;
+
             Platform.runLater(() -> {
-                System.out.println("[ReceptionController] reloadDashboardAppointments sel=" + day + " rows=" + (finalRows == null ? 0 : finalRows.size()));
 
                 // --- Apply rows to dashboard table (clear when empty) ---
                 if (finalRows == null || finalRows.isEmpty()) {
@@ -2552,7 +2738,7 @@ public class ReceptionController {
                         if (TableAppInDashboard != null) {
                             TableAppInDashboard.getSelectionModel().clearSelection();
                             if (TableAppInDashboard.getItems() != dashSorted) {
-                                TableAppInDashboard.setItems(dashSorted); // fix: use dashSorted consistently
+                                TableAppInDashboard.setItems(dashSorted);
                             }
                             TableAppInDashboard.setPlaceholder(new Label(
                                     (day == null ? "No appointments" : ("No appointments for " + day))
@@ -2560,8 +2746,43 @@ public class ReceptionController {
                             TableAppInDashboard.refresh();
                         }
                     } catch (Throwable ignore) {}
-                    System.out.println("[ReceptionController] reloadDashboardAppointments: no rows → cleared table");
-                    return; // stop here; nothing more to populate
+                    // ننظف الذاكرة تبعت الحالات
+                    dashLastStatus.clear();
+                    return;
+                }
+
+                // --- Detect status changes (for sound notification) ---
+                boolean anyInterestingChange = false;
+                String lastInterestingStatus = null;
+
+                java.util.Set<Long> currentIds = new java.util.HashSet<>();
+
+                for (DoctorDAO.AppointmentRow r : finalRows) {
+                    if (r == null) continue;
+                    currentIds.add(r.id);
+
+                    String newSt = (r.status == null ? "" : r.status.trim().toUpperCase());
+                    String oldSt = dashLastStatus.get(r.id);
+
+                    // نتجنب أول تحميل (oldSt == null)
+                    if (oldSt != null && !oldSt.equals(newSt)) {
+                        if ("COMPLETED".equals(newSt)
+                                || "CANCELLED".equals(newSt)
+                                || "CANCELED".equals(newSt)
+                                || "CANCEL".equals(newSt)) {
+                            anyInterestingChange = true;
+                            lastInterestingStatus = newSt;
+                        }
+                    }
+
+                    dashLastStatus.put(r.id, newSt);
+                }
+
+                // احذف من الخريطة أي مواعيد لم تعد موجودة في الجدول
+                dashLastStatus.keySet().removeIf(id -> !currentIds.contains(id));
+
+                if (anyInterestingChange) {
+                    playStatusChangeSound(lastInterestingStatus);
                 }
 
                 // If we have rows → show them
@@ -2572,6 +2793,9 @@ public class ReceptionController {
                     }
                 } catch (Throwable ignore) {}
             });
+
+
+
         }, "reload-dashboard").start();
     }
 
@@ -2782,7 +3006,9 @@ public class ReceptionController {
 
         // --- 1) Table wiring (idempotent) ---
         //TableAppInDashboard.setColumnResizePolicy(TableView.UNCONSTRAINED_RESIZE_POLICY);
-        try { dashSorted.comparatorProperty().bind(TableAppInDashboard.comparatorProperty()); } catch (Throwable ignore) {}
+        try {
+            dashSorted.comparatorProperty().bind(TableAppInDashboard.comparatorProperty());
+        } catch (Throwable ignore) {}
         if (TableAppInDashboard.getItems() != dashSorted) {
             TableAppInDashboard.setItems(dashSorted);
         }
@@ -2793,12 +3019,7 @@ public class ReceptionController {
         // -------- Appointment ID (index shown 1..n) --------
         if (colAppointmentID != null) {
             colAppointmentID.setStyle("-fx-alignment: CENTER;");
-            /*
-            colAppointmentID.setMinWidth(10);
-            colAppointmentID.setPrefWidth(30);
-            colAppointmentID.setMaxWidth(30);
 
-             */
             colAppointmentID.setCellFactory(col -> new TableCell<DoctorDAO.AppointmentRow, Number>() {
                 @Override
                 protected void updateItem(Number item, boolean empty) {
@@ -2812,34 +3033,16 @@ public class ReceptionController {
         // -------- Patient Name --------
         if (colPatientNameDash != null) {
             colPatientNameDash.setCellValueFactory(cd -> new SimpleStringProperty(cd.getValue().patientName));
-            /*
-            colPatientNameDash.setMinWidth(160);
-            colPatientNameDash.setPrefWidth(160);
-            //colPatientNameDash.setMaxWidth(250);
-
-             */
         }
 
         // -------- Doctor Name --------
         if (colDoctorNameDash != null) {
             colDoctorNameDash.setCellValueFactory(cd -> new SimpleStringProperty(cd.getValue().doctorName));
-            /*
-            colDoctorNameDash.setMinWidth(160);
-            colDoctorNameDash.setPrefWidth(160);
-            //colDoctorNameDash.setMaxWidth(250);
-
-             */
         }
 
         // -------- Specialty --------
         if (colSpecialtyDash != null) {
             colSpecialtyDash.setCellValueFactory(cd -> new SimpleStringProperty(cd.getValue().specialty));
-            /*
-            colSpecialtyDash.setMinWidth(120);
-            colSpecialtyDash.setPrefWidth(120);
-            //colSpecialtyDash.setMaxWidth(140);
-
-             */
         }
 
         // -------- Date --------
@@ -2850,12 +3053,6 @@ public class ReceptionController {
             });
             colAppintementDateDash.setEditable(false);
             colAppintementDateDash.setStyle("-fx-alignment: CENTER;");
-            /*
-            colAppintementDateDash.setMinWidth(100);
-            colAppintementDateDash.setPrefWidth(100);
-            //colAppintementDateDash.setMaxWidth(120);
-
-             */
         }
 
         // -------- Time --------
@@ -2868,43 +3065,31 @@ public class ReceptionController {
                 return new SimpleStringProperty(from.format(SLOT_FMT_12H) + " \u2192 " + to.format(SLOT_FMT_12H));
             });
             colAppintementTimeDash.setStyle("-fx-alignment: CENTER;");
-            /*
-            colAppintementTimeDash.setMinWidth(180);
-            colAppintementTimeDash.setPrefWidth(180);
-            //colAppintementTimeDash.setMaxWidth(260);
-
-             */
-
         }
 
         // -------- Room --------
         if (colRoomDash != null) {
             colRoomDash.setCellValueFactory(cd -> new SimpleStringProperty(cd.getValue().location));
             colRoomDash.setStyle("-fx-alignment: CENTER;");
-            /*
-            colRoomDash.setMinWidth(100);
-            colRoomDash.setPrefWidth(100);
-
-             */
         }
 
         // -------- Action (button) --------
         if (colActionDash != null) {
             colActionDash.setStyle("-fx-alignment: CENTER;");
-            /*
-            colActionDash.setMinWidth(100);
-            colActionDash.setPrefWidth(100);
-            //colActionDash.setMaxWidth(100);
-            colActionDash.setResizable(true);
-
-             */
 
             colActionDash.setCellFactory(col -> new TableCell<DoctorDAO.AppointmentRow, Void>() {
                 private final Button btn = new Button("Open");
-                { btn.getStyleClass().add("action-btn"); btn.setFocusTraversable(false); }
-                @Override protected void updateItem(Void item, boolean empty) {
+                {
+                    btn.getStyleClass().add("action-btn");
+                    btn.setFocusTraversable(false);
+                }
+                @Override
+                protected void updateItem(Void item, boolean empty) {
                     super.updateItem(item, empty);
-                    if (empty) { setGraphic(null); return; }
+                    if (empty) {
+                        setGraphic(null);
+                        return;
+                    }
                     btn.setOnAction(e -> {
                         DoctorDAO.AppointmentRow r = getTableView().getItems().get(getIndex());
                         if (r == null) return;
@@ -2931,9 +3116,37 @@ public class ReceptionController {
             });
         }
 
-        // ختامًا: أول تحميل + فلترة (خفيفة جدًا)
-        reloadDashboardAppointments();
-        applyDashboardFilters();
+        // -------- Row styling: color by status (more visible) --------
+        TableAppInDashboard.setRowFactory(tv -> new TableRow<DoctorDAO.AppointmentRow>() {
+            @Override
+            protected void updateItem(DoctorDAO.AppointmentRow item, boolean empty) {
+                super.updateItem(item, empty);
+
+                if (empty || item == null) {
+                    setStyle("");
+                    return;
+                }
+
+                // Normalize status to a safe upper-case string
+                String st = String.valueOf(item.status).trim().toUpperCase();
+
+//                String style;
+                switch (st) {
+                    case "COMPLETED" -> {
+                        getStyleClass().add("appt-completed-row");
+                    }
+                    case "CANCELLED", "CANCELED", "CANCEL" -> {
+                        getStyleClass().add("appt-cancelled-row");
+                    }
+                    case "SCHEDULED" -> {
+                        getStyleClass().add("appt-scheduled-row");
+                    }
+                    default -> {
+                        // لا شيء
+                    }
+                }
+            }
+        });
     }
 
 
@@ -2946,36 +3159,7 @@ public class ReceptionController {
         if (searchAppointmentDach != null) {
             searchAppointmentDach.textProperty().addListener((obs, old, q) -> applyDashboardFilters());
         }
-        reloadDashboardAppointments();
-        applyDashboardFilters();
     }
-
-    //    private void applyDashboardFilters() {
-    //        String q = (searchAppointmentDach == null || searchAppointmentDach.getText() == null)
-    //                ? "" : searchAppointmentDach.getText().trim().toLowerCase();
-    //        LocalDate sel = (dataPickerDashboard == null) ? null : dataPickerDashboard.getValue();
-    //
-    //        dashFiltered.setPredicate(r -> {            // date filter
-    //            LocalDateTime ldt = toLocal(r.startAt);
-    //            if (sel != null) {
-    //                if (ldt == null || !ldt.toLocalDate().equals(sel)) return false;
-    //            }
-    //            // search filter across multiple fields
-    //            if (q.isEmpty()) return true;
-    //            return (r.patientName != null && r.patientName.toLowerCase().contains(q)) ||
-    //                    (r.doctorName != null && r.doctorName.toLowerCase().contains(q)) ||
-    //                    (r.specialty != null && r.specialty.toLowerCase().contains(q)) ||
-    //                    (r.location != null && r.location.toLowerCase().contains(q)) ||
-    //                    (String.valueOf(r.id).contains(q));
-    //        });
-    //
-    //        if (TableAppInDashboard != null) {
-    //            TableAppInDashboard.refresh();
-    //            if (sel != null && TableAppInDashboard.getItems().isEmpty()) {
-    //                // messages handled on date listener
-    //            }
-    //        }
-    //    }
 
     private void applyDashboardFilters() {
         String q = (searchAppointmentDach == null || searchAppointmentDach.getText() == null)
@@ -3004,6 +3188,11 @@ public class ReceptionController {
      * تحديث مخطط حالات المواعيد حسب تاريخ محدد (BarChart)
      */
     private void refreshAppointmentStatusChart(LocalDate day) {
+        if (isOffline()) {
+            showToast("warn", "You are offline. Showing the last loaded appointments.");
+            return;
+        }
+
         if (appointmentStatusChart == null) return;
         if (day == null) {
             day = (dataPickerDashboard != null && dataPickerDashboard.getValue() != null)
@@ -3017,8 +3206,17 @@ public class ReceptionController {
             try {
                 counts = com.example.healthflow.dao.AppointmentJdbcDAO.countByStatusOnDate(dayFinal);
             } catch (Exception e) {
-                e.printStackTrace();
+                if (isConnectionError(e)) {
+                    // لا تفتح Alert، فقط خبّر المستخدم بتوست صغير وخلي آخر داتا موجودة
+                    Platform.runLater(() ->
+                            showToast("warn", "Connection lost. Showing last loaded chart data.")
+                    );
+                    return; // لا نكمل تحديث الشارت
+                } else {
+                    e.printStackTrace();
+                }
             }
+
             final java.util.Map<String, Integer> dataMap = counts;
 
             Platform.runLater(() -> {
@@ -3028,7 +3226,7 @@ public class ReceptionController {
                 appointmentStatusChart.setLegendVisible(false); // save space
 
                 // ---- X Axis (Category) – use short labels to fit space ----
-                final String[] ORDER_FULL = {"SCHEDULED", "COMPLETED", "CANCELLED"};
+                final String[] ORDER_FULL  = {"SCHEDULED", "COMPLETED", "CANCELLED"};
                 final String[] ORDER_SHORT = {"SCHED.", "COMP.", "CANCEL."};
 
                 if (appointmentStatusChart.getXAxis() instanceof CategoryAxis cat) {
@@ -3063,7 +3261,7 @@ public class ReceptionController {
                 series.setName(dayFinal.toString());
 
                 for (int i = 0; i < ORDER_FULL.length; i++) {
-                    String full = ORDER_FULL[i];
+                    String full   = ORDER_FULL[i];
                     String shortL = ORDER_SHORT[i];
                     int v = dataMap.getOrDefault(full, 0);
 
@@ -3153,77 +3351,76 @@ public class ReceptionController {
         return null;
     }
 
+
+    // يعتبر أي SocketException / SQLState 08xxx كـ مشكلة اتصال
+    // --- helper: هل الخطأ سببه الاتصال بالداتابيز/الشبكة؟ ---
+    private static boolean isConnectionError(Throwable ex) {
+        if (ex == null) return false;
+
+        Throwable cur = ex;
+        while (cur != null) {
+            if (cur instanceof java.net.SocketException ||
+                    cur instanceof java.net.SocketTimeoutException) {
+                return true;
+            }
+
+            if (cur instanceof java.sql.SQLException sql) {
+                String state = sql.getSQLState();
+                if (state != null && state.startsWith("08")) {
+                    return true;
+                }
+            }
+
+            if (cur instanceof org.postgresql.util.PSQLException) {
+                return true;
+            }
+
+            cur = cur.getCause();
+        }
+        return false;
+    }
+
     // Unified, debounced UI refresh pipeline used by DB NOTIFY and manual triggers
     private void scheduleCoalescedRefresh() {
-        if (uiRefresh == null) return;
         uiRefresh.request(() -> {
-            // 0) Ensure tables are wired to the right backing lists (fixes empty tables like TableINAppointment)
-            ensureTableBindings();
+            if (isOffline()) {
+                Platform.runLater(() ->
+                        showToast("warn", "No internet connection. Using last loaded data.")
+                );
+                return;
+            }
 
-            // 1) Dashboard appointments (date picker respected inside)
             try {
                 reloadDashboardAppointments();
-            } catch (Throwable t) {
-                System.err.println("[UI-Refresh] reloadDashboardAppointments: " + t);
-            }
-            try {
-                applyDashboardFilters();
-            } catch (Throwable t) {
-                System.err.println("[UI-Refresh] applyDashboardFilters: " + t);
+            } catch (Exception e) {
+                handleOfflineException("[ui-refresh]", "reload dashboard appointments", e);
             }
 
-            // 2) Chart & counters
-            try {
-                LocalDate day = (dataPickerDashboard == null) ? LocalDate.now() : dataPickerDashboard.getValue();
-                if (appointmentStatusChart != null) refreshAppointmentStatusChart(day);
-            } catch (Throwable t) {
-                System.err.println("[UI-Refresh] refreshAppointmentStatusChart: " + t);
-            }
             try {
                 updateAppointmentCounters();
-            } catch (Throwable t) {
-                System.err.println("[UI-Refresh] updateAppointmentCounters: " + t);
+            } catch (Exception e) {
+                handleOfflineException("[ui-refresh]", "update appointment counters", e);
             }
 
-            // 3) Patients/Doctors datasets (background fetches but UI swap on FX thread)
-            try {
-                loadPatientsBG();
-            } catch (Throwable t) {
-                System.err.println("[UI-Refresh] loadPatientsBG: " + t);
-            }
-            try {
-                new Thread(() -> {
-                    try {
-                        var list = DoctorDAO.loadDoctorsBG();
-                        Platform.runLater(() -> {
-                            doctorData.setAll(list);
-                            ensureTableBindings();
-                        });
-                    } catch (Throwable ignore) {
-                    }
-                }, "doctors-reload").start();
-            } catch (Throwable t) {
-                System.err.println("[UI-Refresh] reload doctors: " + t);
-            }
-
-            // 4) Appointments pane table (if visible)
             try {
                 loadAppointmentsTable();
-                if (TableINAppointment != null) TableINAppointment.refresh();
-            } catch (Throwable t) {
-                System.err.println("[UI-Refresh] loadAppointmentsTable: " + t);
+            } catch (Exception e) {
+                handleOfflineException("[ui-refresh]", "load appointments table", e);
             }
 
-            // 5) Final touch: refresh visuals
             try {
-                if (TableAppInDashboard != null) TableAppInDashboard.refresh();
-                if (DocTable_Recption != null) DocTable_Recption.refresh();
-                if (patientTable != null) patientTable.refresh();
-            } catch (Throwable ignore) {
+                loadPatientsBG();
+            } catch (Exception e) {
+                handleOfflineException("[ui-refresh]", "load patients", e);
+            }
+
+            try {
+                loadDoctorsBG();
+            } catch (Exception e) {
+                handleOfflineException("[ui-refresh]", "load doctors", e);
             }
         });
     }
-
     private java.sql.Timestamp fetchMaxApptUpdatedAt(java.time.LocalDate day) {
         final String sql = "SELECT MAX(updated_at) FROM appointments WHERE appointment_date::date = ?";
         try (java.sql.Connection c = com.example.healthflow.db.Database.get();
@@ -3237,37 +3434,14 @@ public class ReceptionController {
         }
     }
 
-    private java.sql.Timestamp fetchMaxPatientUpdatedAt() {
-        final String sql = "SELECT MAX(GREATEST(u.updated_at, p.updated_at)) " +
-                "FROM users u JOIN patients p ON p.user_id = u.id";
-        try (java.sql.Connection c = com.example.healthflow.db.Database.get();
-             java.sql.PreparedStatement ps = c.prepareStatement(sql);
-             java.sql.ResultSet rs = ps.executeQuery()) {
-            return rs.next() ? rs.getTimestamp(1) : null;
-        } catch (java.sql.SQLException e) {
-            return null;
-        }
-    }
-
-    public void setOnline(boolean online) {
-        lblStatus.setText(online ? "Active" : "Offline");
-        lblStatus.getStyleClass().removeAll("active", "offline");
-        lblStatus.getStyleClass().add(online ? "active" : "offline");
-    }
-
-    public void onLoginSuccess(User u) {
-        setOnline(true);
-        if (welcomeUser != null && u != null) {
-            welcomeUser.setText(u.getFullName());
-        }
-        // (اختياري) تحميل الصورة
-        // loadAvatarFromDb(u.getId());
-    }
     /* ============ Init ============ */
     @FXML
     private void initialize() {
-        setOnline(false);
         // CSS attach (safe if scene null at init)
+        lblStatus.setText("");
+        if (rootPane != null) {
+            ensureConnectivityBannerOnce();
+        }
         if (rootPane != null) {
             var cssUrl = getClass().getResource("/com/example/healthflow/Design/ReceptionDesign.css");
             attachComboCss(rootPane);
@@ -3288,29 +3462,8 @@ public class ReceptionController {
             }
         }
 
-        monitor.start();
-        if (rootPane != null) {
-            ConnectivityBanner banner = new ConnectivityBanner(monitor);
-            rootPane.getChildren().add(0, banner);
-            banner.prefWidthProperty().bind(rootPane.widthProperty());
-        }
-        OnlineBindings.disableWhenOffline(monitor,
-                InsertButton, UpdateButton, deleteButton, clearBtn,
-                DachboardButton, PatientsButton, AppointmentsButton, DoctorsButton);
+        initConnectivity();
 
-        if (!listenerRegistered) {
-            listenerRegistered = true;
-            final boolean[] firstEmissionHandled = {false};
-            monitor.onlineProperty().addListener((obs, wasOnline, isOnline) -> {
-                if (!firstEmissionHandled[0]) {
-                    firstEmissionHandled[0] = true;
-                    lastNotifiedOnline = isOnline;
-                    return;
-                }
-                if (lastNotifiedOnline != null && lastNotifiedOnline == isOnline) return;
-                lastNotifiedOnline = isOnline;
-            });
-        }
 
         DachboardButton.setOnAction(e -> showDashboardPane());
         PatientsButton.setOnAction(e -> showPatientsPaneAction());
@@ -3480,7 +3633,7 @@ public class ReceptionController {
             }, "hdr-user-load").start();
             new Thread(this::loadPatientsBG, "patients-load").start();
             new Thread(() -> {
-                var list = DoctorDAO.loadDoctorsBG();
+                var list = loadDoctorsBG();
                 Platform.runLater(() -> doctorData.setAll(list));
             }, "doctors-load").start();
         });
@@ -3523,7 +3676,7 @@ public class ReceptionController {
 //
         wireAppointmentStatusFilter();  // ثبّت الافتراضي (SCHEDULED) أولًا
         wireAppointmentFilters();       // بعدين أربط باقي الفلاتر (التاريخ/البحث)
-        loadFilteredAppointments();     // أخيرًا حمّل البيانات أول مرة
+        refreshDashboardAll();          // تحميل موحّد بدل نداءات متعددة
 
         ComboAnimations.applySmoothSelect(statusFilter, s -> s);
 //        ComboAnimations.enableSlidingSelection(statusFilter, Duration.millis(260));
@@ -3539,7 +3692,6 @@ public class ReceptionController {
         if (dataPickerDashboard != null) {
             dataPickerDashboard.valueProperty().addListener((obs, oldD, newD) -> {
                 reloadDashboardAppointments(); // عشان يعرض بيانات اليوم المختار
-                applyDashboardFilters();
                 refreshAppointmentStatusChart(newD);
                 updateAppointmentCounters();
                 if (newD != null) {
@@ -3575,6 +3727,8 @@ public class ReceptionController {
                 if (searchDoctor != null)
                     searchDoctor.requestFocus();
             });
+            try { if (doctorFiltered != null) doctorFiltered.setPredicate(r -> true); } catch (Throwable ignore) {}
+            try { if (DocTable_Recption != null) DocTable_Recption.refresh(); } catch (Throwable ignore) {}
         }
         if (clearSelectionPatient != null) {
             clearSelectionPatient.setOnAction(e -> {
@@ -4080,6 +4234,103 @@ public class ReceptionController {
             b.setGraphic(null);
             b.setMouseTransparent(false);
         } catch (Throwable ignored) {}
+    }
+
+    // --- Doctor search & autocomplete ---
+    private AutoCompletionBinding<String> doctorAutoComplete;
+
+    /** ControlsFX autocomplete on the doctor search field (name/specialty/room). */
+    private void setupDoctorSearchAutocomplete() {
+        if (searchDoctor == null) return;
+
+        try {
+            if (doctorAutoComplete != null) {
+                doctorAutoComplete.dispose();
+                doctorAutoComplete = null;
+            }
+        } catch (Throwable ignore) {}
+
+        doctorAutoComplete = TextFields.bindAutoCompletion(searchDoctor, req -> {
+            String q = (req.getUserText() == null) ? "" : req.getUserText().trim().toLowerCase();
+            if (q.isEmpty()) return java.util.Collections.emptyList();
+
+            java.util.List<String> out = new java.util.ArrayList<>();
+            for (Object r : doctorData) {
+                String s = formatDoctorSuggestion(r);
+                if (s.toLowerCase().contains(q)) {
+                    out.add(s);
+                    if (out.size() >= 20) break; // حد أقصى للاقتراحات
+                }
+            }
+            return out;
+        });
+
+        doctorAutoComplete.setOnAutoCompleted(ev -> {
+            try { searchDoctor.setText(ev.getCompletion()); } catch (Throwable ignore) {}
+        });
+    }
+
+    private static String s(Object o) { return (o == null) ? "" : String.valueOf(o); }
+
+    private String buildDoctorHaystack(Object r) {
+        try {
+            Class<?> c = r.getClass();
+            StringBuilder sb = new StringBuilder();
+
+            // حقول محتملة
+            try { sb.append(s(c.getField("fullName").get(r))).append(' '); } catch (Throwable ignore) {}
+            try { sb.append(s(c.getField("name").get(r))).append(' '); } catch (Throwable ignore) {}
+            try { sb.append(s(c.getField("doctorName").get(r))).append(' '); } catch (Throwable ignore) {}
+            try { sb.append(s(c.getField("specialty").get(r))).append(' '); } catch (Throwable ignore) {}
+            try { sb.append(s(c.getField("roomNumber").get(r))).append(' '); } catch (Throwable ignore) {}
+            try { sb.append(s(c.getField("location").get(r))).append(' '); } catch (Throwable ignore) {}
+            try { sb.append(s(c.getField("email").get(r))).append(' '); } catch (Throwable ignore) {}
+
+            // Getters محتملة
+            try { sb.append(s(c.getMethod("getFullName").invoke(r))).append(' '); } catch (Throwable ignore) {}
+            try { sb.append(s(c.getMethod("getName").invoke(r))).append(' '); } catch (Throwable ignore) {}
+            try { sb.append(s(c.getMethod("getDoctorName").invoke(r))).append(' '); } catch (Throwable ignore) {}
+            try { sb.append(s(c.getMethod("getSpecialty").invoke(r))).append(' '); } catch (Throwable ignore) {}
+            try { sb.append(s(c.getMethod("getRoomNumber").invoke(r))).append(' '); } catch (Throwable ignore) {}
+            try { sb.append(s(c.getMethod("getLocation").invoke(r))).append(' '); } catch (Throwable ignore) {}
+            try { sb.append(s(c.getMethod("getEmail").invoke(r))).append(' '); } catch (Throwable ignore) {}
+
+            String hay = sb.toString().trim();
+            if (!hay.isEmpty()) return hay.toLowerCase();
+        } catch (Throwable ignore) {}
+        return s(r).toLowerCase();
+    }
+
+    /** صياغة نص الاقتراح المعرُوض للمستخدم. */
+    private String formatDoctorSuggestion(Object r) {
+        try {
+            Class<?> c = r.getClass();
+            String name = null, spec = null, room = null;
+
+            try { name = s(c.getField("fullName").get(r)); } catch (Throwable ignore) {}
+            if (name == null || name.isEmpty()) try { name = s(c.getField("name").get(r)); } catch (Throwable ignore) {}
+            if (name == null || name.isEmpty()) try { name = s(c.getField("doctorName").get(r)); } catch (Throwable ignore) {}
+            if (name == null || name.isEmpty()) try { name = s(c.getMethod("getFullName").invoke(r)); } catch (Throwable ignore) {}
+            if (name == null || name.isEmpty()) try { name = s(c.getMethod("getName").invoke(r)); } catch (Throwable ignore) {}
+            if (name == null || name.isEmpty()) try { name = s(c.getMethod("getDoctorName").invoke(r)); } catch (Throwable ignore) {}
+
+            try { spec = s(c.getField("specialty").get(r)); } catch (Throwable ignore) {}
+            if (spec == null || spec.isEmpty()) try { spec = s(c.getMethod("getSpecialty").invoke(r)); } catch (Throwable ignore) {}
+
+            try { room = s(c.getField("roomNumber").get(r)); } catch (Throwable ignore) {}
+            if (room == null || room.isEmpty()) try { room = s(c.getField("location").get(r)); } catch (Throwable ignore) {}
+            if (room == null || room.isEmpty()) try { room = s(c.getMethod("getRoomNumber").invoke(r)); } catch (Throwable ignore) {}
+            if (room == null || room.isEmpty()) try { room = s(c.getMethod("getLocation").invoke(r)); } catch (Throwable ignore) {}
+
+            StringBuilder sb = new StringBuilder();
+            if (name != null && !name.isEmpty()) sb.append(name);
+            if (spec != null && !spec.isEmpty()) sb.append(" — ").append(spec);
+            if (room != null && !room.isEmpty()) sb.append(" (").append(room).append(')');
+            String out = sb.toString().trim();
+            return out.isEmpty() ? s(r) : out;
+        } catch (Throwable ignore) {
+            return s(r);
+        }
     }
 
 }

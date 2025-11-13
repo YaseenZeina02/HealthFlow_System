@@ -1,5 +1,9 @@
 package com.example.healthflow.controllers;
 
+import java.sql.ResultSet;
+
+import javafx.scene.media.AudioClip;
+import javafx.scene.paint.Color;
 import com.example.healthflow.dao.DoctorDAO;
 import com.example.healthflow.db.Database;
 import com.example.healthflow.model.*;
@@ -298,13 +302,13 @@ public class DoctorController {
     private final PrescriptionDAO prescriptionDAO = new PrescriptionDAO();
 
     private final ObservableList<AppointmentRow> apptData = FXCollections.observableArrayList();
+
+    // Track known appointment IDs to detect newly inserted rows for this doctor
+    private final java.util.Set<Long> knownApptIds = new java.util.HashSet<>();
+    private boolean firstApptLoadDone = false;
+
     private FilteredList<AppointmentRow> apptFiltered = new FilteredList<>(apptData, r -> true);
     private SortedList<AppointmentRow> apptSorted = new SortedList<>(apptFiltered);
-//    private org.controlsfx.control.textfield.AutoCompletionBinding<String> apptSearchBinding;
-
-    // Lightweight autocomplete (no ControlsFX modules needed) (Dashbord)
-//    private final ContextMenu apptAutoMenu = new ContextMenu();
-//    private final java.util.ArrayList<String> apptSuggestions = new java.util.ArrayList<>();
 
     /** Returns the TextField used to search/filter the Appointments table.
      *  Prefer 'searchLabel' (the dashboard search near AppointmentsTable),
@@ -327,6 +331,21 @@ public class DoctorController {
         this(new ConnectivityMonitor());
     }
 
+    // ====== Sounds for doctor dashboard (new appointments) ======
+    private static AudioClip apptNewClip;
+    static {
+        try {
+            var url = DoctorController.class.getResource(
+                    "/sounds/mixkit-software-interface-start-2574.mp3"
+            );
+            if (url != null) {
+                apptNewClip = new AudioClip(url.toExternalForm());
+                apptNewClip.setVolume(0.35); // صوت خفيف
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
 
     /* ====== Nav highlight ====== */
     private static final String ACTIVE_CLASS = "current";
@@ -346,6 +365,17 @@ public class DoctorController {
         }
         if (active != null && !active.getStyleClass().contains(ACTIVE_CLASS)) {
             active.getStyleClass().add(ACTIVE_CLASS);
+        }
+    }
+
+    /** Update header status label (& circle) from a boolean flag. */
+    private void updateStatusUI(boolean active) {
+        if (lblStatus != null) {
+            lblStatus.setText(active ? "Active" : "Inactive");
+            lblStatus.setTextFill(active ? Color.web("#16a34a") : Color.web("#dc2626"));
+        }
+        if (ActiveStatus != null) {
+            ActiveStatus.setFill(active ? Color.web("#22c55e") : Color.web("#ef4444"));
         }
     }
 
@@ -447,9 +477,23 @@ public class DoctorController {
 
         if (clearSelectionDach != null) {
             clearSelectionDach.setOnAction(e -> {
+                // 1) أزل أي تحديد داخل جدول المواعيد
                 if (AppointmentsTable != null) {
                     AppointmentsTable.getSelectionModel().clearSelection();
                 }
+
+                // 2) امسح حقول البحث كلها (searchLabel / search) بأمان
+//                TextField apptSearch = apptSearchField(); // يختار الأفضل بين searchLabel و search
+                try { if (apptSearch != null) apptSearch.clear(); } catch (Throwable ignore) {}
+                try { if (searchLabel != null && searchLabel != apptSearch) searchLabel.clear(); } catch (Throwable ignore) {}
+                try { if (search != null && search != apptSearch) search.clear(); } catch (Throwable ignore) {}
+
+                // 3) صفّر الفلترة (اعرض كل الصفوف)
+                try { applyAppointmentsFilter(""); } catch (Throwable ignore) {}
+
+                // 4) حدّث الجدول وارجع التركيز لحقل البحث
+                try { if (AppointmentsTable != null) AppointmentsTable.refresh(); } catch (Throwable ignore) {}
+                try { if (apptSearch != null) apptSearch.requestFocus(); } catch (Throwable ignore) {}
             });
         }
 
@@ -458,6 +502,9 @@ public class DoctorController {
                 if (patientTable != null) {
                     patientTable.getSelectionModel().clearSelection();
                 }
+                if (searchLabel != null) searchLabel.clear();
+                if (patientTable != null) patientTable.refresh();
+                if (searchLabel != null) searchLabel.requestFocus();
             });
         }
 
@@ -473,6 +520,10 @@ public class DoctorController {
             // Reload whenever the date changes
             datePickerPatientsWithDoctorDash.valueProperty().addListener((obs, ov, nv) -> {
                 if (nv != null) {
+                    // نبدأ العد من جديد لليوم الجديد
+                    knownApptIds.clear();
+                    firstApptLoadDone = false;
+
                     loadStatsForDateAsync(nv);
                     loadAppointmentsForDateAsync(nv);
                 }
@@ -613,7 +664,7 @@ public class DoctorController {
                         FROM appointments a
                         JOIN doctors d  ON d.id = a.doctor_id
                         JOIN users   du ON du.id = d.user_id
-                        WHERE du.id = ?                -- الدكتور الحالي
+                        WHERE du.id = ?   
                         GROUP BY a.patient_id
                     )
                     SELECT
@@ -904,6 +955,19 @@ public class DoctorController {
         UsernameLabel.setText(u.getFullName());
         UserIdLabel.setText(String.valueOf(u.getId()));
         welcomeUser.setText(firstName(u.getFullName()));
+        // Pull fresh is_active from DB (fallback to true if column is NULL/missing)
+        boolean activeFlag = true;
+        try (Connection c = Database.get();
+             PreparedStatement ps = c.prepareStatement(
+                     "SELECT COALESCE(is_active, TRUE) AS is_active FROM users WHERE id = ?")) {
+            ps.setLong(1, u.getId());
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) activeFlag = rs.getBoolean("is_active");
+            }
+        } catch (Exception ex) {
+            System.err.println("[DoctorController] loadUserAndEnsureDoctorProfile is_active read error: " + ex.getMessage());
+        }
+        updateStatusUI(activeFlag);
         // Cache doctor info for prescription header
         currentDoctorUserId = u.getId();
         currentDoctorFullName = u.getFullName();
@@ -975,6 +1039,8 @@ public class DoctorController {
     }
 
     private void reloadAll() {
+        knownApptIds.clear();
+        firstApptLoadDone = false;
         var _dashDate = (datePickerPatientsWithDoctorDash != null && datePickerPatientsWithDoctorDash.getValue() != null)
                 ? datePickerPatientsWithDoctorDash.getValue()
                 : java.time.ZonedDateTime.now(APP_TZ).toLocalDate();
@@ -1419,7 +1485,26 @@ public class DoctorController {
             final List<Appt> finalList = list;
             final Exception finalErr = lastErr;
             Platform.runLater(() -> {
-                // امسح القائمة الحالية دائمًا ثم املأ
+                // 1) اكتشف المواعيد الجديدة بناءً على الـ ID
+                java.util.Set<Long> newIds = new java.util.HashSet<>();
+                if (finalList != null && !finalList.isEmpty()) {
+                    for (Appt a : finalList) {
+                        if (a == null) continue;
+                        long id = a.id;
+                        // لو ID جديد ولم يكن معروف سابقًا
+                        if (!knownApptIds.contains(id)) {
+                            if (firstApptLoadDone) {
+                                // بعد أول تحميل، اعتبر أي ID جديد = موعد جديد -> صوت
+                                newIds.add(id);
+                            }
+                            knownApptIds.add(id);
+                        }
+                    }
+                }
+                // اعتبر إننا خلصنا أول تحميل لليوم الحالي
+                firstApptLoadDone = true;
+
+                // 2) امسح القائمة الحالية دائمًا ثم املأ (نفس السلوك القديم بالضبط)
                 apptData.clear();
 
                 if (finalList != null && !finalList.isEmpty()) {
@@ -1434,6 +1519,14 @@ public class DoctorController {
                     showWarn("Appointments", msg);
                 }
 
+                // 3) لو فيه مواعيد جديدة فعلاً → شغّل صوت الموعد الجديد
+                if (!newIds.isEmpty() && apptNewClip != null) {
+                    try {
+                        apptNewClip.play();
+                    } catch (Exception ignore) { }
+                }
+
+                // 4) فلترة البحث (نفس الكود القديم)
                 try {
                     TextField fld = apptSearchField();
                     String q = (fld == null) ? "" : fld.getText();
@@ -1444,8 +1537,11 @@ public class DoctorController {
                     }
                 } catch (Throwable ignore) { }
 
+                // 5) إعادة ضبط الأعمدة وتحديث الجدول (كما كان)
                 refitAppointmentsColumnsLater();
-                try { if (AppointmentsTable != null) AppointmentsTable.refresh(); } catch (Throwable ignore) { }
+                try {
+                    if (AppointmentsTable != null) AppointmentsTable.refresh();
+                } catch (Throwable ignore) { }
             });
         }, "doc-appts-by-date");
 
@@ -1498,7 +1594,7 @@ public class DoctorController {
 
         // Serial number column: running index (unsortable)
         if (colSerialNumber != null) {
-            colSerialNumber.setResizable(true);
+           // colSerialNumber.setResizable(true);
             colSerialNumber.setSortable(false);
             colSerialNumber.setCellFactory(col -> new TableCell<AppointmentRow, String>() {
                 @Override
@@ -1510,6 +1606,7 @@ public class DoctorController {
         }
 
         // Preferred widths so H-scroll appears when total exceeds viewport
+        /*
         if (colSerialNumber != null) colSerialNumber.setPrefWidth(60);
         if (colDoctorName != null) colDoctorName.setPrefWidth(140);
         if (colPatientName != null) colPatientName.setPrefWidth(220);
@@ -1520,7 +1617,7 @@ public class DoctorController {
             colAction.setPrefWidth(220);
             colAction.setMinWidth(180);
         }
-
+*/
         // --- Make the last column (Action) flex to fill remaining space when available ---
         final double actionBaseWidth = (colAction == null) ? 0 : Math.max(180, colAction.getPrefWidth());
 
@@ -1641,7 +1738,7 @@ public class DoctorController {
         apptSorted.comparatorProperty().bind(AppointmentsTable.comparatorProperty());
         AppointmentsTable.setItems(apptSorted);
         // سياسة القياس: سياسة غير مقيدة لتمكين سكرول أفقي عند تجاوز العرض
-        AppointmentsTable.setColumnResizePolicy(TableView.UNCONSTRAINED_RESIZE_POLICY);
+        //AppointmentsTable.setColumnResizePolicy(TableView.UNCONSTRAINED_RESIZE_POLICY);
         startDbNotificationsForDoctor();
         startLightweightPollingDoctor();
 
@@ -1864,7 +1961,41 @@ public class DoctorController {
                 showPrescriptionPane();
             }
 
-            Platform.runLater(() -> setPatientHeader(row.getPatientName(), row.getNationalId(), false));
+            // خزّن معلومات الهيدر (اسم المريض + NID + تاريخ/وقت الموعد)
+            final LocalDate apptDate = row.getDate();      // يفترض عندك getter للـ date
+            final String   apptTime = row.getTimeStr();    // هذا اللي استخدمناه في عمود الوقت
+
+            Platform.runLater(() -> {
+                // العنوان القديم (اسم + هوية)
+                setPatientHeader(row.getPatientName(), row.getNationalId(), false);
+
+                // تعبئة dateWithTimePres بتاريخ ووقت الموعد
+                if (dateWithTimePres != null) {
+                    String txt = "";
+
+                    if (apptDate != null) {
+                        // شكله: 2025-11-13  (غيّر الفورمات لو حابب)
+                        txt = apptDate.format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+                    }
+
+                    if (apptTime != null && !apptTime.isBlank()) {
+                        // نحاول نحول "9:00" إلى "09:00 AM" لنفس شكل جدول المواعيد
+                        try {
+                            java.time.LocalTime t24 = java.time.LocalTime.parse(
+                                    apptTime,
+                                    java.time.format.DateTimeFormatter.ofPattern("H:mm")
+                            );
+                            String t12 = t24.format(java.time.format.DateTimeFormatter.ofPattern("hh:mm a"));
+                            txt = txt.isEmpty() ? t12 : (txt + "  " + t12);
+                        } catch (Exception ex) {
+                            // لو فشل البارس، اعرضها زي ما هي
+                            txt = txt.isEmpty() ? apptTime : (txt + "  " + apptTime);
+                        }
+                    }
+
+                    dateWithTimePres.setText(txt);
+                }
+            });
         } catch (Exception ex) {
             showError("Open Prescription", ex);
         }

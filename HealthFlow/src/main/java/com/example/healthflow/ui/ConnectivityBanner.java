@@ -10,6 +10,7 @@ import javafx.scene.control.Label;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
+import javafx.scene.layout.StackPane;
 import javafx.util.Duration;
 
 /** شريط تحذير يظهر فقط عندما لا يوجد اتصال إنترنت (بشكل جميل + أنيميشن). */
@@ -104,80 +105,20 @@ public class ConnectivityBanner extends HBox {
         });
         ft.play();
     }
+    public static void attach(StackPane rootPane, ConnectivityMonitor monitor) {
+        if (rootPane == null || monitor == null) return;
+
+        ConnectivityBanner banner = new ConnectivityBanner(monitor);
+
+        // حط البانر في أعلى الـ StackPane
+        rootPane.getChildren().add(0, banner);
+
+        // خلّي عرض البانر يساوي عرض الواجهة
+        banner.prefWidthProperty().bind(rootPane.widthProperty());
+    }
 
     /** مساعد صغير لشدّ عناصر إضافية لليمين إذا احتجت */
     public void appendRight(Node node) {
         getChildren().add(node);
     }
 }
-
-//package com.example.healthflow.ui;
-//
-//import com.example.healthflow.net.ConnectivityMonitor;
-//import javafx.application.Platform;
-//import javafx.geometry.Insets;
-//import javafx.scene.Node;
-//import javafx.scene.control.Button;
-//import javafx.scene.control.Label;
-//import javafx.scene.layout.HBox;
-//
-///** شريط تحذير يظهر فقط عندما لا يوجد اتصال إنترنت. */
-//public class ConnectivityBanner extends HBox {
-//
-//    public ConnectivityBanner(ConnectivityMonitor monitor) {
-//        Label msg = new Label("⚠️ No internet connection");
-//        Button retry = new Button("Retry");
-//        retry.setOnAction(e -> monitor.checkNow());
-//
-//        setSpacing(10);
-//        setPadding(new Insets(8));
-////        setStyle("-fx-background-color: #FFE7A3; -fx-border-color: #E2C46E; -fx-border-width: 0 0 1 0;");
-////        getChildren().addAll(msg, retry);
-//        setStyle("""
-//    -fx-background-color: linear-gradient(to right, #ffe0a3, #ffd280);
-//    -fx-border-color: #e0b96b;
-//    -fx-border-width: 0 0 1 0;
-//    -fx-alignment: CENTER_LEFT;
-//""");
-//
-//        Label icon = new Label("\uD83D\uDCF6"); // رمز الواي فاي
-//        icon.setStyle("-fx-font-size: 16px; -fx-text-fill: #d17b00;");
-//        msg.setStyle("-fx-text-fill: #333; -fx-font-size: 13px;");
-//        retry.setStyle("""
-//    -fx-background-color: #fff3;
-//    -fx-border-color: #dba400;
-//    -fx-border-radius: 6;
-//    -fx-background-radius: 6;
-//    -fx-font-size: 12px;
-//""");
-//
-//        getChildren().setAll(icon, msg, retry);
-//
-//        // تجاهل أول إشارة من monitor لتجنب الوميض المؤقت عند الإقلاع
-//        final boolean[] firstEmissionHandled = {false};
-//        monitor.onlineProperty().addListener((obs, wasOnline, isOnline) -> {
-//            if (!firstEmissionHandled[0]) {
-//                firstEmissionHandled[0] = true;
-//                // خفي البانر مبدئيًا (ما يطلع التنبيه المؤقت)
-//                Platform.runLater(() -> {
-//                    setVisible(false);
-//                    setManaged(false);
-//                });
-//                return;
-//            }
-//            Platform.runLater(() -> {
-//                setVisible(!isOnline);
-//                setManaged(!isOnline);
-//            });
-//        });
-//
-//        // الحالة المبدئية
-//        setVisible(false);
-//        setManaged(false);
-//    }
-//
-//    /** مساعد صغير لشدّ عناصر إضافية لليمين إذا احتجت */
-//    public void appendRight(Node node) {
-//        getChildren().add(node);
-//    }
-//}

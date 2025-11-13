@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.chart.*?>
+
+<!--<AnchorPane fx:id="rootReports" stylesheets="@/com/example/healthflow/Design/ReceptionDesign.css"-->
+<!--            xmlns="http://javafx.com/javafx" xmlns:fx="http://javafx.com/fxml">-->
+
+<AnchorPane xmlns="http://javafx.com/javafx"
+            xmlns:fx="http://javafx.com/fxml"
+
+            prefHeight="400.0" prefWidth="600.0">
+
+<!--    </AnchorPane>-->
+
+    <!-- Top toolbar (month selector + quick actions) -->
+    <HBox spacing="10" AnchorPane.topAnchor="8" AnchorPane.leftAnchor="12" AnchorPane.rightAnchor="12">
+        <Label text="Reports" styleClass="page-title"/>
+        <Pane HBox.hgrow="ALWAYS"/>
+        <Label text="Month:"/>
+        <DatePicker fx:id="monthPicker" promptText="Select month"/>
+        <Button fx:id="btnRefresh" text="Refresh" styleClass="btn-primary"/>
+        <Button fx:id="btnExport" text="Export"  styleClass="btn-secondary"/>
+    </HBox>
+
+    <!-- Main split -->
+    <SplitPane orientation="HORIZONTAL" dividerPositions="0.42"
+               AnchorPane.topAnchor="52" AnchorPane.leftAnchor="12"
+               AnchorPane.rightAnchor="12" AnchorPane.bottomAnchor="12">
+        <!-- LEFT: tables -->
+        <AnchorPane>
+            <VBox spacing="12" AnchorPane.topAnchor="0" AnchorPane.leftAnchor="0"
+                  AnchorPane.rightAnchor="0" AnchorPane.bottomAnchor="0">
+                <!-- Near Expiry -->
+                <TitledPane text="Medicines Near Expiry (next 30 days)" expanded="true" styleClass="card">
+                    <VBox spacing="8" padding="10">
+                        <TextField fx:id="searchExpiry" promptText="search…"/>
+                        <TableView fx:id="tblNearExpiry" prefHeight="220">
+                            <columns>
+                                <TableColumn fx:id="colNExpIdx"      text="#"            prefWidth="40"/>
+                                <TableColumn fx:id="colNExpMed"      text="Medicine"     prefWidth="160"/>
+                                <TableColumn fx:id="colNExpBatch"    text="Batch"        prefWidth="120"/>
+                                <TableColumn fx:id="colNExpQty"      text="Qty"          prefWidth="80"  />
+                                <TableColumn fx:id="colNExpExpiry"   text="Expiry"       prefWidth="120"/>
+                                <TableColumn fx:id="colNExpDaysLeft" text="Days Left"    prefWidth="90" />
+                            </columns>
+                        </TableView>
+                    </VBox>
+                </TitledPane>
+
+                <!-- Low Stock -->
+                <TitledPane text="Low Stock (at/below reorder)" expanded="true" styleClass="card">
+                    <VBox spacing="8" padding="10">
+                        <TextField fx:id="searchLow" promptText="search…"/>
+                        <TableView fx:id="tblLowStock" prefHeight="220">
+                            <columns>
+                                <TableColumn fx:id="colLowIdx"    text="#"               prefWidth="40"/>
+                                <TableColumn fx:id="colLowMed"    text="Medicine"        prefWidth="180"/>
+                                <TableColumn fx:id="colLowAvail"  text="Available Units" prefWidth="140"/>
+                                <TableColumn fx:id="colLowThresh" text="Reorder @"
+                                             prefWidth="110"/>
+                                <TableColumn fx:id="colLowStatus" text="Status"          prefWidth="100"/>
+                            </columns>
+                        </TableView>
+                    </VBox>
+                </TitledPane>
+            </VBox>
+        </AnchorPane>
+
+        <!-- RIGHT: charts -->
+        <AnchorPane>
+            <VBox spacing="12" AnchorPane.topAnchor="0" AnchorPane.leftAnchor="0"
+                  AnchorPane.rightAnchor="0" AnchorPane.bottomAnchor="0">
+
+                <!-- Dispensed per week (last month) -->
+                <TitledPane text="Dispensed Medicines — weekly totals (selected month)" expanded="true" styleClass="card">
+                    <VBox spacing="8" padding="10">
+                        <BarChart fx:id="chartDispensed"
+                                  prefHeight="260">
+                            <xAxis>
+                                <CategoryAxis fx:id="xDispensed" label="Week"/>
+                            </xAxis>
+                            <yAxis>
+                                <NumberAxis fx:id="yDispensed" label="Units"/>
+                            </yAxis>
+                        </BarChart>
+                    </VBox>
+                </TitledPane>
+
+                <!-- Patients count per week (last month) -->
+                <TitledPane text="New Patients — weekly counts (selected month)" expanded="true" styleClass="card">
+                    <VBox spacing="8" padding="10">
+                        <LineChart fx:id="chartPatients"
+                                   prefHeight="260" createSymbols="true">
+                            <xAxis>
+                                <CategoryAxis fx:id="xPatients" label="Week"/>
+                            </xAxis>
+                            <yAxis>
+                                <NumberAxis fx:id="yPatients" label="Patients"/>
+                            </yAxis>
+                        </LineChart>
+                    </VBox>
+                </TitledPane>
+
+            </VBox>
+        </AnchorPane>
+    </SplitPane>
+</AnchorPane>

@@ -1199,6 +1199,7 @@ CREATE TRIGGER trg_cleanup_old_drafts
                         EXECUTE FUNCTION cleanup_old_draft_prescriptions();
 
 
+
 -- 1) إنشاء الدالة
 CREATE OR REPLACE FUNCTION cleanup_old_draft_prescriptions()
 RETURNS VOID LANGUAGE plpgsql AS $$
@@ -1228,4 +1229,48 @@ CREATE TRIGGER trg_cleanup_old_drafts
                         EXECUTE FUNCTION cleanup_old_draft_prescriptions_trg();
 
 
----------------------
+
+-- =========================
+--  Password Reset Tokens
+-- =========================
+CREATE TABLE IF NOT EXISTS password_reset_tokens (
+                                                     id           BIGSERIAL PRIMARY KEY,
+                                                     user_id      BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    otp_hash     VARCHAR(64) NOT NULL,            -- SHA-256 hex (64 chars)
+    expires_at   TIMESTAMPTZ NOT NULL,            -- انتهاء صلاحية الكود
+    used         BOOLEAN NOT NULL DEFAULT FALSE,  -- استُخدم أم لا
+    request_info TEXT,                            -- ملاحظات (IP/هاتف/approved-by-email...)
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
+-- منع تكرار نفس الهاش لنفس المستخدم
+CREATE UNIQUE INDEX IF NOT EXISTS uniq_prt_user_hash
+    ON password_reset_tokens(user_id, otp_hash);
+
+-- فهرس للأكواد الفعالة فقط
+CREATE INDEX IF NOT EXISTS idx_prt_valid
+    ON password_reset_tokens(user_id, expires_at)
+    WHERE used = FALSE;
+
+-- تنظيف دوري (اختياري)
+CREATE OR REPLACE FUNCTION cleanup_expired_prt() RETURNS VOID LANGUAGE plpgsql AS $$
+BEGIN
+DELETE FROM password_reset_tokens
+WHERE used = TRUE OR expires_at < NOW();
+END $$;
+
+
+
+
+
+CREATE OR REPLACE FUNCTION close_past_appointments()
+RETURNS VOID
+LANGUAGE plpgsql
+AS $$
+BEGIN
+UPDATE appointments
+SET status = 'NO_SHOW'
+WHERE status = 'SCHEDULED'
+  AND appointment_date::date < (NOW() AT TIME ZONE 'Asia/Gaza')::date;
+END;
+$$;
