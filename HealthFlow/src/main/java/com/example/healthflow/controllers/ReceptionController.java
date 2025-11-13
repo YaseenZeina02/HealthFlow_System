@@ -223,7 +223,6 @@ public class ReceptionController {
     @FXML private Label AppointmentDateDetailes;
 
     @FXML private ComboBox<String> statusFilter;
-    @FXML private ComboBox<String> statusFilterDashboard; // لو معرف في FXML تجاهل هذا السطر
     @FXML private javafx.scene.image.ImageView imgAvatar;
     @FXML private Label lblStatus;
 
@@ -266,6 +265,7 @@ public class ReceptionController {
 
 
     public static final int DEFAULT_SESSION_MIN = 20;
+
     // --- Coalesced UI refresh + DB NOTIFY ---
     private final RefreshScheduler uiRefresh = new RefreshScheduler(600);
     private DbNotifications apptDbListener;
@@ -370,7 +370,7 @@ public class ReceptionController {
         }
         OnlineBindings.disableWhenOffline(monitor,
                 InsertButton, UpdateButton, deleteButton, clearBtn,
-                DachboardButton, PatientsButton, AppointmentsButton, DoctorsButton
+                DachboardButton, PatientsButton, AppointmentsButton, DoctorsButton,BookAppointmentFromPateint
         );
         ConnectivityBanner banner = new ConnectivityBanner(monitor);
         rootPane.getChildren().add(0, banner);
@@ -3383,9 +3383,10 @@ private void loadHeaderUser() {
     // Unified, debounced UI refresh pipeline used by DB NOTIFY and manual triggers
     private void scheduleCoalescedRefresh() {
         uiRefresh.request(() -> {
-            // لو أصلاً مراقب الاتصال شايفنا أوفلاين، اختصر من البداية
-            if (monitor != null && !monitor.isOnline()) {
-                System.err.println("[ui-refresh] offline – skip refresh cycle.");
+            if (isOffline()) {
+                Platform.runLater(() ->
+                        showToast("warn", "No internet connection. Using last loaded data.")
+                );
                 return;
             }
 

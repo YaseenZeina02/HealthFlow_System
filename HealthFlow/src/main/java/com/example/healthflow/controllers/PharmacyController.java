@@ -16,7 +16,10 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.HashSet;
 import java.util.Optional;
+
+import java.util.Set;
 
 import com.example.healthflow.ui.fx.TableUtils;
 import javafx.application.Platform;
@@ -31,6 +34,7 @@ import com.example.healthflow.core.packaging.PackagingSupport.PackagingInfo;
 import com.example.healthflow.core.packaging.PackagingSupport.PackSuggestion;
 import javafx.concurrent.Task; // (لو مش موجود بس)
 import javafx.scene.layout.*;
+import javafx.scene.media.AudioClip;
 import javafx.scene.paint.Color;
 import javafx.stage.Stage;
 import javafx.util.Duration;
@@ -406,6 +410,23 @@ public class PharmacyController {
     @FXML private Label lblStatus;
     private DeductSupport deductSupport; // from the redy class
 
+    // audio clip forprescription pending
+    private static AudioClip prescPendingClip;
+
+    static {
+        try {
+            var url = PharmacyController.class.getResource(
+                    "/sounds/mixkit-software-interface-start-2574.mp3"
+            );
+            if (url != null) {
+                prescPendingClip = new AudioClip(url.toExternalForm());
+                prescPendingClip.setVolume(0.35);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
     public PharmacyController(ConnectivityMonitor monitor) {
         this.monitor = monitor;
     }
@@ -424,6 +445,8 @@ public class PharmacyController {
     private final javafx.animation.PauseTransition itemsCoalesce = new javafx.animation.PauseTransition(javafx.util.Duration.millis(200));
     private final javafx.animation.PauseTransition invCoalesce   = new javafx.animation.PauseTransition(javafx.util.Duration.millis(200));
     private volatile javafx.concurrent.Task<java.util.List<MedicineSuggestion>> currentMedTask;
+
+    private final java.util.Map<Long, String> prescLastStatus = new java.util.HashMap<>();
 
     private static final class DashboardData {
         int total;
@@ -1265,6 +1288,8 @@ public class PharmacyController {
     private void loadDashboardTable() {
         loadDashboardAsync(true);
     }
+
+
     private void loadDashboardAsync(boolean force) {
         LocalDate day = getSelectedDateOrToday();
         if (!force && lastLoadedDate != null && lastLoadedDate.equals(day) && !dashboardRows.isEmpty()) {
@@ -1274,8 +1299,9 @@ public class PharmacyController {
         dashboardLoading = true;
         lastLoadedDate = day;
 
-
-        if (PresciptionsTable != null) PresciptionsTable.setPlaceholder(new Label("Loading..."));
+        if (PresciptionsTable != null) {
+            PresciptionsTable.setPlaceholder(new Label("Loading..."));
+        }
 
         // Busy UI hint
         if (rootPane != null) rootPane.setCursor(Cursor.WAIT);
@@ -1284,7 +1310,8 @@ public class PharmacyController {
         }
 
         Task<DashboardData> task = new Task<>() {
-            @Override protected DashboardData call() throws Exception {
+            @Override
+            protected DashboardData call() throws Exception {
                 DashboardData data = new DashboardData();
                 try (Connection c = Database.get()) {
                     PrescriptionDAO dao = new PrescriptionDAO();
@@ -1302,17 +1329,57 @@ public class PharmacyController {
             System.out.println("[PharmacyController] loadDashboardAsync SUCCESS day=" + lastLoadedDate
                     + " rows=" + (d == null || d.rows == null ? 0 : d.rows.size()));
 
-            // Update counts
             if (d != null) {
-                if (PrescriptionsTodayTotal != null)   PrescriptionsTodayTotal.setText(String.valueOf(d.total));
-                if (PrescriptionsWatingNum != null)    PrescriptionsWatingNum.setText(String.valueOf(d.waiting));
-                if (PrescriptionsCompleteNum != null)  PrescriptionsCompleteNum.setText(String.valueOf(d.completed));
-                // Update table
-                dashboardRows.setAll(d.rows == null ? java.util.Collections.emptyList() : d.rows);
-            }
-            if (PresciptionsTable != null) PresciptionsTable.setPlaceholder(new Label(dashboardRows.isEmpty() ? "No data" : ""));
+                if (PrescriptionsTodayTotal != null)
+                    PrescriptionsTodayTotal.setText(String.valueOf(d.total));
+                if (PrescriptionsWatingNum != null)
+                    PrescriptionsWatingNum.setText(String.valueOf(d.waiting));
+                if (PrescriptionsCompleteNum != null)
+                    PrescriptionsCompleteNum.setText(String.valueOf(d.completed));
 
-            // Finalize UI state
+                // --- صوت تحوّل DRAFT -> PENDING في الداشبورد ---
+                boolean anyNewPending = false;
+                java.util.Set<Long> currentIds = new java.util.HashSet<>();
+
+                if (d.rows != null) {
+                    for (var r : d.rows) {
+                        if (r == null) continue;
+
+                        long id = r.prescriptionId;       // تأكد أن الاسم صحيح في DashboardRow
+                        currentIds.add(id);
+
+                        String newStatus = (r.status == null ? "" : r.status.name());
+                        String oldStatus = prescLastStatus.get(id);
+
+                        // لو كانت قديمة DRAFT والجديدة PENDING → شغّل الصوت
+                        if (oldStatus != null
+                                && "DRAFT".equals(oldStatus)
+                                && "PENDING".equals(newStatus)) {
+                            anyNewPending = true;
+                        }
+
+                        prescLastStatus.put(id, newStatus);
+                    }
+                }
+
+                // احذف الوصفات اللي بطلت موجودة في الداشبورد من الخريطة
+                prescLastStatus.keySet().removeIf(oldId -> !currentIds.contains(oldId));
+
+                // شغّل الصوت لو صار أي انتقال من DRAFT → PENDING
+                if (anyNewPending && prescPendingClip != null) {
+                    prescPendingClip.play();
+                }
+
+                // تحديث الجدول
+                dashboardRows.setAll(
+                        d.rows == null ? java.util.Collections.emptyList() : d.rows
+                );
+            }
+
+            if (PresciptionsTable != null) {
+                PresciptionsTable.setPlaceholder(new Label(dashboardRows.isEmpty() ? "No data" : ""));
+            }
+
             dashboardLoading = false;
             if (rootPane != null) rootPane.setCursor(Cursor.DEFAULT);
             if (DashboardButton != null && !DashboardButton.disableProperty().isBound()) {
@@ -1323,7 +1390,9 @@ public class PharmacyController {
         task.setOnFailed(ev -> {
             Throwable ex = task.getException();
             System.err.println("[PharmacyController] loadDashboardAsync FAILED day=" + lastLoadedDate + " ex=" + ex);
-            if (PresciptionsTable != null) PresciptionsTable.setPlaceholder(new Label("Failed to load"));
+            if (PresciptionsTable != null) {
+                PresciptionsTable.setPlaceholder(new Label("Failed to load"));
+            }
 
             // Finalize UI state
             dashboardLoading = false;
