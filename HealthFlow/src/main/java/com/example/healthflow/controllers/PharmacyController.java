@@ -1433,8 +1433,12 @@ public class PharmacyController {
                 return rows;
             }
         };
-        task.setOnSucceeded(ev -> inventoryRows.setAll(task.getValue()));
-        updateInventorySummary();
+        task.setOnSucceeded(ev -> {
+
+            inventoryRows.setAll(task.getValue());
+            updateInventorySummary();
+
+        });
 
         task.setOnFailed(ev -> {
             Throwable ex = task.getException();

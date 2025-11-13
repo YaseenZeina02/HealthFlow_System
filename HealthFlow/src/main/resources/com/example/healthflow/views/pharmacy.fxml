@@ -29,7 +29,7 @@
 <?import org.controlsfx.control.SegmentedButton?>
 <?import org.kordamp.ikonli.javafx.FontIcon?>
 
-<VBox fx:id="rootPane" fillWidth="true" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="842.0" prefWidth="1331.0" spacing="0" xmlns="http://javafx.com/javafx/23.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.example.healthflow.controllers.PharmacyController">
+<VBox fx:id="rootPane" fillWidth="true" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="842.0" prefWidth="1331.0" spacing="0" xmlns="http://javafx.com/javafx/19" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.example.healthflow.controllers.PharmacyController">
     <children>
         <BorderPane prefHeight="600.0" prefWidth="1090.0" stylesheets="@../Design/ReceptionDesign.css" VBox.vgrow="ALWAYS">
             <top>
@@ -397,7 +397,7 @@
                                 </AnchorPane>
                             </children>
                         </AnchorPane>
-                        <AnchorPane fx:id="InventoryAnchorPane" layoutY="-2.0" prefHeight="560.0" prefWidth="890.0" style="-fx-background-color: #ededed;" stylesheets="@../Design/ReceptionDesign.css" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="-2.0">
+                        <AnchorPane fx:id="InventoryAnchorPane" layoutY="-2.0" prefHeight="560.0" prefWidth="890.0" style="-fx-background-color: #ededed;" stylesheets="@../Design/ReceptionDesign.css" visible="false" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="-2.0">
                             <children>
                                 <AnchorPane layoutX="10.0" layoutY="11.0" prefHeight="538.0" prefWidth="870.0" stylesheets="@../Design/ReceptionDesign.css" AnchorPane.bottomAnchor="11.0" AnchorPane.leftAnchor="10.0" AnchorPane.rightAnchor="10.0" AnchorPane.topAnchor="11.0">
                                     <styleClass>
@@ -618,7 +618,7 @@
                                 </AnchorPane>
                             </children>
                         </AnchorPane>
-                        <AnchorPane fx:id="ReportsAnchorPane" style="-fx-background-color: #ededed;" visible="false" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+                        <AnchorPane fx:id="ReportsAnchorPane" style="-fx-background-color: #ededed;" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
                             <children>
                                 <AnchorPane layoutX="10.0" layoutY="11.0" AnchorPane.bottomAnchor="11.0" AnchorPane.leftAnchor="10.0" AnchorPane.rightAnchor="10.0" AnchorPane.topAnchor="11.0">
                                     <stylesheets>
@@ -638,7 +638,6 @@
                                                 <Pane prefHeight="42.0" prefWidth="313.0" HBox.hgrow="ALWAYS" />
                                                 <Label prefHeight="34.0" prefWidth="62.0" text="Month:" />
                                                 <DatePicker fx:id="repMonthPicker" promptText="Select month" />
-                                                <Button fx:id="repBtnRefresh" styleClass="btn-primary" text="Refresh" />
                                                 <Button fx:id="repBtnExport" styleClass="btn-secondary" text="Export" />
                                             </children>
                                         </HBox>

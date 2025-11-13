@@ -1269,7 +1269,7 @@ LANGUAGE plpgsql
 AS $$
 BEGIN
 UPDATE appointments
-SET status = 'NO_SHOW'
+SET status = 'CANCELLED'
 WHERE status = 'SCHEDULED'
   AND appointment_date::date < (NOW() AT TIME ZONE 'Asia/Gaza')::date;
 END;
