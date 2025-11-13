@@ -246,7 +246,7 @@
                                 </AnchorPane>
                             </children>
                         </AnchorPane>
-                        <AnchorPane fx:id="PrescriptionAnchorPane" style="-fx-background-color: #eeee;" stylesheets="@../Design/ReceptionDesign.css" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+                        <AnchorPane fx:id="PrescriptionAnchorPane" style="-fx-background-color: #eeee;" stylesheets="@../Design/ReceptionDesign.css" visible="false" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
                             <children>
                                 <AnchorPane fx:id="PrescriptionMedicationAnchorPane" layoutX="7.0" layoutY="206.0" prefHeight="343.0" prefWidth="875.0" AnchorPane.bottomAnchor="9.0" AnchorPane.leftAnchor="7.0" AnchorPane.rightAnchor="8.0" AnchorPane.topAnchor="203.0">
                                     <children>
@@ -397,7 +397,7 @@
                                 </AnchorPane>
                             </children>
                         </AnchorPane>
-                        <AnchorPane fx:id="InventoryAnchorPane" layoutY="-2.0" prefHeight="560.0" prefWidth="890.0" style="-fx-background-color: #ededed;" stylesheets="@../Design/ReceptionDesign.css" visible="false" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="-2.0">
+                        <AnchorPane fx:id="InventoryAnchorPane" layoutY="-2.0" prefHeight="560.0" prefWidth="890.0" style="-fx-background-color: #ededed;" stylesheets="@../Design/ReceptionDesign.css" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="-2.0">
                             <children>
                                 <AnchorPane layoutX="10.0" layoutY="11.0" prefHeight="538.0" prefWidth="870.0" stylesheets="@../Design/ReceptionDesign.css" AnchorPane.bottomAnchor="11.0" AnchorPane.leftAnchor="10.0" AnchorPane.rightAnchor="10.0" AnchorPane.topAnchor="11.0">
                                     <styleClass>
@@ -406,7 +406,7 @@
                                         <String fx:value="shadow" />
                                     </styleClass>
                                     <children>
-                                        <AnchorPane fx:id="InventoryPane" layoutY="47.0" prefHeight="491.0" prefWidth="870.0" stylesheets="@../Design/ReceptionDesign.css" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="47.0">
+                                        <AnchorPane fx:id="InventoryPane" layoutY="47.0" prefHeight="491.0" prefWidth="870.0" stylesheets="@../Design/ReceptionDesign.css" visible="false" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="47.0">
                                             <children>
                                                 <Label layoutX="18.0" layoutY="13.0" prefHeight="23.0" prefWidth="205.0" styleClass="header-top" stylesheets="@../Design/ReceptionDesign.css" text="Inventory Contents" AnchorPane.leftAnchor="18.0" AnchorPane.topAnchor="13.0">
                                                     <font>
@@ -478,61 +478,66 @@
                                                 <String fx:value="radius" />
                                             </styleClass>
                                         </AnchorPane>
-                                        <AnchorPane fx:id="ReceivePane" prefHeight="491.0" prefWidth="870.0" stylesheets="@../Design/ReceptionDesign.css" visible="false" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="47.0">
+                                        <AnchorPane fx:id="ReceivePane" prefHeight="491.0" prefWidth="870.0" stylesheets="@../Design/ReceptionDesign.css" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="47.0">
                                             <children>
-                                                <Label layoutX="535.0" layoutY="122.0" prefHeight="25.0" prefWidth="112.0" styleClass="text-gradient" stylesheets="@../Design/ReceptionDesign.css" text="Batch Number">
+                                                <Label layoutX="526.0" layoutY="153.0" prefHeight="25.0" prefWidth="130.0" styleClass="text-gradient" stylesheets="@../Design/ReceptionDesign.css" text="Batch Number">
                                                     <font>
                                                         <Font name="System Bold Italic" size="22.0" />
                                                     </font>
                                                 </Label>
-                                                <TextField fx:id="batchNum" layoutX="671.0" layoutY="119.0" prefHeight="31.0" prefWidth="232.0" styleClass="box" stylesheets="@../Design/ReceptionDesign.css" />
+                                                <TextField fx:id="batchNum" layoutX="665.0" layoutY="148.0" prefHeight="31.0" prefWidth="230.0" styleClass="box" stylesheets="@../Design/ReceptionDesign.css" />
                                                 <Label layoutX="21.0" layoutY="22.0" prefHeight="45.0" prefWidth="205.0" styleClass="header-top" stylesheets="@../Design/ReceptionDesign.css" text="Receive Medicines">
                                                     <font>
                                                         <Font size="18.0" />
                                                     </font>
                                                 </Label>
-                                                <TextField fx:id="MedicineNameRecive" layoutX="158.0" layoutY="121.0" prefHeight="31.0" prefWidth="231.0" styleClass="box" stylesheets="@../Design/ReceptionDesign.css" />
-                                                <Label layoutX="22.0" layoutY="124.0" prefHeight="25.0" prefWidth="129.0" styleClass="text-gradient" stylesheets="@../Design/ReceptionDesign.css" text="Medicines Name">
+                                                <TextField fx:id="MedicineNameRecive" layoutX="183.0" layoutY="148.0" prefHeight="31.0" prefWidth="230.0" styleClass="box" stylesheets="@../Design/ReceptionDesign.css" />
+                                                <Label layoutX="18.0" layoutY="152.0" prefHeight="25.0" prefWidth="130.0" styleClass="text-gradient" stylesheets="@../Design/ReceptionDesign.css" text="Medicines Name">
                                                     <font>
                                                         <Font name="System Bold Italic" size="22.0" />
                                                     </font>
                                                 </Label>
-                                                <Label layoutX="46.0" layoutY="194.0" prefHeight="25.0" prefWidth="70.0" styleClass="text-gradient" stylesheets="@../Design/ReceptionDesign.css" text="Quantity">
+                                                <Label layoutX="526.0" layoutY="273.0" prefHeight="25.0" prefWidth="130.0" styleClass="text-gradient" stylesheets="@../Design/ReceptionDesign.css" text="Quantity">
                                                     <font>
                                                         <Font name="System Bold Italic" size="22.0" />
                                                     </font>
                                                 </Label>
-                                                <TextField fx:id="quantity" layoutX="158.0" layoutY="191.0" prefHeight="31.0" prefWidth="229.0" styleClass="box" stylesheets="@../Design/ReceptionDesign.css" />
-                                                <Label layoutX="46.0" layoutY="260.0" prefHeight="25.0" prefWidth="108.0" styleClass="text-gradient" stylesheets="@../Design/ReceptionDesign.css" text="Expiry Date">
+                                                <TextField fx:id="quantity" layoutX="665.0" layoutY="268.0" prefHeight="31.0" prefWidth="230.0" styleClass="box" stylesheets="@../Design/ReceptionDesign.css" />
+                                                <Label layoutX="526.0" layoutY="211.0" prefHeight="25.0" prefWidth="130.0" styleClass="text-gradient" stylesheets="@../Design/ReceptionDesign.css" text="Expiry Date">
                                                     <font>
                                                         <Font name="System Bold Italic" size="22.0" />
                                                     </font>
                                                 </Label>
-                                                <DatePicker fx:id="ExpiryDate" layoutX="158.0" layoutY="257.0" prefHeight="32.0" prefWidth="230.0" styleClass="boxDataPickar" stylesheets="@../Design/ReceptionDesign.css" />
-                                                <Button fx:id="saveBtnReceive" layoutX="807.0" layoutY="674.0" minWidth="45.0" mnemonicParsing="false" onAction="#onSaveReceiveBtn" prefHeight="33.0" prefWidth="166.0" styleClass="btn-2" stylesheets="@../Design/ReceptionDesign.css" text="save" />
-                                                <VBox fx:id="medBox" fillWidth="true" layoutX="43.0" layoutY="319.0" prefHeight="214.0" prefWidth="350.0">
+                                                <DatePicker fx:id="ExpiryDate" layoutX="665.0" layoutY="206.0" prefHeight="32.0" prefWidth="230.0" styleClass="boxDataPickar" stylesheets="@../Design/ReceptionDesign.css" />
+                                                <Button fx:id="saveBtnReceive" layoutX="792.0" layoutY="516.0" minWidth="45.0" mnemonicParsing="false" onAction="#onSaveReceiveBtn" prefHeight="30.0" prefWidth="150.0" styleClass="btn-2" stylesheets="@../Design/ReceptionDesign.css" text="Save Receipt" />
+                                                <VBox fx:id="medBox" fillWidth="true" layoutX="16.0" layoutY="223.0" prefHeight="200.0" prefWidth="400.0">
 
                                                     <!-- جدول الاقتراحات يظهر/يختفي -->
                                                     <AnchorPane fx:id="suggestPane" managed="false" />
-                                                    <TableView fx:id="tblMedSuggest" prefHeight="178.0" prefWidth="475.0">
+                                                    <TableView fx:id="tblMedSuggest" prefHeight="200.0" prefWidth="400.0">
                                                         <columns>
-                                                            <TableColumn fx:id="colSuggName" prefWidth="220.0" text="Name" />
-                                                            <TableColumn fx:id="colSuggStrength" prefWidth="154.50003051757812" text="Strength" />
+                                                            <TableColumn fx:id="colSuggName" minWidth="250.0" prefWidth="250.0" text="Name" />
+                                                            <TableColumn fx:id="colSuggStrength" minWidth="150.0" prefWidth="150.0" text="Strength" />
                                                         </columns>
                                                     </TableView>
                                                 </VBox>
-                                                <Label layoutX="557.0" layoutY="191.0" prefHeight="25.0" prefWidth="102.0" styleClass="text-gradient" stylesheets="@../Design/ReceptionDesign.css" text="Description">
+                                                <Label layoutX="526.0" layoutY="329.0" prefHeight="25.0" prefWidth="130.0" styleClass="text-gradient" stylesheets="@../Design/ReceptionDesign.css" text="Description">
                                                     <font>
                                                         <Font name="System Bold Italic" size="22.0" />
                                                     </font>
                                                 </Label>
-                                                <TextArea fx:id="descriptionTf" layoutX="671.0" layoutY="181.0" prefHeight="106.0" prefWidth="230.0" styleClass="boxTFA" />
-                                                <Label fx:id="MedicineLabelDt" layoutX="42.0" layoutY="532.0" prefHeight="38.0" prefWidth="346.0" />
-                                                <Button fx:id="downloadTemp" layoutX="611.0" layoutY="674.0" minWidth="45.0" mnemonicParsing="false" onAction="#onDownloadTemplate" prefHeight="33.0" prefWidth="174.0" styleClass="btn-2" stylesheets="@../Design/ReceptionDesign.css" text="Download Template .xlsx" />
-                                                <Button fx:id="importExcelFile" layoutX="611.0" layoutY="615.0" minWidth="45.0" mnemonicParsing="false" onAction="#onImportExcelFile" prefHeight="33.0" prefWidth="174.0" styleClass="btn-2" stylesheets="@../Design/ReceptionDesign.css" text=" Import (.xlsx) " />
-                                                <Label fx:id="labelFileDetails" layoutX="810.0" layoutY="616.0" prefHeight="29.0" prefWidth="198.0" wrapText="true" />
-                                                <Button fx:id="btnMoreDetails" layoutX="578.0" layoutY="360.0" minWidth="45.0" mnemonicParsing="false" prefHeight="33.0" prefWidth="102.0" styleClass="btn-2" stylesheets="@../Design/ReceptionDesign.css" text="More Details" />
-                                                <Label fx:id="MedicineDetails" layoutX="577.0" layoutY="416.0" prefHeight="38.0" prefWidth="363.0" />
+                                                <TextArea fx:id="descriptionTf" layoutX="665.0" layoutY="329.0" prefHeight="106.0" prefWidth="230.0" styleClass="boxTFA" />
+                                                <Label fx:id="MedicineLabelDt" layoutX="16.0" layoutY="463.0" prefHeight="40.0" prefWidth="400.0" />
+                                                <Button fx:id="downloadTemp" layoutX="21.0" layoutY="83.0" minWidth="45.0" mnemonicParsing="false" onAction="#onDownloadTemplate" prefHeight="30.0" prefWidth="170.0" styleClass="btn-2" stylesheets="@../Design/ReceptionDesign.css" text="Download Template .xlsx" />
+                                                <Button fx:id="importExcelFile" layoutX="216.0" layoutY="83.0" minWidth="45.0" mnemonicParsing="false" onAction="#onImportExcelFile" prefHeight="30.0" prefWidth="170.0" styleClass="btn-2" stylesheets="@../Design/ReceptionDesign.css" text=" Import (.xlsx) " />
+                                                <Label fx:id="labelFileDetails" layoutX="416.0" layoutY="83.0" prefHeight="40.0" prefWidth="400.0" wrapText="true" />
+                                                <Button fx:id="btnMoreDetails" layoutX="792.0" layoutY="468.0" minWidth="45.0" mnemonicParsing="false" prefHeight="30.0" prefWidth="150.0" styleClass="btn-2" stylesheets="@../Design/ReceptionDesign.css" text="More Details" />
+                                                <Label fx:id="MedicineDetails" layoutX="531.0" layoutY="463.0" prefHeight="40.0" prefWidth="250.0" />
+                                    <Label layoutX="919.0" layoutY="273.0" prefHeight="25.0" prefWidth="130.0" styleClass="text-gradient" stylesheets="@../Design/ReceptionDesign.css" text="Base Unit">
+                                       <font>
+                                          <Font name="System Bold Italic" size="22.0" />
+                                       </font>
+                                    </Label>
                                                 <!--                                    <TextField fx:id="MedicineNameRecive" layoutX="154.0" layoutY="179.0" promptText="Type medicine name..." />-->
                                             </children>
                                             <styleClass>
