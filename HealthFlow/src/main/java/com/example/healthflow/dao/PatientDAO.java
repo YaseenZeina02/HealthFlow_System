@@ -17,4 +17,6 @@ public interface PatientDAO {
     void update(long patientId, LocalDate dob, String history, Connection c) throws SQLException;
 
     List<PatientRow> findAll() throws SQLException;
+    List<PatientRow> searchPatientsByKeyword(String keyword, int limit) throws SQLException;
+
 }

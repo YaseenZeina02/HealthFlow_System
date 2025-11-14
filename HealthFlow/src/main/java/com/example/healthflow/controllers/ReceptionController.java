@@ -1,6 +1,8 @@
 package com.example.healthflow.controllers;
 
 import com.example.healthflow.dao.AppointmentJdbcDAO;
+import com.example.healthflow.dao.PatientDAO;
+import com.example.healthflow.dao.PatientJdbcDAO;
 import com.example.healthflow.db.Database;
 import com.example.healthflow.dao.DoctorDAO;
 import com.example.healthflow.model.Appointment;
@@ -14,6 +16,8 @@ import com.example.healthflow.service.PatientService;
 import com.example.healthflow.ui.ConfirmDialog;
 import com.example.healthflow.ui.ConnectivityBanner;
 import com.example.healthflow.ui.OnlineBindings;
+
+import javafx.concurrent.Task;
 
 import com.example.healthflow.db.notify.DbNotifications;
 import com.example.healthflow.ui.fx.RefreshScheduler;
@@ -55,6 +59,10 @@ import javafx.scene.text.Text;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
 import javafx.util.Duration;
+import javafx.concurrent.Task;
+import javafx.scene.control.ContextMenu;
+import javafx.scene.control.MenuItem;
+import javafx.geometry.Side;
 
 import java.io.IOException;
 import java.sql.*;
@@ -74,14 +82,6 @@ import com.example.healthflow.ui.ComboAnimations;
 import javafx.scene.control.TextField;
 
 
-import javafx.scene.control.ContextMenu;
-import javafx.scene.control.MenuItem;
-import javafx.scene.control.SeparatorMenuItem;
-import javafx.scene.control.TablePosition;
-import javafx.scene.input.Clipboard;
-import javafx.scene.input.ClipboardContent;
-import javafx.scene.input.KeyCode;
-import javafx.scene.input.KeyEvent;
 import javafx.scene.paint.Color;
 import org.controlsfx.control.textfield.AutoCompletionBinding;
 import org.controlsfx.control.textfield.TextFields;
@@ -121,7 +121,7 @@ public class ReceptionController {
 
     @FXML private Button InsertButton;
     @FXML private Button UpdateButton;
-    @FXML private Button deleteButton;
+//    @FXML private Button deleteButton;
     @FXML private Button clearBtn;
 
 
@@ -263,6 +263,10 @@ public class ReceptionController {
 
     private boolean connectivityInitialized = false;
 
+    private final PatientDAO patientDao = new PatientJdbcDAO();
+
+    // قائمة منبثقة يعاد استخدامها للـ AutoComplete
+    private final ContextMenu patientSearchMenu = new ContextMenu();
 
     public static final int DEFAULT_SESSION_MIN = 20;
 
@@ -306,6 +310,8 @@ public class ReceptionController {
     // Cache currently-selected patient to survive pane switches / refreshes
     private PatientRow selectedPatient;
     private boolean patientSelHooked = false;
+
+    private FilteredList<PatientRow> patientFiltered;
 
     private static AudioClip apptCompletedClip;
     private static AudioClip apptCancelledClip;
@@ -369,7 +375,9 @@ public class ReceptionController {
             }
         }
         OnlineBindings.disableWhenOffline(monitor,
-                InsertButton, UpdateButton, deleteButton, clearBtn,
+                InsertButton, UpdateButton
+//                , deleteButton
+                , clearBtn,
                 DachboardButton, PatientsButton, AppointmentsButton, DoctorsButton,BookAppointmentFromPateint
         );
         ConnectivityBanner banner = new ConnectivityBanner(monitor);
@@ -1061,19 +1069,125 @@ private void loadHeaderUser() {
     }
 
     private void wireSearchPatients() {
-        filtered = new FilteredList<>(patientData, p -> true);
+        if (search == null || patientTable == null) return;
+
+        // نتاكد ما نعيدش إنشاء الـ FilteredList كل مرة
+        if (filtered == null) {
+            filtered = new FilteredList<>(patientData, p -> true);
+            SortedList<PatientRow> sorted = new SortedList<>(filtered);
+            sorted.comparatorProperty().bind(patientTable.comparatorProperty());
+            patientTable.setItems(sorted);
+        }
+
         search.textProperty().addListener((obs, old, q) -> {
             String s = (q == null) ? "" : q.trim().toLowerCase();
-            if (s.isEmpty()) filtered.setPredicate(p -> true);
-            else filtered.setPredicate(p ->
-                    contains(p.getFullName(), s) || contains(p.getGender(), s) ||
-                            contains(p.getPhone(), s) || contains(p.getNationalId(), s) ||
-                            contains(p.getMedicalHistory(), s) ||
-                            (p.getDateOfBirth() != null && p.getDateOfBirth().toString().toLowerCase().contains(s)));
+
+            // ① فلترة الجدول المحلي
+            if (s.isEmpty()) {
+                filtered.setPredicate(p -> true);
+            } else {
+                filtered.setPredicate(p ->
+                        contains(p.getFullName(), s) ||
+                                contains(p.getGender(), s) ||
+                                contains(p.getPhone(), s) ||
+                                contains(p.getNationalId(), s) ||
+                                contains(p.getMedicalHistory(), s) ||
+                                (p.getDateOfBirth() != null &&
+                                        p.getDateOfBirth().toString().toLowerCase().contains(s))
+                );
+            }
+
+            // ② لو في نص بحث حقيقي → حاول تجيب من الداتابيز وتضيف للـ patientData
+            if (!s.isEmpty() && s.length() >= 2) {    // ممكن تغيّر 2 إلى 3 لو بدك
+                autoCompleteFromDb(s);
+            }
         });
-        SortedList<PatientRow> sorted = new SortedList<>(filtered);
-        sorted.comparatorProperty().bind(patientTable.comparatorProperty());
-        patientTable.setItems(sorted);
+    }
+
+    private void autoCompleteFromDb(String query) {
+        if (query == null || query.isBlank()) return;
+        final String q = query.trim();
+
+        Task<List<PatientRow>> task = new Task<>() {
+            @Override
+            protected List<PatientRow> call() throws Exception {
+                // 10 = عدد الاقتراحات القصوى
+                return patientDao.searchPatientsByKeyword(q, 10);
+            }
+        };
+
+        task.setOnSucceeded(e -> {
+            List<PatientRow> result = task.getValue();
+
+            // لو المستخدم غيّر النص أثناء التحميل → تجاهل النتيجة
+            String current = (search == null) ? "" : search.getText().trim();
+            if (!q.equalsIgnoreCase(current)) {
+                return;
+            }
+
+            if (result == null || result.isEmpty()) {
+                patientSearchMenu.hide();
+                return;
+            }
+
+            // ❶ أضِف المرضى الجدد للـ patientData (عشان يبانوا في الجدول مباشرة)
+            for (PatientRow p : result) {
+                boolean exists = false;
+                for (PatientRow row : patientData) {
+                    if (row.getPatientId() == p.getPatientId()) {
+                        exists = true;
+                        break;
+                    }
+                }
+                if (!exists) {
+                    patientData.add(p);
+                }
+            }
+            // بما ان الفلتر يعتمد على contains(...) والاسم/الهوية فيها q،
+            // الـ FilteredList رح يحدّث نفسه ويظهرهم في الجدول.
+
+            // ❷ جهّز قائمة الـ AutoComplete (اختيار فقط، بدون تغيير الفلتر)
+            patientSearchMenu.getItems().clear();
+
+            for (PatientRow p : result) {
+                String label = p.getFullName();
+                if (p.getPhone() != null && !p.getPhone().isBlank()) {
+                    label += " — " + p.getPhone();
+                }
+
+                MenuItem item = new MenuItem(label);
+                item.setOnAction(ev -> {
+                    // ابحث عن نفس الصف داخل patientData
+                    PatientRow target = null;
+                    for (PatientRow row : patientData) {
+                        if (row.getPatientId() == p.getPatientId()) {
+                            target = row;
+                            break;
+                        }
+                    }
+                    if (target != null && patientTable != null) {
+                        patientTable.getSelectionModel().select(target);
+                        patientTable.scrollTo(target);
+                    }
+                    patientSearchMenu.hide();
+                });
+
+                patientSearchMenu.getItems().add(item);
+            }
+
+            if (!patientSearchMenu.getItems().isEmpty() && search != null) {
+                patientSearchMenu.show(search, Side.BOTTOM, 0, 0);
+            }
+        });
+
+        task.setOnFailed(e -> {
+            Throwable ex = task.getException();
+            if (ex != null) ex.printStackTrace();
+        });
+
+        Thread th = new Thread(task, "patient-autocomplete");
+        th.setDaemon(true);
+        th.start();
     }
 
     private void setupPatientInlineEditing() {
@@ -1610,44 +1724,44 @@ private void loadHeaderUser() {
         }
     }
 
-    private void doDeletePatient() {
-        PatientRow row = (patientTable == null) ? null : patientTable.getSelectionModel().getSelectedItem();
-        if (row == null) {
-            showWarn("Delete", "Select a patient row first.");
-            return;
-        }
-        if (!confirm("Delete", "Are you sure you want to delete this patient?")) return;
-        try {
-            patientService.deletePatientByUserId(row.getUserId());
-            patientData.remove(row);
-            clearForm();
-            showInfo("Delete", "Patient deleted.");
-        } catch (java.sql.SQLException ex) {
-            // 23503 = foreign_key_violation في PostgreSQL
-            if ("23503".equals(ex.getSQLState())) {
-                Alert alert = new Alert(Alert.AlertType.ERROR);
-                alert.setTitle("Delete patient");
-                alert.setHeaderText("Cannot delete this patient");
-                alert.setContentText(
-                        "This patient is still linked to one or more appointments.\n" +
-                                "Please cancel or complete all appointments for this patient " +
-                                "before deleting their record."
-                );
-                alert.showAndWait();
-            } else {
-                error("Delete patient", ex); // رسالتك العامة لأي خطأ آخر
-            }
-        } catch (Exception ex) {
-            error("Delete patient", ex);
-        }
-
-        try (Connection c = Database.get();
-             PreparedStatement nps = c.prepareStatement("SELECT pg_notify('patients_changed','delete')")) {
-            nps.execute();
-        } catch (SQLException e) {
-            throw new RuntimeException(e);
-        }
-    }
+//    private void doDeletePatient() {
+//        PatientRow row = (patientTable == null) ? null : patientTable.getSelectionModel().getSelectedItem();
+//        if (row == null) {
+//            showWarn("Delete", "Select a patient row first.");
+//            return;
+//        }
+//        if (!confirm("Delete", "Are you sure you want to delete this patient?")) return;
+//        try {
+//            patientService.deletePatientByUserId(row.getUserId());
+//            patientData.remove(row);
+//            clearForm();
+//            showInfo("Delete", "Patient deleted.");
+//        } catch (java.sql.SQLException ex) {
+//            // 23503 = foreign_key_violation في PostgreSQL
+//            if ("23503".equals(ex.getSQLState())) {
+//                Alert alert = new Alert(Alert.AlertType.ERROR);
+//                alert.setTitle("Delete patient");
+//                alert.setHeaderText("Cannot delete this patient");
+//                alert.setContentText(
+//                        "This patient is still linked to one or more appointments.\n" +
+//                                "Please cancel or complete all appointments for this patient " +
+//                                "before deleting their record."
+//                );
+//                alert.showAndWait();
+//            } else {
+//                error("Delete patient", ex); // رسالتك العامة لأي خطأ آخر
+//            }
+//        } catch (Exception ex) {
+//            error("Delete patient", ex);
+//        }
+//
+//        try (Connection c = Database.get();
+//             PreparedStatement nps = c.prepareStatement("SELECT pg_notify('patients_changed','delete')")) {
+//            nps.execute();
+//        } catch (SQLException e) {
+//            throw new RuntimeException(e);
+//        }
+//    }
 
     private void clearForm() {
         if (FullNameTextField != null) FullNameTextField.clear();
@@ -3528,15 +3642,16 @@ private void loadHeaderUser() {
             pt.play();
         });
 
-        if (deleteButton != null) deleteButton.setOnAction(e -> {
-            startBtnBusy(deleteButton, "Deleting…");
-            javafx.animation.PauseTransition pt = new javafx.animation.PauseTransition(javafx.util.Duration.millis(120));
-            pt.setOnFinished(ev -> javafx.application.Platform.runLater(() -> {
-                try { doDeletePatient(); }
-                finally { stopBtnBusy(deleteButton); }
-            }));
-            pt.play();
-        });
+//        if (deleteButton != null) deleteButton.setOnAction(e -> {
+//            startBtnBusy(deleteButton, "Deleting…");
+//            javafx.animation.PauseTransition pt = new javafx.animation.PauseTransition(javafx.util.Duration.millis(120));
+//            pt.setOnFinished(ev -> javafx.application.Platform.runLater(() -> {
+//                try { doDeletePatient(); }
+//                finally { stopBtnBusy(deleteButton); }
+//            }));
+//            pt.play();
+//        });
+
         clearBtn.setOnAction(e -> {
             selectedPatient = null;
             clearForm();
@@ -3637,6 +3752,8 @@ private void loadHeaderUser() {
                 Platform.runLater(() -> doctorData.setAll(list));
             }, "doctors-load").start();
         });
+
+
         if (cmbSlots != null) {
             cmbSlots.setCellFactory(cb -> new ListCell<DoctorDAO.Slot>() {
                 @Override
