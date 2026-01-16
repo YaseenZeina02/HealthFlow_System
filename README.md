@@ -59,7 +59,6 @@ HealthFlow is a desktop application for managing daily operations in local healt
 ## License
 Proprietary/Academic use for Graduation Project. Consult project maintainers for reuse.
 
-
 ## 📸 Screenshots
 
 ### 🔐 Authentication
@@ -68,6 +67,7 @@ Proprietary/Academic use for Graduation Project. Consult project maintainers for
 ---
 
 ### 🧑‍💼 Reception Module
+
 | Dashboard | Patients | Doctors |
 |----------|----------|---------|
 | ![](docs/images/Reception_Dashboard.png) | ![](docs/images/Reception_Patients.png) | ![](docs/images/Reception_Doctor.png) |
@@ -75,6 +75,7 @@ Proprietary/Academic use for Graduation Project. Consult project maintainers for
 ---
 
 ### 👨‍⚕️ Doctor Module
+
 | Appointments | Patients | Prescriptions |
 |--------------|----------|---------------|
 | ![](docs/images/Doctor_Appointments.png) | ![](docs/images/Doctor_Patients.png) | ![](docs/images/Doctor_Prescription.png) |
@@ -82,6 +83,7 @@ Proprietary/Academic use for Graduation Project. Consult project maintainers for
 ---
 
 ### 💊 Pharmacy Module
+
 | Dashboard | Inventory |
 |----------|-----------|
 | ![](docs/images/Pharmacy_Dashboard.png) | ![](docs/images/Pharmacy_Inventory.png) |
